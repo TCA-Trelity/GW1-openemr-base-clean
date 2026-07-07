@@ -36,15 +36,58 @@ here is new design — it collates decisions already made in `USERS.md`,
 
 ### 1. Domain Selection
 
-**What specific use cases will you support?** Seven, each traced to the
-design partner's stated needs (`USERS.md` UC-1–UC-7): the 90-second pre-visit
-brief (the anti-template); iterative verification and drill-down through
-chat; contradiction surfacing across fragmented sources; auto-computed
-medication-toxicity risk (hydroxychloroquine dose arithmetic against
-published AAO thresholds); treat-and-extend interval guidance; imaging in
-clinical context one toggle away; and patient-goal-aware care. Equally
-explicit non-goals: the agent never recommends treatment, never writes to
-the record, never orders anything.
+**Why this domain, against the universe of EHR products that could be
+built.** The obvious AI-in-EHR products are scribes (dictation → template),
+coding/billing assistants, patient-facing chatbots, inbox triage, and
+standalone diagnostic imaging tools. We rejected the whole scribe-adjacent
+category on our design partner's founder testimony — Dan built and sold the
+category-leading ophthalmology EHR, and his diagnostic test for teams that
+misunderstand the opportunity is exactly that framing: *"They're building,
+quote, an AI scribe on top of a template system. No, I don't want to be
+involved in this."* A scribe makes it easier to pour more text into notes;
+the actual disease is on the *read* side. His foundational complaint, in his
+words: *"20 pages where one page would have done"* — *"you looked at the
+screen, it's just loaded with information. 90% of it is not relevant."*
+
+That yields our three core assertions, which precede any feature list:
+
+1. **This is a presentation failure, not a data failure.** The record
+   already holds what the doctor needs; templates buried it. The product is
+   relevance filtering — per patient, per provider, per visit. The one-page
+   brief is the *anti-template*, and Dan explicitly warns against rebuilding
+   templates with AI.
+2. **The consumption window is ~90 seconds, so latency is the binding
+   constraint** on every interactive surface. Any design that searches,
+   re-reads, or "thinks" while the doctor stands at the door has already
+   failed.
+3. **In this specialty, imagery is where the value concentrates.** Retina
+   runs on scans — *"the image tells the whole story — at least 90, 95% of
+   the story is in those images"* — yet imaging is disconnected from the
+   clinical record, to the point that Dan photographs his own monitor to ask
+   a consumer chatbot about scans. Images must be one toggle away, chosen
+   for the visit, annotated with clinical context ("taken six weeks after
+   their last injection").
+
+**Why ophthalmology/retina specifically:** an image-driven, high-volume
+specialty (~70 visits/day makes minutes-per-patient the economics), a
+referral-heavy intake with genuinely fragmented multi-source history (the
+fax pathway is real and current), and — decisively — a design partner who is
+simultaneously the target user, a domain founder, and our ground truth for
+what belongs on one page.
+
+**What specific use cases will you support?** The seven in `USERS.md`
+(UC-1–UC-7) follow from the assertions rather than preceding them: the
+90-second brief (assertion 1), iterative chat drill-down (assertions 1+2),
+contradiction surfacing across fragmented sources, auto-computed
+medication-toxicity risk, treat-and-extend interval guidance, the imaging
+toggle (assertion 3), and patient-goal-aware care. The medication-risk
+case earns flagship status not because our prototype had a calculator but
+because it is Dan's every-visit grind and stated fear: *"I've got to go
+through the system of trying to calculate what their total risk factor is…
+every time they come back into the office"* and *"it kind of scares me to
+death that I'm missing a subtle toxicity."* Non-goals are equally explicit:
+the agent never recommends treatment, never writes to the record, never
+orders anything.
 
 **What are the verification requirements for this domain?** The strictest
 available: every clinical claim shown to a physician must carry a resolvable
@@ -52,8 +95,11 @@ citation into the record (enforced by a deterministic gate — code, not a
 model), every clinical number must come from hand-checkable arithmetic
 rather than model generation, and fact verification is role-gated (a
 physician verifies medications, allergies, conditions, findings; delegated
-staff may verify social history, goals, chief complaint). Anything
-unsupported by the record must be phrased as absence or uncertainty.
+staff may verify social history, goals, chief complaint). Source-reliability
+weighting is the design partner's own requirement — *"this source is
+typically highly accurate. This one is questionable… has to be weighted
+differently as you bring it in."* Anything unsupported by the record must be
+phrased as absence or uncertainty.
 
 **What data sources will you need access to?** OpenEMR's FHIR R4 API only:
 Patient, Condition, MedicationRequest/MedicationStatement,
@@ -62,7 +108,7 @@ DocumentReference. (The audit found lab results are FHIR-only in this fork,
 which settled FHIR-first.) Scans live in object storage referenced from the
 fact store. This week the corpus is synthetic and seeded by us; no real PHI.
 
-*Deep dive: `USERS.md`; `ARCHITECTURE.md` §2; `AUDIT.md` "Data quality audit".*
+*Deep dive: `USERS.md` (Dan and UC-1–7); `ARCHITECTURE.md` §2; defense "The diagnosis" and "What ophthalmology specifically demands".*
 
 ### 2. Scale & Performance
 
@@ -78,16 +124,50 @@ model in the hot path); scan toggle **< 1 s** (pre-fetched); chat first
 token **< 2 s** (streaming Haiku over prepared facts); chat full answer
 **< 10 s**; preparation **≤ ~5 min** per patient, invisible inside the gap.
 
-**Concurrent user requirements?** A single clinic is 1–5 concurrent users —
-trivial. The chat service is stateless, so scale-out is horizontal:
-~100 users on the single host as designed, ~1K by splitting the host, ~10K
-with dedicated prep workers + prompt caching, ~100K with multi-tenant
-isolation (the per-patient fact bundle shards naturally). Cost and load
-scale with *visits*, not seats.
+**Concurrent user requirements — and what scaling looks like
+architecturally.** Two properties make scale a solved-shape problem rather
+than a redesign: the chat/API tier is **stateless** (all per-patient state
+is the prepared fact bundle in Postgres), and the workload **shards
+perfectly by patient** — no query ever joins across patients, so there is
+no cross-tenant data gravity. Scaling is then a staged widening, with the
+hot path unchanged at every stage (the brief is a stored read everywhere):
+
+- **One clinic (pilot).** Everything colocated beside the practice's EHR:
+  one sidecar, one Postgres, one queue. Single-tenant, 1–5 concurrent
+  users. This is what Tier 1 deploys.
+- **A practice group (tens of clinics — e.g., a ~30-surgeon retina group).**
+  Two options: (a) *stack-per-clinic* — replicate the whole sidecar per
+  site; maximal isolation, but N ops burdens and N upgrade trains; or (b)
+  *shared multi-tenant sidecar* — one regional deployment, per-clinic
+  OAuth credentials into each clinic's EHR, `tenant_id` row isolation in
+  the fact store. We'd choose (b): statelessness makes the shared fleet
+  trivial, and the per-clinic *integration* surface is credentials, not
+  code. The EHR stays wherever the clinic runs it; the sidecar only ever
+  speaks outbound FHIR.
+- **Hundreds of clinics (a national specialty network — ~300 physicians).**
+  Split control plane from data plane: a stateless chat/API fleet behind a
+  load balancer; preparation workers autoscaling on queue depth (the
+  elastic load — clinic mornings arrive in waves across time zones);
+  Postgres partitioned per tenant (or schema-per-tenant) with per-tenant
+  encryption keys; Redis clustered; per-tenant observability and cost
+  rollups. Prompt caching and batch precompute start to matter — system
+  prompts and rubric text are shared across tenants, so cached-input
+  pricing compounds.
+- **Thousands of clinics / multi-EHR.** The deliberate payoff of the
+  integration choice: the sidecar touches **FHIR R4 + SMART-on-FHIR only**
+  — never OpenEMR internals — so the identical architecture attaches to any
+  US Core-certified EHR (the ONC certification universe: the specialty
+  incumbents, Epic, and the rest). At this scale the deployment becomes
+  regional **cells** (data residency + blast-radius isolation), a thin
+  routing/control plane above them, and per-cell observability. Nothing in
+  the agent, the fact schema, or the latency budget changes.
 
 **Cost constraints for LLM calls?** ~$0.20–0.30 per prepared brief (Sonnet 5
 deep read) plus ~1¢ per chat turn (Haiku 4.5) ≈ **~$20 per 70-patient day**,
 against ~35 minutes of reclaimed clinic time — an easy trade at any margin.
+Cost scales with *visits*, not seats or clinics; at network scale, model
+spend is dominated by preparation, which is batchable and cache-friendly
+(both carry provider discounts), so unit cost *falls* with scale.
 
 *Deep dive: `ARCHITECTURE.md` §6, §11; defense "Cost & scale, in numbers".*
 
@@ -313,7 +393,27 @@ absence. Repeated tool failure → degrade per the ladder in item 11 and say
 so. Anything touching treatment choice → outside the agent's surface
 entirely (non-goals).
 
-*Deep dive: `ARCHITECTURE.md` §4; `USERS.md` UC-2/UC-3.*
+**How citations appear in the UI.** Every claim in the brief and every chat
+answer renders with a small inline **citation chip** (a numbered bubble at
+the end of the claim, plus laterality OD/OS/OU and verification-state badges
+where relevant). Clicking a chip opens a **source card** — not a raw
+document dump: the source's type badge (referral letter, pharmacy record,
+lab report, prior visit note, intake transcript…), its date, its attribution
+(*who said it* — patient, physician, pharmacist, external provider — which
+is how patient-reported facts stay visibly distinct), and the **verbatim
+excerpt with the cited span highlighted** in its surrounding context. From
+the card, one more click deep-links to the full source document (the
+panel's Sources tab, which lists every document preparation consumed, each
+carrying its reliability weighting). The mechanism under the chip is the
+same `CitationRef` object the gate verifies — source document ID +
+character-range excerpt + attribution — so the UI affordance and the
+verification primitive are one thing: a chip *cannot render* unless its
+excerpt resolves inside a stored source document. In chat, the model emits
+citations in a strict inline token format that the sidecar parses back into
+the same chip component, so brief and chat share one citation system.
+
+*Deep dive: `ARCHITECTURE.md` §4; `USERS.md` UC-2/UC-3; port manifest §2
+(`CitationRef`), §4 (brief tabs incl. Sources), §5 (chat citation contract).*
 
 ---
 
