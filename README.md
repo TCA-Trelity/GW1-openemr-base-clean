@@ -16,6 +16,27 @@
 
 [![Backers on Open Collective](https://opencollective.com/openemr/backers/badge.svg)](#backers) [![Sponsors on Open Collective](https://opencollective.com/openemr/sponsors/badge.svg)](#sponsors)
 
+# AgentForge Clinical Co-Pilot (OpenEMR fork)
+
+This is a fork of [OpenEMR](https://github.com/openemr/openemr) used for the
+AgentForge Clinical Co-Pilot project: an AI co-pilot for ophthalmology
+embedded in a brownfield EHR.
+
+- **Live deployment:** https://gw1-openemr-base-clean-production.up.railway.app
+  (demo instance, synthetic data only)
+- **Development branch:** `claude/ehr-architecture-defense-gg486o`
+
+| Deliverable | Location |
+|---|---|
+| Security & architecture audit | [`AUDIT.md`](AUDIT.md) |
+| Users & use cases | [`USERS.md`](USERS.md) |
+| Agent integration architecture | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
+| Architecture defense (full) | [`docs/defense/architecture-defense.md`](docs/defense/architecture-defense.md) |
+| Tiered PRD | [`docs/defense/PRD-clinical-copilot.md`](docs/defense/PRD-clinical-copilot.md) |
+| Railway deploy runbook | [`deploy/railway-runbook.md`](deploy/railway-runbook.md) |
+
+The original OpenEMR README follows.
+
 # OpenEMR
 
 [OpenEMR](https://open-emr.org) is a Free and Open Source electronic health records and medical practice management application. It features fully integrated electronic health records, practice management, scheduling, electronic billing, internationalization, free support, a vibrant community, and a whole lot more. It runs on Windows, Linux, Mac OS X, and many other platforms.
