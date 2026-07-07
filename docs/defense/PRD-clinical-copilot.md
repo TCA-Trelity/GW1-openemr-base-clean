@@ -45,10 +45,10 @@ Argued in full in the architecture defense; verdicts recorded here. **In scope:*
 
 ### ─── TIER 0 — MVP hard gates (tonight, Tue 11:59 PM CT) ───
 
-**Unit 0.1: Public deploy of the OpenEMR fork**
-- **What:** GCP Compute Engine VM (e2-standard-2, Ubuntu LTS); Docker Compose stack: MariaDB + OpenEMR built from this fork's source + Caddy TLS on a `sslip.io` hostname (domain swap later if provided). Caddy denies `/apis/default/api/background_service/*` from outside (F6 mitigation). Demo credentials rotated from defaults.
-- **Files:** `deploy/docker-compose.yml`, `deploy/Caddyfile`, `deploy/README.md` (runbook), `Dockerfile.deploy` (fork-source image).
-- **Depends on:** GCP credentials from user (open question Q1). **Fences:** F6. **Complexity:** medium.
+**Unit 0.1: Public deploy of the OpenEMR fork (Railway)**
+- **What:** Railway project driven from the user's browser (Railway's API is egress-blocked from agent sessions; user executes a prepared runbook). Services: MariaDB (image + volume) and OpenEMR built from this fork's source via `Dockerfile.deploy` with a persistent volume for the sites directory; Railway-managed TLS and public URL; secrets in Railway's dashboard — nothing credential-shaped in the repo (public-repo constraint). GitHub integration connected to this branch so later pushes auto-redeploy (valuable for T1/T2). F6 mitigation moves from Caddy to OpenEMR config/firewall note in the runbook. Demo credentials rotated from defaults. ARCHITECTURE.md carries the hosting note: *demo on PaaS; pilot moves to BAA-capable infrastructure*.
+- **Files:** `Dockerfile.deploy`, `deploy/railway-runbook.md` (click-by-click), `deploy/.env.example` (placeholders only).
+- **Depends on:** user's Railway account (~10 min of dashboard clicks). **Fences:** F6. **Complexity:** medium.
 - **Acceptance:** public HTTPS URL serves login; admin login works; sample patients visible; URL recorded in PR description.
 
 **Unit 0.2: `AUDIT.md` (repo root)**
@@ -139,7 +139,7 @@ Argued in full in the architecture defense; verdicts recorded here. **In scope:*
 
 ### ─── TIER 3 — Post-course pilot roadmap (unscheduled; for Dan) ───
 
-Multimodal scan interpretation (fills the reserved `imaging_finding` slot; replaces F10's fabricated spec with a real model); intake surfaces (mine `branchingLogic.jsx` + `SafetyFlag.jsx`); de-identification pipeline for real-PHI parallel operation (Dan's RCA "easy yes" posture); NexTech/fax referral ingestion; William Thompson source-document corpus as a second deep eval scenario; HA deployment; cross-patient/literature retrieval (pgvector activates).
+Multimodal scan interpretation (fills the reserved `imaging_finding` slot; replaces F10's fabricated spec with a real model); intake surfaces (mine `branchingLogic.jsx` + `SafetyFlag.jsx`); de-identification pipeline for real-PHI parallel operation (the design partner's "easy yes" institutional posture); fax referral ingestion; William Thompson source-document corpus as a second deep eval scenario; HA deployment; cross-patient/literature retrieval (pgvector activates).
 
 ## 6. Risks & mitigations
 
@@ -166,7 +166,7 @@ Multimodal scan interpretation (fills the reserved `imaging_finding` slot; repla
 
 **second-opinion (port manifest, this session):** `utils/medicationRiskFlags.jsx:6-150,155-190`; `services/medicationRiskService.jsx:11-199,230-276`; `utils/imagingAnalysis.jsx:41-156 (F10),161-254,315-346,351-431,436-523,537-582`; `citations/citationHelpers.jsx:91-152,158-177`; `citations/CitationBubble.jsx:113-153`; `briefing/SourcesView.jsx:48-98,108-134`; `lib/permissions.jsx:267-306`; `contexts/ProviderContext.jsx:47-60,215-256`; `pages/PatientBriefing.jsx:22-367,369-471,672-702`; `briefing/ReadyToWalkIn.jsx:113-210,154-171`; `briefing/ClinicalDetail.jsx:363-724 (13 sections),407-456`; `consult/ConsultChatPanel.jsx:12-19,41-85,153-158`; `services/consultContextService.jsx:13-224,483-528,535-684,693-760`; `base44/functions/processProviderNote/entry.ts:84-140` (classifier); `data/synthetic/margaret-chen/index.jsx:44-57,120-300,316-362`; `data/sampleImagingData.jsx:22-586,588-991,993-1114`; `data/synthetic/loaders/loadPatientSources.jsx:10-12,90-126`; `PRD.md` (718 lines) §§2.2, 4.13, 6, 9.3, 11–12.
 
-**Voice of customer:** Dan Montzka discovery synthesis (four sessions, Dec 2025–Jan 2026) — quotes cited inline in `docs/defense/architecture-defense.md`.
+**Voice of customer:** design-partner discovery synthesis (four sessions, Dec 2025–Jan 2026) — quotes cited inline in `docs/defense/architecture-defense.md`.
 
 ## Appendix B: second-opinion port manifest (condensed)
 
