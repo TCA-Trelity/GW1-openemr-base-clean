@@ -1,0 +1,32 @@
+name: Mirror to GitLab
+
+on:
+  push:
+    branches: ['**']
+    tags: ['**']
+  workflow_dispatch:
+
+concurrency:
+  group: mirror-to-gitlab
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mirror all branches and tags to GitLab
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITLAB_REPO: ${{ secrets.GITLAB_REPO }}
+        run: |
+          if [ -z "${GITLAB_TOKEN}" ] || [ -z "${GITLAB_REPO}" ]; then
+            echo "GITLAB_TOKEN / GITLAB_REPO secrets not configured; skipping mirror."
+            exit 0
+          fi
+          git clone --mirror "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" repo
+          cd repo
+          # Drop GitHub-internal refs (PR merge refs etc.) that a mirror clone
+          # picks up but a plain git host will not accept.
+          git for-each-ref --format='delete %(refname)' 'refs/pull' | git update-ref --stdin
+          git push --force "https://oauth2:${GITLAB_TOKEN}@${GITLAB_REPO}" \
+            'refs/heads/*:refs/heads/*' 'refs/tags/*:refs/tags/*'
