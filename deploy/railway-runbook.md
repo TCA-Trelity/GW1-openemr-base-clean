@@ -25,15 +25,19 @@ produced is the app URL itself, which the submission requires.
 4. **Settings → Networking:** ensure it has **no public domain** (private only).
 5. Deploy.
 
-## 3. OpenEMR service (built from this fork)
+## 3. OpenEMR service (prebuilt flex image, clones the fork at runtime)
 
-1. **+ New → GitHub Repo** → select `TCA-Trelity/GW1-openemr-base-clean`
-   (authorize the Railway GitHub app if prompted).
-2. **Settings → Source:**
-   - **Branch:** `claude/ehr-architecture-defense-gg486o`
-   - **Root Directory:** `docker/flex`  ← Railway builds the flex Dockerfile
-     with that directory as context.
-3. **Variables** tab → add exactly these:
+**Do NOT build the fork's Dockerfile on Railway** — Railway's builder can't
+handle the flex Dockerfile from a subdirectory (fails with
+`docker/flex does not exist`). Instead run the *published* flex image, whose
+entrypoint clones `FLEX_REPOSITORY` at runtime (`docker/flex/openemr.sh` —
+the clone block fires when `EASY_DEV_MODE*` is unset). This is how the dev
+stack runs it too (`docker/development-easy/docker-compose.yml` uses
+`image: openemr/openemr:flex`, not a build).
+
+1. **+ New → Docker Image** → `openemr/openemr:flex`. Rename the service
+   `openemr`.
+2. **Variables** tab → add exactly these:
 
    | Variable | Value |
    |---|---|
@@ -45,18 +49,21 @@ produced is the app URL itself, which the submission requires.
    | `MYSQL_PASS` | click **Generate** |
    | `MYSQL_DATABASE` | `openemr` |
    | `OE_USER` | `admin` |
-   | `OE_PASS` | click **Generate** — this is the login you'll use |
+   | `OE_PASS` | **Generate** — this is the login you'll use |
 
-4. **Settings → Volumes** → **Add volume**, mount path:
-   `/var/www/localhost/htdocs/openemr`
-   (persists source + built dependencies + the `sites/` data across restarts;
-   the startup script is idempotent via `sites/docker-completed`).
-5. **Settings → Resources:** give the service **≥ 4 GB RAM** if the plan
-   allows — the one-time `npm run build` during first boot is memory-hungry.
-6. **Settings → Networking → Public Networking → Generate Domain**, and set
-   the **target port to `80`** (Railway's edge terminates TLS and forwards
-   HTTP to Apache).
-7. Deploy.
+   Leave `EASY_DEV_MODE` / `EASY_DEV_MODE_NEW` **unset** — that selects
+   clone-from-fork mode. (Optional, only if composer rate-limits during boot:
+   add `GITHUB_COMPOSER_TOKEN` with the upstream token shipped in
+   `docker/development-easy/docker-compose.yml`.)
+3. **Attach Volume** (canvas right-click → Attach Volume, or Ctrl+K →
+   volume), mount path `/var/www/localhost/htdocs/openemr` (persists cloned
+   source + built dependencies + `sites/` across restarts; idempotent via
+   `sites/docker-completed`).
+4. **Settings → Resources:** **≥ 4 GB RAM** if the plan allows — the one-time
+   `npm run build` during first boot is memory-hungry.
+5. **Settings → Networking → Generate Domain**, target **port `80`**
+   (Railway's edge terminates TLS and forwards HTTP to Apache).
+6. Deploy.
 
 ## 4. First boot (one-time, be patient)
 
