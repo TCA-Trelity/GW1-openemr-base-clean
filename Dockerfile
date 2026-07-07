@@ -9,3 +9,7 @@
 # this same image with source provided locally).
 FROM openemr/openemr:flex
 COPY . /openemr
+COPY deploy/wait-and-start.sh /wait-and-start.sh
+RUN chmod +x /wait-and-start.sh
+WORKDIR /var/www/localhost/htdocs
+CMD ["/wait-and-start.sh"]
