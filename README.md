@@ -32,6 +32,7 @@ embedded in a brownfield EHR.
 | Users & use cases | [`USERS.md`](USERS.md) |
 | Agent integration architecture | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
 | Architecture defense (full) | [`docs/defense/architecture-defense.md`](docs/defense/architecture-defense.md) |
+| Pre-search checklist (appendix Q1–16) | [`docs/defense/presearch.md`](docs/defense/presearch.md) |
 | Tiered PRD | [`docs/defense/PRD-clinical-copilot.md`](docs/defense/PRD-clinical-copilot.md) |
 | Railway deploy runbook | [`deploy/railway-runbook.md`](deploy/railway-runbook.md) |
 
