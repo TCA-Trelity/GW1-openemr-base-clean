@@ -1,0 +1,170 @@
+// Citation chip + source card (the verification affordance, presearch Q10 / CitationBubble.jsx
+// port): numbered chip -> popover card with type badge, date, attribution, and the verbatim
+// excerpt highlighted in context; "View source" deep-links into the Sources tab.
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { Calendar, MapPin, User } from 'lucide-react';
+import type { Attribution, CitationRef } from './types';
+import { formatDate, sourceTypeConfig } from './ui';
+
+/** Provided by App; lets any chip anywhere jump to the Sources tab. No-op by default so chips render standalone. */
+export const SourceNavContext = createContext<(citation: CitationRef) => void>(() => undefined);
+
+// Port of CitationBubble.jsx attributionLabels/getAttributionText.
+const ATTRIBUTION_LABELS: Record<Attribution['speaker_role'], string> = {
+    patient: 'Reported by patient',
+    family_member: 'Reported by family member',
+    physician: 'Documented by physician',
+    nurse: 'Documented by nurse',
+    technician: 'Documented by technician',
+    pharmacist: 'From pharmacy record',
+    external_provider: 'From external provider',
+    system: 'System imported',
+};
+
+function attributionText(attribution: Attribution): string {
+    const { speaker_role, speaker_name, speaker_relationship } = attribution;
+    if (speaker_name != null && speaker_name !== '') {
+        return speaker_role === 'family_member' && speaker_relationship != null
+            ? `${speaker_name} (${speaker_relationship})`
+            : speaker_name;
+    }
+    if (speaker_role === 'family_member' && speaker_relationship != null) {
+        return `Patient's ${speaker_relationship}`;
+    }
+    return ATTRIBUTION_LABELS[speaker_role] ?? 'Unknown source';
+}
+
+function Excerpt({ citation }: { citation: CitationRef }) {
+    if (citation.excerpt_text == null || citation.excerpt_text === '') {
+        return <p className="text-sm text-slate-500 italic">No excerpt available</p>;
+    }
+    const location = citation.excerpt_location;
+    const hasContext = location != null && (location.context_before != null || location.context_after != null);
+    return (
+        <p className="text-sm text-slate-600 leading-relaxed">
+            {hasContext ? (
+                <>
+                    {location.context_before != null && <span className="text-slate-500">{location.context_before}</span>}
+                    <mark className="bg-yellow-100 px-0.5 rounded font-medium text-slate-800">{citation.excerpt_text}</mark>
+                    {location.context_after != null && <span className="text-slate-500">{location.context_after}</span>}
+                </>
+            ) : (
+                <span className="italic">&ldquo;{citation.excerpt_text}&rdquo;</span>
+            )}
+        </p>
+    );
+}
+
+export function CitationChip({ citation, index }: { citation: CitationRef; index: number }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const rootRef = useRef<HTMLSpanElement>(null);
+    const viewSource = useContext(SourceNavContext);
+    const config = sourceTypeConfig(citation.source_type);
+    const Icon = config.icon;
+
+    // Close on outside click / Escape — plain-React stand-in for the prototype's Popover.
+    useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+        const onPointerDown = (event: MouseEvent) => {
+            if (rootRef.current !== null && event.target instanceof Node && !rootRef.current.contains(event.target)) {
+                setIsOpen(false);
+            }
+        };
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', onPointerDown);
+        document.addEventListener('keydown', onKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', onPointerDown);
+            document.removeEventListener('keydown', onKeyDown);
+        };
+    }, [isOpen]);
+
+    return (
+        <span ref={rootRef} className="relative inline-block align-text-top">
+            <button
+                type="button"
+                aria-label={`Citation ${index}: ${citation.source_label}`}
+                aria-expanded={isOpen}
+                onClick={() => setIsOpen((open) => !open)}
+                className={`inline-flex items-center justify-center min-w-[1.15rem] h-[1.15rem] px-1 ml-0.5 rounded-full border text-[10px] font-semibold cursor-pointer transition-colors ${config.color}`}
+            >
+                {index}
+            </button>
+            {isOpen && (
+                <div
+                    role="dialog"
+                    aria-label={`Source: ${citation.source_label}`}
+                    className="absolute left-0 top-full mt-1 w-80 z-50 rounded-xl shadow-lg border border-slate-200 bg-white overflow-hidden text-left font-normal normal-case tracking-normal"
+                >
+                    {/* Header: source type badge + label + date */}
+                    <div className={`px-4 py-3 border-b border-slate-200 ${config.color.split(' ').slice(0, 2).join(' ')}`}>
+                        <div className="flex items-center gap-2">
+                            <span className="p-1.5 rounded-md bg-white/60">
+                                <Icon className="w-4 h-4" />
+                            </span>
+                            <span>
+                                <span className="block font-semibold text-slate-800 text-sm">{config.label}</span>
+                                <span className="block text-xs text-slate-600">{citation.source_label}</span>
+                                {citation.document_date != null && (
+                                    <span className="flex items-center gap-1 text-xs text-slate-500 mt-0.5">
+                                        <Calendar className="w-3 h-3" />
+                                        {formatDate(citation.document_date)}
+                                    </span>
+                                )}
+                            </span>
+                        </div>
+                    </div>
+                    {/* Verbatim excerpt, cited span highlighted within context */}
+                    <div className="px-4 py-3 border-b border-slate-100 bg-white">
+                        <div className="pl-3 border-l-2 border-slate-200">
+                            <Excerpt citation={citation} />
+                        </div>
+                    </div>
+                    {/* Footer: attribution + View source */}
+                    <div className="px-4 py-2.5 bg-slate-50 flex items-center justify-between gap-2">
+                        {citation.attribution !== null ? (
+                            <span className="flex items-center gap-1.5 text-xs text-slate-600 bg-white px-2 py-1 rounded-full border border-slate-200">
+                                <User className="w-3 h-3 text-slate-400" />
+                                <span className="font-medium">{attributionText(citation.attribution)}</span>
+                            </span>
+                        ) : (
+                            <span />
+                        )}
+                        <button
+                            type="button"
+                            disabled={citation.source_document_id === null}
+                            onClick={() => {
+                                setIsOpen(false);
+                                viewSource(citation);
+                            }}
+                            className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium bg-blue-50 hover:bg-blue-100 disabled:opacity-40 disabled:cursor-not-allowed px-2.5 py-1.5 rounded-md transition-colors"
+                        >
+                            <MapPin className="w-3 h-3" />
+                            View source
+                        </button>
+                    </div>
+                </div>
+            )}
+        </span>
+    );
+}
+
+/** Numbered chip row for a claim's citation list — the one component shared everywhere. */
+export function CitationChips({ citations }: { citations: CitationRef[] }) {
+    if (citations.length === 0) {
+        return null;
+    }
+    return (
+        <span className="inline-flex items-center gap-0.5 ml-1">
+            {citations.map((citation, i) => (
+                <CitationChip key={citation.id} citation={citation} index={i + 1} />
+            ))}
+        </span>
+    );
+}
