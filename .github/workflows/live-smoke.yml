@@ -1,0 +1,37 @@
+# Live smoke probe (S1.10 seed): GitHub runners can reach the public app URL
+# (the dev session cannot), so this workflow is the session's eyes on prod.
+name: Live smoke
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe EHR login page and FHIR endpoint
+        env:
+          APP_URL: https://gw1-openemr-base-clean-production.up.railway.app
+        run: |
+          set -uo pipefail
+          fail=0
+
+          echo "== GET / (login page) =="
+          code=$(curl -s -o /tmp/login.html -w '%{http_code}' -L --max-time 30 "$APP_URL/")
+          echo "HTTP $code"
+          if [ "$code" = "200" ] && grep -qi "openemr\|login" /tmp/login.html; then
+            echo "login page: OK"
+          else
+            echo "login page: FAILED"; head -c 400 /tmp/login.html || true; fail=1
+          fi
+
+          echo "== GET /apis/default/fhir/metadata (capability statement) =="
+          code=$(curl -s -o /tmp/meta.json -w '%{http_code}' --max-time 30 "$APP_URL/apis/default/fhir/metadata")
+          echo "HTTP $code"
+          if [ "$code" = "200" ] && grep -q '"resourceType" *: *"CapabilityStatement"' /tmp/meta.json; then
+            echo "fhir metadata: OK ($(wc -c < /tmp/meta.json) bytes)"
+          else
+            echo "fhir metadata: FAILED"; head -c 400 /tmp/meta.json || true; fail=1
+          fi
+
+          exit $fail
