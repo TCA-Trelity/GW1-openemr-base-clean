@@ -24,7 +24,12 @@ async function fetchOk(url: string, init?: RequestInit): Promise<void> {
     }
 }
 
-function buildChecks(config: Config): DepCheck[] {
+/** Probes injected by server.ts when the backing dependency is wired (S1.7: postgres). */
+export interface HealthProbes {
+    checkPostgres?: () => Promise<void>;
+}
+
+function buildChecks(config: Config, probes?: HealthProbes): DepCheck[] {
     return [
         {
             name: 'openemr',
@@ -52,13 +57,14 @@ function buildChecks(config: Config): DepCheck[] {
             configured: config.LANGFUSE_HOST !== undefined,
             check: () => fetchOk(`${config.LANGFUSE_HOST}/api/public/health`),
         },
-        // postgres / redis checks land with the fact store (S1.6) and queue (S1.7).
+        // Real when server.ts wires the pool (S1.7): SELECT 1 through the injected probe.
         {
             name: 'postgres',
             requiredInProduction: false,
-            configured: false,
-            check: async () => {},
+            configured: probes?.checkPostgres !== undefined,
+            check: probes?.checkPostgres ?? (async () => {}),
         },
+        // redis check lands with the queue (S1.9) if BullMQ is adopted.
         {
             name: 'redis',
             requiredInProduction: false,
@@ -68,11 +74,11 @@ function buildChecks(config: Config): DepCheck[] {
     ];
 }
 
-export function registerHealthRoutes(app: FastifyInstance, config: Config): void {
+export function registerHealthRoutes(app: FastifyInstance, config: Config, probes?: HealthProbes): void {
     app.get('/health', async () => ({ status: 'ok' }));
 
     app.get('/ready', async (request, reply) => {
-        const checks = buildChecks(config);
+        const checks = buildChecks(config, probes);
         const results: Record<string, { status: DepStatus; error?: string }> = {};
 
         await Promise.all(

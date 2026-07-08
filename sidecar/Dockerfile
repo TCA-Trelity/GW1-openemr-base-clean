@@ -14,6 +14,9 @@ ENV NODE_ENV=production
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY package.json ./
+# Runtime data the compiled code resolves relative to dist/: SQL migrations
+# (dist/store -> ../../migrations) and the seed corpus (dist/scripts -> ../../seed).
+COPY migrations ./migrations
 COPY seed ./seed
 EXPOSE 8080
 CMD ["node", "dist/server.js"]

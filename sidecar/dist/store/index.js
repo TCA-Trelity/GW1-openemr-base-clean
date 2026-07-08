@@ -1,0 +1,21 @@
+// Store barrel + Pool factory (S1.6). ssl engages only when the connection string demands
+// it — Railway's public proxy uses sslmode=require with a cert we cannot verify, while the
+// private-network URL carries no sslmode and needs no TLS.
+import { Pool } from 'pg';
+export { FactStore } from './factStore.js';
+export { migrate } from './migrate.js';
+export function createPool(config) {
+    const url = config.DATABASE_URL;
+    if (url === undefined) {
+        throw new Error('DATABASE_URL is not configured');
+    }
+    const sslmode = /[?&]sslmode=([a-z-]+)/.exec(url)?.[1];
+    if (sslmode === 'verify-ca' || sslmode === 'verify-full') {
+        return new Pool({ connectionString: url, ssl: true }); // full certificate verification
+    }
+    if (sslmode === 'require' || sslmode === 'prefer' || /[?&]ssl=true/.test(url)) {
+        return new Pool({ connectionString: url, ssl: { rejectUnauthorized: false } });
+    }
+    return new Pool({ connectionString: url });
+}
+//# sourceMappingURL=index.js.map

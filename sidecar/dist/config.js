@@ -2,7 +2,6 @@
 // Dependencies may be absent in dev/test; /ready reports each as not_configured
 // rather than crashing, so the scaffold runs before every service exists.
 import { z } from 'zod';
-
 const EnvSchema = z.object({
     PORT: z.coerce.number().int().positive().default(8080),
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -13,9 +12,7 @@ const EnvSchema = z.object({
     DATABASE_URL: z.string().min(1).optional(),
     REDIS_URL: z.string().min(1).optional(),
 });
-
-export type Config = z.infer<typeof EnvSchema>;
-
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
+export function loadConfig(env = process.env) {
     return EnvSchema.parse(env);
 }
+//# sourceMappingURL=config.js.map
