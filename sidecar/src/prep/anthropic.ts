@@ -1,6 +1,9 @@
 // Minimal Anthropic Messages API client over injected fetch — no SDK dependency (S1.7).
-// Sampling params are deliberately omitted: claude-sonnet-5 rejects non-default
-// temperature/top_p/top_k with a 400; determinism comes from the prompt + Zod validation.
+// Requests STREAM (required above ~16K output tokens; extraction needs far more than the
+// old 16K cap) and accumulate text deltas; hung calls die on an idle timeout instead of
+// wedging the prep run forever. Sampling params are deliberately omitted: claude-sonnet-5
+// rejects non-default temperature/top_p/top_k with a 400; determinism comes from the
+// prompt + Zod validation.
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
 export interface AnthropicMessage {
@@ -14,12 +17,19 @@ export interface AnthropicUsage {
 }
 
 export interface AnthropicCompletion {
-    /** Concatenated text blocks (thinking blocks are skipped). */
+    /** Concatenated text deltas (thinking deltas are skipped). */
     text: string;
     usage: AnthropicUsage;
     stop_reason: string | null;
     model: string;
 }
+
+/** Periodic in-flight progress snapshot — the caller's observability heartbeat. */
+export interface StreamProgress {
+    textChars: number;
+    elapsedMs: number;
+}
+export type OnProgress = (progress: StreamProgress) => void;
 
 // Typed API failure: status plus the API error type/message only — never the raw body.
 export class AnthropicApiError extends Error {
@@ -40,11 +50,21 @@ export interface AnthropicClientOptions {
     baseUrl?: string;
     maxTokens?: number;
     fetchImpl?: FetchLike;
+    /** Abort when no stream bytes arrive for this long — the hung-call detector. */
+    idleTimeoutMs?: number;
+    /** Absolute ceiling on one call, however slowly it drips. */
+    totalTimeoutMs?: number;
+    /** Cadence of onProgress heartbeats while streaming. */
+    heartbeatMs?: number;
 }
 
 const DEFAULT_BASE_URL = 'https://api.anthropic.com';
-// Non-streaming ceiling: above ~16K output the HTTP request risks timing out.
-const DEFAULT_MAX_TOKENS = 16000;
+// Streaming output budget: sonnet-5 allows up to 128K; extraction re-quotes source text
+// per citation so its output scales with input. Unused budget costs nothing.
+const DEFAULT_MAX_TOKENS = 64000;
+const DEFAULT_IDLE_TIMEOUT_MS = 90_000;
+const DEFAULT_TOTAL_TIMEOUT_MS = 900_000;
+const DEFAULT_HEARTBEAT_MS = 15_000;
 
 export class AnthropicClient {
     private readonly apiKey: string;
@@ -52,6 +72,9 @@ export class AnthropicClient {
     private readonly url: string;
     private readonly maxTokens: number;
     private readonly fetchImpl: FetchLike;
+    private readonly idleTimeoutMs: number;
+    private readonly totalTimeoutMs: number;
+    private readonly heartbeatMs: number;
 
     constructor(options: AnthropicClientOptions) {
         this.apiKey = options.apiKey;
@@ -59,49 +82,177 @@ export class AnthropicClient {
         this.url = `${(options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '')}/v1/messages`;
         this.maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
         this.fetchImpl = options.fetchImpl ?? globalThis.fetch;
+        this.idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
+        this.totalTimeoutMs = options.totalTimeoutMs ?? DEFAULT_TOTAL_TIMEOUT_MS;
+        this.heartbeatMs = options.heartbeatMs ?? DEFAULT_HEARTBEAT_MS;
     }
 
     async complete(
         system: string,
         messages: AnthropicMessage[],
         correlationId: string,
+        onProgress?: OnProgress,
     ): Promise<AnthropicCompletion> {
         if (this.apiKey === '') {
             throw new AnthropicApiError(0, 'not_configured', 'ANTHROPIC_API_KEY is not configured');
         }
-        const response = await this.fetchImpl(this.url, {
-            method: 'POST',
-            headers: {
-                'content-type': 'application/json',
-                'x-api-key': this.apiKey,
-                'anthropic-version': '2023-06-01',
-                'x-correlation-id': correlationId,
-            },
-            body: JSON.stringify({
-                model: this.model,
-                max_tokens: this.maxTokens,
-                system,
-                messages,
-            }),
-        });
-        const body = await parseJsonBody(response);
-        if (!response.ok) {
-            const error = isRecord(body?.['error']) ? body['error'] : undefined;
-            throw new AnthropicApiError(
-                response.status,
-                asString(error?.['type']),
-                asString(error?.['message']),
-            );
-        }
-        if (body === undefined) {
-            throw new AnthropicApiError(response.status, 'invalid_response', 'response was not a JSON object');
-        }
-        return {
-            text: textBlocksOf(body['content']),
-            usage: usageOf(body['usage']),
-            stop_reason: asString(body['stop_reason']) ?? null,
-            model: asString(body['model']) ?? this.model,
+        const startedAt = Date.now();
+        const controller = new AbortController();
+        let abortReason = '';
+        const abort = (reason: string): void => {
+            abortReason = reason;
+            controller.abort();
         };
+        // Race every await against the abort signal: injected test fetches (and some fetch
+        // impls) do not tie their streams to the signal, so the timeout must not rely on it.
+        const abortedPromise = new Promise<never>((_, reject) => {
+            controller.signal.addEventListener('abort', () =>
+                reject(new AnthropicApiError(0, 'timeout', abortReason)),
+            );
+        });
+        const totalTimer = setTimeout(
+            () => abort(`call exceeded ${this.totalTimeoutMs}ms total`),
+            this.totalTimeoutMs,
+        );
+        let idleTimer = setTimeout(() => abort(`no stream progress for ${this.idleTimeoutMs}ms`), this.idleTimeoutMs);
+        const resetIdle = (): void => {
+            clearTimeout(idleTimer);
+            idleTimer = setTimeout(() => abort(`no stream progress for ${this.idleTimeoutMs}ms`), this.idleTimeoutMs);
+        };
+
+        const state = { text: '', inputTokens: 0, outputTokens: 0, stopReason: null as string | null, model: this.model };
+        const heartbeat =
+            onProgress === undefined
+                ? undefined
+                : setInterval(
+                      () => onProgress({ textChars: state.text.length, elapsedMs: Date.now() - startedAt }),
+                      this.heartbeatMs,
+                  );
+
+        try {
+            const response = await Promise.race([
+                this.fetchImpl(this.url, {
+                    method: 'POST',
+                    headers: {
+                        'content-type': 'application/json',
+                        'x-api-key': this.apiKey,
+                        'anthropic-version': '2023-06-01',
+                        'x-correlation-id': correlationId,
+                    },
+                    body: JSON.stringify({
+                        model: this.model,
+                        max_tokens: this.maxTokens,
+                        stream: true,
+                        system,
+                        messages,
+                    }),
+                    signal: controller.signal,
+                }),
+                abortedPromise,
+            ]);
+            resetIdle();
+            if (!response.ok) {
+                // Error responses are plain JSON, not SSE.
+                const body = await Promise.race([parseJsonBody(response), abortedPromise]);
+                const error = isRecord(body?.['error']) ? body['error'] : undefined;
+                throw new AnthropicApiError(
+                    response.status,
+                    asString(error?.['type']),
+                    asString(error?.['message']),
+                );
+            }
+            if (response.body === null) {
+                throw new AnthropicApiError(response.status, 'invalid_response', 'response had no body stream');
+            }
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            for (;;) {
+                const chunk = await Promise.race([reader.read(), abortedPromise]);
+                if (chunk.done) {
+                    break;
+                }
+                resetIdle();
+                buffer += decoder.decode(chunk.value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() ?? '';
+                for (const line of lines) {
+                    handleSseLine(line, state);
+                }
+            }
+            handleSseLine(buffer, state);
+            return {
+                text: state.text,
+                usage: { input_tokens: state.inputTokens, output_tokens: state.outputTokens },
+                stop_reason: state.stopReason,
+                model: state.model,
+            };
+        } catch (error) {
+            // Abort surfaced through fetch/read instead of our race: normalize to timeout.
+            if (controller.signal.aborted && !(error instanceof AnthropicApiError)) {
+                throw new AnthropicApiError(0, 'timeout', abortReason);
+            }
+            throw error;
+        } finally {
+            clearTimeout(totalTimer);
+            clearTimeout(idleTimer);
+            if (heartbeat !== undefined) {
+                clearInterval(heartbeat);
+            }
+        }
+    }
+}
+
+interface StreamState {
+    text: string;
+    inputTokens: number;
+    outputTokens: number;
+    stopReason: string | null;
+    model: string;
+}
+
+// One SSE line. Only `data:` lines matter — the payload's own `type` field routes it.
+function handleSseLine(line: string, state: StreamState): void {
+    if (!line.startsWith('data:')) {
+        return;
+    }
+    let event: unknown;
+    try {
+        event = JSON.parse(line.slice(5).trim());
+    } catch {
+        return; // tolerate keep-alive noise; real malformation surfaces as validation failure downstream
+    }
+    if (!isRecord(event)) {
+        return;
+    }
+    switch (event['type']) {
+        case 'message_start': {
+            const message = isRecord(event['message']) ? event['message'] : undefined;
+            state.model = asString(message?.['model']) ?? state.model;
+            const usage = isRecord(message?.['usage']) ? message['usage'] : undefined;
+            state.inputTokens = asNumber(usage?.['input_tokens']) ?? state.inputTokens;
+            return;
+        }
+        case 'content_block_delta': {
+            const delta = isRecord(event['delta']) ? event['delta'] : undefined;
+            if (delta?.['type'] === 'text_delta' && typeof delta['text'] === 'string') {
+                state.text += delta['text'];
+            }
+            return;
+        }
+        case 'message_delta': {
+            const delta = isRecord(event['delta']) ? event['delta'] : undefined;
+            state.stopReason = asString(delta?.['stop_reason']) ?? state.stopReason;
+            const usage = isRecord(event['usage']) ? event['usage'] : undefined;
+            state.outputTokens = asNumber(usage?.['output_tokens']) ?? state.outputTokens;
+            return;
+        }
+        case 'error': {
+            const error = isRecord(event['error']) ? event['error'] : undefined;
+            throw new AnthropicApiError(0, asString(error?.['type']) ?? 'stream_error', asString(error?.['message']));
+        }
+        default:
+            return; // ping, content_block_start/stop, message_stop
     }
 }
 
@@ -113,25 +264,8 @@ function asString(value: unknown): string | undefined {
     return typeof value === 'string' ? value : undefined;
 }
 
-function textBlocksOf(content: unknown): string {
-    if (!Array.isArray(content)) {
-        return '';
-    }
-    return content
-        .map((block: unknown) =>
-            isRecord(block) && block['type'] === 'text' && typeof block['text'] === 'string'
-                ? block['text']
-                : '',
-        )
-        .join('');
-}
-
-function usageOf(usage: unknown): AnthropicUsage {
-    const record = isRecord(usage) ? usage : {};
-    return {
-        input_tokens: typeof record['input_tokens'] === 'number' ? record['input_tokens'] : 0,
-        output_tokens: typeof record['output_tokens'] === 'number' ? record['output_tokens'] : 0,
-    };
+function asNumber(value: unknown): number | undefined {
+    return typeof value === 'number' ? value : undefined;
 }
 
 async function parseJsonBody(response: Response): Promise<Record<string, unknown> | undefined> {

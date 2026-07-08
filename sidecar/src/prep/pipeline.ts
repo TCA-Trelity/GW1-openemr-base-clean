@@ -14,6 +14,7 @@ import { runCitationGate, type Claim } from '../gate/citationGate.js';
 import { DEFAULT_PROVIDER_PROFILE, type PatientFact, type ProviderProfile } from '../schemas/index.js';
 import type { BriefInput, PrepRunStatus, StoredBrief } from '../store/index.js';
 import { assembleBrief, type BriefContent } from './brief.js';
+import type { LlmCallRecord } from './budget.js';
 import type { FactExtractor, PrepLogger } from './extraction.js';
 import type { DocumentSource } from './sources.js';
 
@@ -21,7 +22,15 @@ import type { DocumentSource } from './sources.js';
 export interface PrepStore {
     startPrepRun(patientId: string, correlationId: string): Promise<string>;
     finishPrepRun(runId: string, status: PrepRunStatus, error?: string): Promise<void>;
+    /** Optional stage stamping — a failed run's row then shows where it died (/api/prep-runs). */
+    setPrepRunStage?(runId: string, stageName: string): Promise<void>;
     saveBrief(brief: BriefInput): Promise<StoredBrief>;
+}
+
+/** The SpendGuard surface the pipeline needs (SpendGuard satisfies it; tests fake it). */
+export interface PrepSpendGuard {
+    assertBudget(): Promise<void>;
+    recordCall(call: LlmCallRecord): Promise<void>;
 }
 
 export interface PrepDeps {
@@ -29,6 +38,8 @@ export interface PrepDeps {
     source: DocumentSource;
     extractor: FactExtractor;
     logger: PrepLogger;
+    /** Spend guardrails: 24h budget gate before the LLM call + per-call ledger writes. */
+    spendGuard?: PrepSpendGuard;
     /** Injected clock (PSR-20 spirit): medication-duration arithmetic and prepared_at. */
     clock?: () => Date;
     providerProfile?: ProviderProfile;
@@ -61,22 +72,40 @@ export async function executePrep(deps: PrepDeps, ctx: PrepRunContext): Promise<
     const { prepRunId, patientId, correlationId } = ctx;
     const now = (deps.clock ?? (() => new Date()))();
     const profile = deps.providerProfile ?? DEFAULT_PROVIDER_PROFILE;
+    const spendGuard = deps.spendGuard;
+    // Stamp the stage being ENTERED on the prep_run row before running it: a running run
+    // shows where it is, a failed run shows where it died.
+    const runStage = async <T>(name: string, fn: () => T | Promise<T>): Promise<T> => {
+        await deps.store.setPrepRunStage?.(prepRunId, name);
+        return stage(logger, correlationId, name, fn);
+    };
     try {
-        const sources = await stage(logger, correlationId, 'load_sources', () =>
+        // Budget gate BEFORE any token is bought: a blown 24h budget throws
+        // BudgetExceededError here, and the catch below records its clear message
+        // on the prep_run row as the failure.
+        if (spendGuard !== undefined) {
+            await runStage('budget_check', () => spendGuard.assertBudget());
+        }
+
+        const sources = await runStage('load_sources', () =>
             deps.source.load(patientId, correlationId),
         );
 
-        const extraction = await stage(logger, correlationId, 'llm_extraction', () =>
+        const extraction = await runStage('llm_extraction', () =>
             deps.extractor.extract(
                 { patientId, patientName: sources.patient.name, documents: sources.documents },
                 correlationId,
                 logger,
+                // Ledger every Anthropic call (both attempts) under this run's correlation ID.
+                spendGuard === undefined
+                    ? undefined
+                    : (usage) => spendGuard.recordCall({ ...usage, correlationId, purpose: 'prep_extraction' }),
             ),
         );
 
         // Citation gate over every extracted fact: blocked facts are dropped from the
         // brief (the rewrite-as-absence) and logged alongside the gate metrics.
-        const { verifiedFacts, metrics } = await stage(logger, correlationId, 'citation_gate', () => {
+        const { verifiedFacts, metrics } = await runStage('citation_gate', () => {
             const textById = new Map(sources.documents.map((doc) => [doc.id, doc.text]));
             const claims: Claim[] = extraction.facts.map((fact) => ({ id: fact.id, citations: fact.sources }));
             const gate = runCitationGate(claims, (id) => textById.get(id));
@@ -94,11 +123,11 @@ export async function executePrep(deps: PrepDeps, ctx: PrepRunContext): Promise<
             return { verifiedFacts: verified, metrics: gate.metrics };
         });
 
-        const medicationRiskFlags = await stage(logger, correlationId, 'medication_risk', () =>
+        const medicationRiskFlags = await runStage('medication_risk', () =>
             computeMedicationRiskFlags(medicationEngineInputs(verifiedFacts, now), profile),
         );
 
-        const imaging = await stage(logger, correlationId, 'imaging_analytics', () => ({
+        const imaging = await runStage('imaging_analytics', () => ({
             timeline_summary: [...sources.images]
                 .sort(
                     (a, b) =>
@@ -116,7 +145,7 @@ export async function executePrep(deps: PrepDeps, ctx: PrepRunContext): Promise<
             hcq_progression: analyzeHCQProgression(sources.images),
         }));
 
-        const content = await stage(logger, correlationId, 'brief_assembly', () =>
+        const content = await runStage('brief_assembly', () =>
             assembleBrief({
                 verifiedFacts,
                 contradictions: extraction.contradictions,
@@ -128,7 +157,7 @@ export async function executePrep(deps: PrepDeps, ctx: PrepRunContext): Promise<
             }),
         );
 
-        const brief = await stage(logger, correlationId, 'save_brief', () =>
+        const brief = await runStage('save_brief', () =>
             deps.store.saveBrief({
                 patient_id: patientId,
                 correlation_id: correlationId,

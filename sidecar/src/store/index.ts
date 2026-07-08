@@ -20,6 +20,7 @@ export type {
     StoredFact,
     StoredImageRecord,
     StoredPatient,
+    StoredPrepRun,
     StoredTreatment,
     TreatmentInput,
 } from './factStore.js';

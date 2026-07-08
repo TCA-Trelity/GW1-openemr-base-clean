@@ -173,6 +173,18 @@ export interface StoredBrief {
 export type PrepRunStatus = 'complete' | 'failed';
 const PrepRunStatusSchema = z.enum(['complete', 'failed']);
 
+/** Operational view of a prep run: status + the last stage entered (where a failure died). */
+export interface StoredPrepRun {
+    id: string;
+    patient_id: string;
+    correlation_id: string;
+    status: string;
+    stage: string | null;
+    error: string | null;
+    started_at: string; // ISO datetime
+    finished_at: string | null;
+}
+
 // ---- Validation helpers ----
 
 // Contradiction payloads may be the rich seed shape or the runtime detector shape.
@@ -493,6 +505,36 @@ export class FactStore {
         }
     }
 
+    /** Stamps the stage a run is entering — a failed run's row then shows where it died. */
+    public async setPrepRunStage(runId: string, stageName: string): Promise<void> {
+        const result = await this.pool.query('UPDATE prep_runs SET stage = $2 WHERE id = $1', [runId, stageName]);
+        if (result.rowCount !== 1) {
+            throw new Error(`prep run ${runId} not found`);
+        }
+    }
+
+    /** Newest-first run history for a patient — the observability read behind /api/prep-runs. */
+    public async getPrepRuns(patientId: string, limit = 20): Promise<StoredPrepRun[]> {
+        const result = await this.pool.query<PrepRunRow>(
+            `SELECT id, patient_id, correlation_id, status, stage, error, started_at, finished_at
+             FROM prep_runs
+             WHERE patient_id = $1
+             ORDER BY started_at DESC
+             LIMIT $2`,
+            [patientId, limit],
+        );
+        return result.rows.map((row) => ({
+            id: row.id,
+            patient_id: row.patient_id,
+            correlation_id: row.correlation_id,
+            status: row.status,
+            stage: row.stage,
+            error: row.error,
+            started_at: row.started_at.toISOString(),
+            finished_at: row.finished_at === null ? null : row.finished_at.toISOString(),
+        }));
+    }
+
     /** Rebuild lever: drops the patient's entire derived view (cascades); prep_runs survive as audit. */
     public async wipePatient(patientId: string): Promise<void> {
         await this.pool.query('DELETE FROM patients WHERE id = $1', [patientId]);
@@ -549,6 +591,16 @@ type ImageRow = {
 };
 type TreatmentRow = { id: string; patient_id: string; treatment_date: string; payload: unknown };
 type BriefRow = { id: string; patient_id: string; prepared_at: Date; correlation_id: string; content: unknown; status: string };
+type PrepRunRow = {
+    id: string;
+    patient_id: string;
+    correlation_id: string;
+    status: string;
+    stage: string | null;
+    error: string | null;
+    started_at: Date;
+    finished_at: Date | null;
+};
 
 function toStoredBrief(row: BriefRow): StoredBrief {
     return {

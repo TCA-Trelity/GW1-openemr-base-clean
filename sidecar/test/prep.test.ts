@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../src/config.js';
 import { AnthropicClient, type FetchLike } from '../src/prep/anthropic.js';
 import { BriefContentSchema } from '../src/prep/brief.js';
+import { BudgetExceededError, type LlmCallRecord, type UsageSummary } from '../src/prep/budget.js';
 import { ExtractionError, FactExtractor, type PrepLogger } from '../src/prep/extraction.js';
 import { runPrep, type PrepDeps } from '../src/prep/pipeline.js';
 import {
@@ -14,10 +15,10 @@ import {
     type FhirReader,
     type SourceDocumentQuerier,
 } from '../src/prep/sources.js';
-import type { PrepRouteDeps, PrepRouteStore } from '../src/routes/prep.js';
+import type { PrepRouteDeps, PrepRouteSpendGuard, PrepRouteStore } from '../src/routes/prep.js';
 import { ContradictionSchema, projectContradiction } from '../src/schemas/index.js';
 import { buildDeps, buildServer, type AppDeps } from '../src/server.js';
-import { FactStore, type BriefInput, type FactBundle, type PrepRunStatus, type StoredBrief } from '../src/store/index.js';
+import { FactStore, type BriefInput, type FactBundle, type PrepRunStatus, type StoredBrief, type StoredPrepRun } from '../src/store/index.js';
 
 // The corpus is trusted fixture data; test/corpus-conformance.test.ts locks its schema.
 const corpus = JSON.parse(
@@ -49,20 +50,26 @@ function corpusContradictions() {
     );
 }
 
-function llmResponse(payload: unknown): Response {
+// The client streams now (stream: true), so fakes speak SSE. The payload text is split
+// across two text_delta events to exercise accumulation on every test.
+function sseEvents(events: Record<string, unknown>[]): string {
+    return events.map((event) => `event: ${String(event['type'])}\ndata: ${JSON.stringify(event)}\n\n`).join('');
+}
+
+function llmResponse(payload: unknown, stopReason = 'end_turn'): Response {
+    const text = typeof payload === 'string' ? payload : JSON.stringify(payload);
+    const mid = Math.ceil(text.length / 2);
     return new Response(
-        JSON.stringify({
-            id: 'msg_test',
-            type: 'message',
-            role: 'assistant',
-            model: 'claude-sonnet-5',
-            content: [
-                { type: 'text', text: typeof payload === 'string' ? payload : JSON.stringify(payload) },
-            ],
-            stop_reason: 'end_turn',
-            usage: { input_tokens: 1200, output_tokens: 800 },
-        }),
-        { status: 200, headers: { 'content-type': 'application/json' } },
+        sseEvents([
+            { type: 'message_start', message: { model: 'claude-sonnet-5', usage: { input_tokens: 1200, output_tokens: 3 } } },
+            { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+            { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: text.slice(0, mid) } },
+            { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: text.slice(mid) } },
+            { type: 'content_block_stop', index: 0 },
+            { type: 'message_delta', delta: { stop_reason: stopReason }, usage: { output_tokens: 800 } },
+            { type: 'message_stop' },
+        ]),
+        { status: 200, headers: { 'content-type': 'text/event-stream' } },
     );
 }
 
@@ -82,6 +89,7 @@ interface FakeRun {
     patientId: string;
     correlationId: string;
     status: 'running' | PrepRunStatus;
+    stage?: string;
     error?: string;
 }
 
@@ -133,6 +141,30 @@ class FakeStore implements PrepRouteStore {
 
     async getFactBundle(patientId: string): Promise<FactBundle | null> {
         return this.bundle !== null && this.bundle.patient.id === patientId ? this.bundle : null;
+    }
+
+    async setPrepRunStage(runId: string, stageName: string): Promise<void> {
+        const run = this.runs.find((candidate) => candidate.id === runId);
+        if (run === undefined) {
+            throw new Error(`prep run ${runId} not found`);
+        }
+        run.stage = stageName;
+    }
+
+    async getPrepRuns(patientId: string): Promise<StoredPrepRun[]> {
+        return [...this.runs]
+            .reverse()
+            .filter((run) => run.patientId === patientId)
+            .map((run) => ({
+                id: run.id,
+                patient_id: run.patientId,
+                correlation_id: run.correlationId,
+                status: run.status,
+                stage: run.stage ?? null,
+                error: run.error ?? null,
+                started_at: NOW.toISOString(),
+                finished_at: run.status === 'running' ? null : NOW.toISOString(),
+            }));
     }
 }
 
@@ -222,6 +254,10 @@ describe('FactExtractor', () => {
         const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
         expect(body['model']).toBe('claude-sonnet-5');
         expect('temperature' in body).toBe(false);
+        // Streaming is REQUIRED at this output budget: >16K tokens without stream risks
+        // HTTP timeouts, and 16K was exactly the cap that truncated the first live prep.
+        expect(body['stream']).toBe(true);
+        expect(body['max_tokens']).toBe(64000);
         expect(body['system']).toContain('VERBATIM');
         const messages = body['messages'] as { role: string; content: string }[];
         expect(messages).toHaveLength(1);
@@ -286,6 +322,120 @@ describe('FactExtractor', () => {
         await expect(
             extractor.extract({ patientId: PATIENT_ID, patientName: null, documents: [] }, 'corr-stray', silentLogger),
         ).rejects.toThrow(/patient_id/);
+    });
+});
+
+// ---- Anthropic streaming client ----
+
+describe('AnthropicClient streaming', () => {
+    // Guards: delta accumulation dropping chunks or thinking deltas leaking into the
+    // extraction text (adaptive thinking is on by default and bills as output).
+    it('accumulates text deltas, skips thinking deltas, and reports usage + stop_reason', async () => {
+        const fetchMock = vi.fn<FetchLike>().mockResolvedValueOnce(
+            new Response(
+                sseEvents([
+                    { type: 'message_start', message: { model: 'claude-sonnet-5', usage: { input_tokens: 42, output_tokens: 1 } } },
+                    { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'INTERNAL' } },
+                    { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'hello ' } },
+                    { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'world' } },
+                    { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 7 } },
+                    { type: 'message_stop' },
+                ]),
+                { status: 200 },
+            ),
+        );
+        const client = new AnthropicClient({ apiKey: 'test-key', model: 'claude-sonnet-5', fetchImpl: fetchMock });
+        const completion = await client.complete('sys', [{ role: 'user', content: 'hi' }], 'corr-sse');
+        expect(completion.text).toBe('hello world');
+        expect(completion.text).not.toContain('INTERNAL');
+        expect(completion.usage).toEqual({ input_tokens: 42, output_tokens: 7 });
+        expect(completion.stop_reason).toBe('end_turn');
+    });
+
+    // Guards: the observed live failure mode — a hung Anthropic call wedging the prep run
+    // (and its in-flight dedupe slot) forever. Idle silence must kill the call.
+    it('aborts with a typed timeout error when the stream goes idle', async () => {
+        const body = new ReadableStream<Uint8Array>({
+            start(controller) {
+                controller.enqueue(
+                    new TextEncoder().encode(
+                        sseEvents([{ type: 'message_start', message: { model: 'm', usage: { input_tokens: 1 } } }]),
+                    ),
+                );
+                // never closes — simulates a wedged upstream
+            },
+        });
+        const fetchMock = vi.fn<FetchLike>().mockResolvedValueOnce(new Response(body, { status: 200 }));
+        const client = new AnthropicClient({
+            apiKey: 'test-key',
+            model: 'claude-sonnet-5',
+            fetchImpl: fetchMock,
+            idleTimeoutMs: 25,
+        });
+        await expect(client.complete('sys', [{ role: 'user', content: 'hi' }], 'corr-idle')).rejects.toThrow(
+            /no stream progress/,
+        );
+    });
+
+    // Guards: mid-stream API errors (e.g. overloaded_error) dissolving into downstream
+    // JSON-parse noise instead of a typed, retryable failure.
+    it('throws a typed error on an SSE error event', async () => {
+        const fetchMock = vi.fn<FetchLike>().mockResolvedValueOnce(
+            new Response(
+                sseEvents([
+                    { type: 'message_start', message: { model: 'm', usage: { input_tokens: 1 } } },
+                    { type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } },
+                ]),
+                { status: 200 },
+            ),
+        );
+        const client = new AnthropicClient({ apiKey: 'test-key', model: 'claude-sonnet-5', fetchImpl: fetchMock });
+        await expect(client.complete('sys', [{ role: 'user', content: 'hi' }], 'corr-err')).rejects.toThrow(
+            /overloaded_error/,
+        );
+    });
+
+    // Guards: silent-heartbeat regression — a long call must emit periodic progress so
+    // Railway logs distinguish slow from hung.
+    it('emits onProgress heartbeats while the stream is open', async () => {
+        const encoder = new TextEncoder();
+        const body = new ReadableStream<Uint8Array>({
+            start(controller) {
+                controller.enqueue(
+                    encoder.encode(
+                        sseEvents([
+                            { type: 'message_start', message: { model: 'm', usage: { input_tokens: 1 } } },
+                            { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'chunk-one' } },
+                        ]),
+                    ),
+                );
+                setTimeout(() => {
+                    controller.enqueue(
+                        encoder.encode(
+                            sseEvents([
+                                { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 2 } },
+                                { type: 'message_stop' },
+                            ]),
+                        ),
+                    );
+                    controller.close();
+                }, 60);
+            },
+        });
+        const fetchMock = vi.fn<FetchLike>().mockResolvedValueOnce(new Response(body, { status: 200 }));
+        const client = new AnthropicClient({
+            apiKey: 'test-key',
+            model: 'claude-sonnet-5',
+            fetchImpl: fetchMock,
+            heartbeatMs: 10,
+        });
+        const progress = vi.fn();
+        const completion = await client.complete('sys', [{ role: 'user', content: 'hi' }], 'corr-beat', progress);
+        expect(completion.text).toBe('chunk-one');
+        expect(progress).toHaveBeenCalled();
+        const last = progress.mock.calls.at(-1)![0] as { textChars: number; elapsedMs: number };
+        expect(last.textChars).toBe('chunk-one'.length);
+        expect(last.elapsedMs).toBeGreaterThan(0);
     });
 });
 
@@ -540,6 +690,54 @@ describe('prep routes', () => {
     });
 
     // Guards: the fact-bundle read path and its unknown-patient 404.
+    // Guards: the run-status observability contract — a completed run shows its final
+    // stage; a failed run shows the stage it died in, plus the recorded error.
+    it('GET /api/prep-runs reports stage and error for completed and failed runs', async () => {
+        const { deps, store } = routeDeps();
+        const app = testServer(deps);
+        await app.inject({ method: 'POST', url: `/api/prep/${PATIENT_ID}` });
+        await vi.waitFor(() => {
+            expect(store.runs[0]!.status).toBe('complete');
+        });
+        const ok = await app.inject({ method: 'GET', url: `/api/prep-runs/${PATIENT_ID}` });
+        expect(ok.statusCode).toBe(200);
+        const completed = (ok.json() as { runs: StoredPrepRun[] }).runs[0]!;
+        expect(completed.status).toBe('complete');
+        expect(completed.stage).toBe('save_brief'); // the last stage entered
+
+        // A failing extraction (invalid JSON on both attempts) must leave the run failed
+        // AT llm_extraction with the ExtractionError message recorded.
+        const failStore = new FakeStore(corpusBundle());
+        const failExtractor = extractorWith(llmResponse('not json'), llmResponse('still not json')).extractor;
+        const failApp = testServer({
+            store: failStore,
+            source: new StoreDocumentSource(failStore, corpusDb),
+            extractor: failExtractor,
+            clock: () => NOW,
+        });
+        await failApp.inject({ method: 'POST', url: `/api/prep/${PATIENT_ID}` });
+        await vi.waitFor(() => {
+            expect(failStore.runs[0]!.status).toBe('failed');
+        });
+        const failed = ((await failApp.inject({ method: 'GET', url: `/api/prep-runs/${PATIENT_ID}` })).json() as {
+            runs: StoredPrepRun[];
+        }).runs[0]!;
+        expect(failed.status).toBe('failed');
+        expect(failed.stage).toBe('llm_extraction');
+        expect(failed.error).toContain('extraction failed');
+    });
+
+    // Guards: the scaffold contract for the new route — 503 without a store, empty list
+    // (not 404) for an unknown patient.
+    it('GET /api/prep-runs answers 503 without deps and [] for an unknown patient', async () => {
+        const bare = await testServer().inject({ method: 'GET', url: `/api/prep-runs/${PATIENT_ID}` });
+        expect(bare.statusCode).toBe(503);
+        const { deps } = routeDeps();
+        const res = await testServer(deps).inject({ method: 'GET', url: '/api/prep-runs/nobody' });
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toEqual({ runs: [] });
+    });
+
     it('GET /api/facts returns the bundle for a known patient and 404 otherwise', async () => {
         const { deps } = routeDeps();
         const app = testServer(deps);
@@ -549,6 +747,265 @@ describe('prep routes', () => {
         const missing = await app.inject({ method: 'GET', url: '/api/facts/nobody' });
         expect(missing.statusCode).toBe(404);
         expect(missing.json()).toEqual({ error: 'patient_not_found' });
+    });
+});
+
+// ---- Spend guardrails (budget gate, reuse window, dedupe, concurrency, usage) ----
+
+// In-memory SpendGuard double (the PrepRouteSpendGuard surface; no Postgres).
+class FakeSpendGuard implements PrepRouteSpendGuard {
+    recorded: LlmCallRecord[] = [];
+    budgetError: BudgetExceededError | null = null;
+    summary: UsageSummary = {
+        window: '24h',
+        calls: 2,
+        input_tokens: 2400,
+        output_tokens: 1600,
+        est_cost_usd: 0.0312,
+        budget_usd: 5,
+        remaining_usd: 4.9688,
+    };
+
+    async assertBudget(): Promise<void> {
+        if (this.budgetError !== null) {
+            throw this.budgetError;
+        }
+    }
+
+    async recordCall(call: LlmCallRecord): Promise<void> {
+        this.recorded.push(call);
+    }
+
+    async usageSummary(): Promise<UsageSummary> {
+        return this.summary;
+    }
+}
+
+function guardedDeps(options: { spendGuard?: FakeSpendGuard; maxConcurrentPreps?: number } = {}) {
+    const store = new FakeStore(corpusBundle());
+    const spendGuard = options.spendGuard ?? new FakeSpendGuard();
+    const { extractor, fetchMock } = extractorWith(
+        llmResponse({ facts: corpusFacts(), contradictions: corpusContradictions() }),
+    );
+    const deps: PrepRouteDeps = {
+        store,
+        source: new StoreDocumentSource(store, corpusDb),
+        extractor,
+        spendGuard,
+        clock: () => NOW,
+        ...(options.maxConcurrentPreps !== undefined ? { maxConcurrentPreps: options.maxConcurrentPreps } : {}),
+    };
+    return { deps, store, spendGuard, fetchMock };
+}
+
+function pushBrief(store: FakeStore, ageMinutes: number): StoredBrief {
+    const stored: StoredBrief = {
+        id: 'brief-existing',
+        patient_id: PATIENT_ID,
+        prepared_at: new Date(NOW.getTime() - ageMinutes * 60_000).toISOString(),
+        correlation_id: 'corr-prev',
+        content: {},
+        status: 'complete',
+    };
+    store.briefs.push(stored);
+    return stored;
+}
+
+// Extractor whose single LLM call hangs until release() — keeps a prep in flight so the
+// dedupe/concurrency guards can be observed, then completes it to free the slot.
+function hangingExtractor() {
+    let release!: (response: Response) => void;
+    const gate = new Promise<Response>((resolve) => {
+        release = resolve;
+    });
+    const fetchMock = vi.fn<FetchLike>();
+    fetchMock.mockReturnValueOnce(gate);
+    const client = new AnthropicClient({ apiKey: 'test-key', model: 'claude-sonnet-5', fetchImpl: fetchMock });
+    return { extractor: new FactExtractor(client), release };
+}
+
+describe('spend guardrails: prep pipeline', () => {
+    // Guards: an LLM call escaping the ledger — BOTH attempts of a retried extraction
+    // must land in recordCall with the run's correlation ID and the prep purpose.
+    it('records usage once per Anthropic call, including the retry attempt', async () => {
+        const store = new FakeStore(corpusBundle());
+        const spendGuard = new FakeSpendGuard();
+        const invalid = corpusFacts();
+        delete invalid[0].source_document_id; // first attempt fails validation -> retry
+        const { extractor, fetchMock } = extractorWith(
+            llmResponse({ facts: invalid, contradictions: [] }),
+            llmResponse({ facts: corpusFacts(), contradictions: [] }),
+        );
+        const deps: PrepDeps = {
+            store,
+            source: new StoreDocumentSource(store, corpusDb),
+            extractor,
+            spendGuard,
+            logger: silentLogger,
+            clock: () => NOW,
+        };
+        await runPrep(deps, PATIENT_ID, 'corr-usage');
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(spendGuard.recorded).toHaveLength(2);
+        for (const call of spendGuard.recorded) {
+            expect(call).toEqual({
+                correlationId: 'corr-usage',
+                purpose: 'prep_extraction',
+                model: 'claude-sonnet-5',
+                inputTokens: 1200,
+                outputTokens: 800,
+            });
+        }
+    });
+
+    // Guards: a blown budget still buying tokens — assertBudget must fail the run BEFORE
+    // any LLM call, with the clear budget message recorded on the prep_run row.
+    it('fails the run before any LLM call when the budget is exceeded', async () => {
+        const store = new FakeStore(corpusBundle());
+        const spendGuard = new FakeSpendGuard();
+        spendGuard.budgetError = new BudgetExceededError(5.25, 5);
+        const { extractor, fetchMock } = extractorWith(llmResponse({ facts: [], contradictions: [] }));
+        const deps: PrepDeps = {
+            store,
+            source: new StoreDocumentSource(store, corpusDb),
+            extractor,
+            spendGuard,
+            logger: silentLogger,
+            clock: () => NOW,
+        };
+        await expect(runPrep(deps, PATIENT_ID, 'corr-budget')).rejects.toThrow(BudgetExceededError);
+        expect(store.runs[0]!.status).toBe('failed');
+        expect(store.runs[0]!.error).toContain('llm daily budget exceeded');
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(spendGuard.recorded).toHaveLength(0);
+        expect(store.briefs).toHaveLength(0);
+    });
+});
+
+describe('spend guardrails: prep route', () => {
+    // Guards: re-prepping (and re-paying for) a patient whose brief is still fresh.
+    it('reuses a brief newer than the reuse window without invoking the extractor', async () => {
+        const { deps, store, fetchMock } = guardedDeps();
+        const brief = pushBrief(store, 5); // 5 min old < the 10 min default window
+        const app = testServer(deps);
+        const res = await app.inject({ method: 'POST', url: `/api/prep/${PATIENT_ID}` });
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toEqual({ status: 'reused', brief_id: brief.id, prepared_at: brief.prepared_at });
+        expect(store.runs).toHaveLength(0); // no prep_run row opened
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    // Guards: the window arithmetic inverting — a stale brief must NOT suppress the prep.
+    it('runs a fresh prep when the latest brief is older than the reuse window', async () => {
+        const { deps, store } = guardedDeps();
+        pushBrief(store, 11); // 11 min old > the 10 min default window
+        const app = testServer(deps);
+        const res = await app.inject({ method: 'POST', url: `/api/prep/${PATIENT_ID}` });
+        expect(res.statusCode).toBe(202);
+        await vi.waitFor(() => {
+            expect(store.runs[0]!.status).toBe('complete');
+        });
+    });
+
+    // Guards: the explicit re-prep escape hatch — force=true must skip the reuse check.
+    it('force=true bypasses the reuse window and starts a new run', async () => {
+        const { deps, store } = guardedDeps();
+        pushBrief(store, 1); // would be reused without force
+        const app = testServer(deps);
+        const res = await app.inject({ method: 'POST', url: `/api/prep/${PATIENT_ID}?force=true` });
+        expect(res.statusCode).toBe(202);
+        expect(res.json()).toMatchObject({ prep_run_id: 'run-1' });
+        await vi.waitFor(() => {
+            expect(store.runs[0]!.status).toBe('complete');
+        });
+    });
+
+    // Guards: double-spending on the same patient — a second POST while the first prep
+    // is still executing must return the running id, not open a second run.
+    it('answers already_running while a prep for the same patient is in flight', async () => {
+        const store = new FakeStore(corpusBundle());
+        const { extractor, release } = hangingExtractor();
+        const deps: PrepRouteDeps = {
+            store,
+            source: new StoreDocumentSource(store, corpusDb),
+            extractor,
+            spendGuard: new FakeSpendGuard(),
+            clock: () => NOW,
+        };
+        const app = testServer(deps);
+        const first = await app.inject({ method: 'POST', url: `/api/prep/${PATIENT_ID}` });
+        expect(first.statusCode).toBe(202);
+        const prepRunId = (first.json() as { prep_run_id: string }).prep_run_id;
+
+        const second = await app.inject({ method: 'POST', url: `/api/prep/${PATIENT_ID}` });
+        expect(second.statusCode).toBe(202);
+        expect(second.json()).toEqual({ status: 'already_running', prep_run_id: prepRunId });
+        expect(store.runs).toHaveLength(1); // no second prep_run row
+
+        // Release the hanging LLM call so the in-flight slot frees for later tests.
+        release(llmResponse({ facts: corpusFacts(), contradictions: corpusContradictions() }));
+        await vi.waitFor(() => {
+            expect(store.runs[0]!.status).toBe('complete');
+        });
+    });
+
+    // Guards: unbounded parallel spend across patients — at the cap the route must 429.
+    it('answers 429 too_many_preps at the concurrency cap', async () => {
+        const store = new FakeStore(corpusBundle());
+        const { extractor, release } = hangingExtractor();
+        const deps: PrepRouteDeps = {
+            store,
+            source: new StoreDocumentSource(store, corpusDb),
+            extractor,
+            spendGuard: new FakeSpendGuard(),
+            maxConcurrentPreps: 1,
+            clock: () => NOW,
+        };
+        const app = testServer(deps);
+        const first = await app.inject({ method: 'POST', url: `/api/prep/${PATIENT_ID}` });
+        expect(first.statusCode).toBe(202);
+
+        // A different patient trips the cap (the per-patient dedupe would not catch it).
+        const capped = await app.inject({ method: 'POST', url: '/api/prep/other-patient' });
+        expect(capped.statusCode).toBe(429);
+        expect(capped.json()).toEqual({ error: 'too_many_preps' });
+        expect(store.runs).toHaveLength(1);
+
+        release(llmResponse({ facts: corpusFacts(), contradictions: corpusContradictions() }));
+        await vi.waitFor(() => {
+            expect(store.runs[0]!.status).toBe('complete');
+        });
+    });
+
+    // Guards: the budget 429 contract — error code plus the spent/budget amounts, and no
+    // prep_run row or LLM call behind it.
+    it('answers 429 llm_budget_exceeded with the spent and budget amounts', async () => {
+        const spendGuard = new FakeSpendGuard();
+        spendGuard.budgetError = new BudgetExceededError(6.5, 5);
+        const { deps, store, fetchMock } = guardedDeps({ spendGuard });
+        const app = testServer(deps);
+        const res = await app.inject({ method: 'POST', url: `/api/prep/${PATIENT_ID}` });
+        expect(res.statusCode).toBe(429);
+        expect(res.json()).toEqual({ error: 'llm_budget_exceeded', spent_usd: 6.5, budget_usd: 5 });
+        expect(store.runs).toHaveLength(0);
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    // Guards: the GET /api/usage contract the panel's spend readout consumes.
+    it('GET /api/usage returns the spend summary', async () => {
+        const { deps, spendGuard } = guardedDeps();
+        const app = testServer(deps);
+        const res = await app.inject({ method: 'GET', url: '/api/usage' });
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toEqual(spendGuard.summary);
+    });
+
+    // Guards: the scaffold breaking when Postgres is not configured — 503, not a crash.
+    it('GET /api/usage answers 503 store_not_configured without deps', async () => {
+        const app = testServer();
+        const res = await app.inject({ method: 'GET', url: '/api/usage' });
+        expect(res.statusCode).toBe(503);
+        expect(res.json()).toEqual({ error: 'store_not_configured' });
     });
 });
 

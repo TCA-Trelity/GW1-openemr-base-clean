@@ -10,6 +10,7 @@ import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { loadConfig, type Config } from './config.js';
 import { AnthropicClient } from './prep/anthropic.js';
+import { SpendGuard } from './prep/budget.js';
 import { FactExtractor } from './prep/extraction.js';
 import { StoreDocumentSource } from './prep/sources.js';
 import { registerHealthRoutes } from './routes/health.js';
@@ -34,8 +35,18 @@ export function buildDeps(config: Config): AppDeps | undefined {
     const pool = createPool(config);
     const store = new FactStore(pool);
     const extractor = new FactExtractor(
-        new AnthropicClient({ apiKey: config.ANTHROPIC_API_KEY ?? '', model: config.ANTHROPIC_MODEL_PREP }),
+        new AnthropicClient({
+            apiKey: config.ANTHROPIC_API_KEY ?? '',
+            model: config.ANTHROPIC_MODEL_PREP,
+            maxTokens: config.LLM_MAX_OUTPUT_TOKENS,
+        }),
     );
+    // Spend guardrails share the store's pool: llm_calls ledger + rolling 24h budget gate.
+    const spendGuard = new SpendGuard(pool, {
+        dailyBudgetUsd: config.LLM_DAILY_BUDGET_USD,
+        inputUsdPerMtok: config.LLM_INPUT_USD_PER_MTOK,
+        outputUsdPerMtok: config.LLM_OUTPUT_USD_PER_MTOK,
+    });
     return {
         checkPostgres: async () => {
             await pool.query('SELECT 1');
@@ -47,6 +58,9 @@ export function buildDeps(config: Config): AppDeps | undefined {
             // once the live FHIR client credentials land with S1.9.
             source: new StoreDocumentSource(store, pool),
             extractor,
+            spendGuard,
+            reuseWindowMinutes: config.PREP_REUSE_WINDOW_MINUTES,
+            maxConcurrentPreps: config.LLM_MAX_CONCURRENT_PREPS,
         },
     };
 }

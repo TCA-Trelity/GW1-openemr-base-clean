@@ -36,6 +36,9 @@ export interface ExtractionResult {
     contradictions: RuntimeContradiction[];
 }
 
+/** Spend-guardrail hook: invoked for EVERY Anthropic call this extraction makes, retries included. */
+export type OnUsage = (usage: { model: string; inputTokens: number; outputTokens: number }) => Promise<void> | void;
+
 export class ExtractionError extends Error {
     constructor(
         public readonly attempts: number,
@@ -152,12 +155,24 @@ function validateResponse(text: string, patientId: string, stopReason: string | 
 export class FactExtractor {
     constructor(private readonly client: AnthropicClient) {}
 
-    async extract(input: ExtractionInput, correlationId: string, logger: PrepLogger): Promise<ExtractionResult> {
+    async extract(
+        input: ExtractionInput,
+        correlationId: string,
+        logger: PrepLogger,
+        onUsage?: OnUsage,
+    ): Promise<ExtractionResult> {
         const messages: AnthropicMessage[] = [{ role: 'user', content: buildUserContent(input) }];
         let lastIssues: string[] = [];
 
         for (let attempt = 1; attempt <= 2; attempt += 1) {
-            const completion = await this.client.complete(EXTRACTION_SYSTEM_PROMPT, messages, correlationId);
+            // Streaming heartbeat: a long extraction logs progress every ~15s, so a silent
+            // Railway log means hung (and the client's idle timeout will kill it), not slow.
+            const completion = await this.client.complete(EXTRACTION_SYSTEM_PROMPT, messages, correlationId, (progress) =>
+                logger.info(
+                    { correlationId, attempt, text_chars: progress.textChars, elapsed_ms: progress.elapsedMs },
+                    'extraction stream in progress',
+                ),
+            );
             // Token usage feeds the cost-tracking requirement — always logged with the correlation ID.
             logger.info(
                 {
@@ -169,6 +184,12 @@ export class FactExtractor {
                 },
                 'extraction llm call complete',
             );
+            // Spend guardrails: every attempt cost tokens, so report it before validation.
+            await onUsage?.({
+                model: completion.model,
+                inputTokens: completion.usage.input_tokens,
+                outputTokens: completion.usage.output_tokens,
+            });
             const validation = validateResponse(completion.text, input.patientId, completion.stop_reason);
             if (validation.ok) {
                 return validation.result;
