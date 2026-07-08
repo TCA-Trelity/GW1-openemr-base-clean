@@ -36,6 +36,12 @@ describe('empty-record-boundary', () => {
             patient: bundle.patient,
             facts_by_type: {},
             medication_risk_flags: [],
+            care_plan: {
+                active_condition_fact_ids: [],
+                protocol: null,
+                monitoring: [],
+                follow_up: { recommendation: null, optimal_interval_weeks: null, confidence: 'low' },
+            },
             contradictions: [],
             documents: [],
             images: [],
