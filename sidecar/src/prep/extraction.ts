@@ -80,14 +80,14 @@ const CITATION_CONTRACT = `Each citation object:
 {"id": "<unique id>", "fact_id": "<owning fact id>", "source_label": "<human label>",
  "source_type": "intake_transcript"|"provider_note"|"pharmacy_record"|"imaging_report"|"lab_report"|"prior_visit_note"|"referral_letter"|"patient_self_report"|"clinical_observation"|"external_ehr_import"|"scribe_transcript",
  "excerpt_text": "<VERBATIM excerpt — character-for-character exact, including punctuation and casing>",
- "excerpt_location": {"type": "character_range", "start_char": <int>, "end_char": <int>, "context_before": null, "context_after": null},
+ "excerpt_location": {"type": "character_range", "start_char": <int>, "end_char": <int>},
  "attribution": {"speaker_role": "patient"|"family_member"|"physician"|"nurse"|"technician"|"pharmacist"|"external_provider"|"system", "speaker_name"?, "confidence"?},
  "source_document_id": "<document id>", "document_date": "<document date>"}
 
 start_char/end_char: a rough estimate is fine — verification matches excerpt_text verbatim \
 against the document and corrects the range. Do NOT spend effort counting characters; the \
-excerpt text itself must be exact, the offsets need not be. Always set context_before and \
-context_after to null.`;
+excerpt text itself must be exact, the offsets need not be. Omit context_before and \
+context_after entirely.`;
 
 // The per-document deep-reader prompt: facts ONLY, from ONE document.
 export const EXTRACTION_SYSTEM_PROMPT = `You are the preparation deep-reader for a clinical co-pilot. You are given ONE source \

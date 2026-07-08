@@ -372,6 +372,26 @@ describe('FactExtractor', () => {
         expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 
+    // Guards: the 2026-07-08 live failure — Haiku omits null keys in minified JSON, so a
+    // citation without context_before/context_after must parse (they default to null).
+    it('accepts citations whose excerpt_location omits the context keys', async () => {
+        const facts = corpusFacts().slice(0, 1);
+        for (const source of facts[0].sources) {
+            if (source.excerpt_location) {
+                delete source.excerpt_location.context_before;
+                delete source.excerpt_location.context_after;
+            }
+        }
+        const { extractor } = extractorWith(llmResponse({ facts }));
+        const result = await extractor.extract(
+            { patientId: PATIENT_ID, patientName: null, documents: ONE_DOC },
+            'corr-noctx',
+            silentLogger,
+        );
+        expect(result.facts).toHaveLength(1);
+        expect(result.facts[0]!.sources[0]!.excerpt_location?.context_before).toBeNull();
+    });
+
     // Guards: common model formatting drift — fenced JSON must still parse.
     it('accepts a markdown-fenced JSON response', async () => {
         const fenced = '```json\n' + JSON.stringify({ facts: [] }) + '\n```';

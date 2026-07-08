@@ -47,8 +47,10 @@ export const ExcerptLocationSchema = z.object({
     type: z.literal('character_range'),
     start_char: z.number().int().min(0),
     end_char: z.number().int().min(0),
-    context_before: z.string().nullable(),
-    context_after: z.string().nullable(),
+    // Omittable by extraction (Haiku drops null keys in minified JSON); the panel derives
+    // context from the stored document text + range, so absence costs nothing.
+    context_before: z.string().nullable().default(null),
+    context_after: z.string().nullable().default(null),
 });
 export type ExcerptLocation = z.infer<typeof ExcerptLocationSchema>;
 
