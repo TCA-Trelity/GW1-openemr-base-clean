@@ -112,6 +112,17 @@ UI moves (avoids collisions in `sidecar/panel/`), corpus agent in parallel.**
 | R5 | Citations fixed end-to-end: (a) brief assembly carries fact/citation refs per item → chips render in the Insights tab like Conditions; (b) chat migrates to the native Citations API (documents as content blocks, citations_delta → chips with char-range deep-links, spans re-verified by the gate server-side); `[[fact:id]]` contract retired | main + sub (panel batch) | — | unit + screenshot | ☑ |
 | R6 | Integrated image analysis (port second-opinion `AIFindingsPanel` + `CombinedImagingSection`): selecting any scan shows image beside findings (severity/trend icons), measurements grid w/ reference ranges, delta vs prior, adjacent trend — one sweep | sub (panel batch) | S2.13 | screenshot | ☑ |
 
+### Wave E — EHR integration layer + Wave V imaging module (user review 2, 2026-07-08)
+
+| ID | Ticket | Agent | Depends | Verify | Done |
+|---|---|---|---|---|---|
+| R7 | Data-conflicts card moves below Chief Complaint AND Recent Scans on Overview | sub | R2 | screenshot | ☐ |
+| R8 | Citation chips: numeric bubbles → source-name labels ("Provider note", "Pharmacy", "Imaging report", "EHR"...) everywhere incl. chat, so provenance reads before the click | sub | — | screenshot | ☐ |
+| E1 | Seed the EHR itself: script creates the 5 corpus patients INSIDE OpenEMR (patient_data + problems/allergies/medications via the standard REST API, payloads derived from corpus facts + synthetic fill for native fields), records returned uuids into sidecar `patients.openemr_patient_id`; OAuth client registration extended with write scopes; user's only click = enabling the API client in OpenEMR admin | sub + railway + user | S1.5 | logs + FHIR read-back | ☐ |
+| E2 | EHR sync service: FHIR pull (Patient/AllergyIntolerance/Condition/MedicationRequest/Observation) for linked patients → facts with EHR provenance + citable "EHR snapshot" source documents through the same gate pipeline; refresh endpoint | main | E1 | unit + ci-live | ☐ |
+| E3 | Panel: "EHR Record" view (systematic live-from-OpenEMR rendering w/ sync timestamp, refresh, open-in-chart link) + EHR/External origin badges on all facts & citations | sub | E2 | screenshot | ☐ |
+| V1 | Imaging workspace revamp (second-opinion pattern): analytics dashboard row (CRT delta, GC-IPL vs reference band, interval status, alert level) + large dark-surround scan viewer with OD/OS toggle + thumbnail filmstrip + metadata/findings in the margins + trend charts beneath with selected-scan highlight | sub | R6 | screenshot | ☐ |
+
 **Phase 2 exit criteria:** agent works in the live environment (embedded), eval results committed, dashboard live, video submitted.
 
 ## Phase 3 — Tier 2 / Final
