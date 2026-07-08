@@ -137,7 +137,7 @@ function toStoredFact(fact: PatientFact): StoredFact {
 /**
  * The seeded-store view of a corpus: authored facts as StoredFact rows under the corpus
  * patient — the bundle shape chat and overview consume. Non-fact collections stay empty;
- * the evals that use this only classify against fact identity.
+ * chat-citation evals verify spans against these documents' text.
  */
 export function seededFactBundle(corpus: LoadedCorpus): FactBundle {
     const { patient_id, name, ...demographics } = corpus.raw.patient;
@@ -147,6 +147,13 @@ export function seededFactBundle(corpus: LoadedCorpus): FactBundle {
         contradictions: [],
         images: [],
         treatments: [],
-        documents: [],
+        documents: corpus.raw.source_documents.map((doc) => ({
+            id: doc.document_id,
+            document_type: doc.document_type,
+            document_date: doc.document_date,
+            content: doc.content as unknown as Record<string, unknown>,
+            metadata: {},
+            extras: {},
+        })),
     };
 }

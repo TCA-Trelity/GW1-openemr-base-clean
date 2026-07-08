@@ -103,12 +103,23 @@ const factsByTypeShape = Object.fromEntries(
     FACT_TYPES.map((type) => [type, z.array(PatientFactSchema).default([])]),
 ) as Record<(typeof FACT_TYPES)[number], z.ZodDefault<z.ZodArray<typeof PatientFactSchema>>>;
 
+// Discussion points are structured items (R4/R5): terse one-line text a physician reads
+// in seconds, plus refs the panel renders as citation chips (fact ids resolve against
+// facts_by_type; contradiction ids link to the alert card carrying the full detail).
+export const DiscussionPointSchema = z.object({
+    text: z.string(),
+    kind: z.enum(['med_change', 'risk_flag', 'contradiction', 'imaging', 'interval']),
+    fact_ids: z.array(z.string()).default([]),
+    contradiction_id: z.string().nullable().default(null),
+});
+export type DiscussionPoint = z.infer<typeof DiscussionPointSchema>;
+
 export const BriefContentSchema = z.object({
     urgency: z.object({ level: z.enum(['high', 'moderate']), reason: z.string() }).nullable(),
     contradiction_alerts: z.array(RuntimeContradictionSchema),
     why_they_are_here: z.object({ fact_id: z.string(), content: ChiefComplaintContentSchema }).nullable(),
     what_they_are_hoping_for: z.object({ fact_id: z.string(), content: PatientGoalContentSchema }).nullable(),
-    key_discussion_points: z.array(z.string()),
+    key_discussion_points: z.array(DiscussionPointSchema),
     questions_to_confirm: z.array(z.string()),
     medication_risk_flags: z.array(MedicationRiskFlagSchema),
     imaging: z.object({
@@ -203,36 +214,81 @@ function deriveUrgency(
 const RECENT_MED_CHANGE_DAYS = 180;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function deriveKeyDiscussionPoints(input: BriefAssemblyInput, active: RuntimeContradiction[]): string[] {
-    const points: string[] = [];
+function deriveKeyDiscussionPoints(input: BriefAssemblyInput, active: RuntimeContradiction[]): DiscussionPoint[] {
+    const points: DiscussionPoint[] = [];
     const preparedAtMs = new Date(input.preparedAt).getTime();
-    for (const fact of input.verifiedFacts) {
-        if (fact.fact_type !== 'medication') {
-            continue;
-        }
+    const medFacts = input.verifiedFacts.filter(
+        (fact): fact is Extract<PatientFact, { fact_type: 'medication' }> => fact.fact_type === 'medication',
+    );
+    for (const fact of medFacts) {
         const started = fact.content.start_date ? new Date(fact.content.start_date).getTime() : NaN;
         if (Number.isFinite(started) && preparedAtMs - started <= RECENT_MED_CHANGE_DAYS * DAY_MS) {
-            points.push(`Recently started medication: ${fact.content.name}`);
+            points.push({ text: `Started: ${fact.content.name}`, kind: 'med_change', fact_ids: [fact.id], contradiction_id: null });
         }
         if (fact.content.end_date != null && fact.content.end_date !== '') {
-            points.push(`Recently stopped medication: ${fact.content.name} (ended ${fact.content.end_date})`);
+            points.push({
+                text: `Stopped: ${fact.content.name} (${fact.content.end_date})`,
+                kind: 'med_change',
+                fact_ids: [fact.id],
+                contradiction_id: null,
+            });
         }
     }
     for (const flag of input.medicationRiskFlags) {
-        if (flag.severity !== 'low') {
-            points.push(flag.message);
+        if (flag.severity === 'low') {
+            continue;
         }
+        // Terse rebuild instead of the engine's full message — the flag card carries detail.
+        const medFact = medFacts.find((fact) =>
+            fact.content.name.toLowerCase().includes(flag.medication.toLowerCase().split(' ')[0] ?? ''),
+        );
+        points.push({
+            text: `${flag.medication}: ${flag.severity.toUpperCase()} ${flagTypeLabel(flag.flag_type)}`,
+            kind: 'risk_flag',
+            fact_ids: medFact === undefined ? [] : [medFact.id],
+            contradiction_id: null,
+        });
     }
     for (const item of active) {
-        points.push(`Conflicting records (${item.type}): ${item.description}`);
+        // The clause before the first colon is the authored one-line summary; the alert
+        // card (linked by contradiction_id) holds the full description + both sources.
+        points.push({
+            text: terse(item.description.split(':')[0] ?? item.description),
+            kind: 'contradiction',
+            fact_ids: [],
+            contradiction_id: item.id,
+        });
     }
     if (input.imaging.hcq_progression.progression_detected) {
-        points.push(`Imaging: ${input.imaging.hcq_progression.progression_description}`);
+        points.push({
+            text: terse(input.imaging.hcq_progression.progression_description),
+            kind: 'imaging',
+            fact_ids: [],
+            contradiction_id: null,
+        });
     }
     if (input.imaging.interval_analysis.recommendation !== '') {
-        points.push(`Treatment intervals: ${input.imaging.interval_analysis.recommendation}`);
+        points.push({
+            text: terse(input.imaging.interval_analysis.recommendation),
+            kind: 'interval',
+            fact_ids: [],
+            contradiction_id: null,
+        });
     }
-    return dedupe(points);
+    const seen = new Set<string>();
+    return points.filter((point) => (seen.has(point.text) ? false : (seen.add(point.text), true)));
+}
+
+function flagTypeLabel(flagType: MedicationRiskFlag['flag_type']): string {
+    return flagType.replace(/_/g, ' ') + ' risk';
+}
+
+// Physicians read this in seconds: first sentence only, hard-capped.
+const TERSE_MAX_CHARS = 90;
+function terse(value: string): string {
+    const firstSentence = value.split(/\.\s/)[0] ?? value;
+    const trimmed = firstSentence.trim().replace(/\.$/, '');
+    return trimmed.length <= TERSE_MAX_CHARS ? trimmed : `${trimmed.slice(0, TERSE_MAX_CHARS - 1).trimEnd()}…`;
 }
 
 function dedupe(values: string[]): string[] {

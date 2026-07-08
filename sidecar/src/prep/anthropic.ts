@@ -6,9 +6,12 @@
 // prompt + Zod validation.
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
+/** Loose content-block shape (document blocks for the Citations API, text blocks, ...). */
+export type AnthropicContentBlock = Record<string, unknown>;
+
 export interface AnthropicMessage {
     role: 'user' | 'assistant';
-    content: string;
+    content: string | AnthropicContentBlock[];
 }
 
 export interface AnthropicUsage {
@@ -19,6 +22,8 @@ export interface AnthropicUsage {
 export interface AnthropicCompletion {
     /** Concatenated text deltas (thinking deltas are skipped). */
     text: string;
+    /** Citations API objects (char_location) in arrival order, when documents enable them. */
+    citations: Record<string, unknown>[];
     usage: AnthropicUsage;
     stop_reason: string | null;
     model: string;
@@ -31,10 +36,11 @@ export interface StreamProgress {
 }
 export type OnProgress = (progress: StreamProgress) => void;
 
-/** Per-call hooks: heartbeat cadence + raw text deltas (chat streams them to the browser). */
+/** Per-call hooks: heartbeat cadence + raw text/citation deltas (chat relays them live). */
 export interface CompleteHooks {
     onProgress?: OnProgress;
     onTextDelta?: (text: string) => void;
+    onCitation?: (citation: Record<string, unknown>) => void;
 }
 
 // Typed API failure: status plus the API error type/message only — never the raw body.
@@ -140,7 +146,14 @@ export class AnthropicClient {
             idleTimer = setTimeout(() => abort(`no stream progress for ${this.idleTimeoutMs}ms`), this.idleTimeoutMs);
         };
 
-        const state = { text: '', inputTokens: 0, outputTokens: 0, stopReason: null as string | null, model: this.model };
+        const state: StreamState = {
+            text: '',
+            citations: [],
+            inputTokens: 0,
+            outputTokens: 0,
+            stopReason: null,
+            model: this.model,
+        };
         const heartbeat =
             onProgress === undefined
                 ? undefined
@@ -197,18 +210,13 @@ export class AnthropicClient {
                 const lines = buffer.split('\n');
                 buffer = lines.pop() ?? '';
                 for (const line of lines) {
-                    const delta = handleSseLine(line, state);
-                    if (delta !== undefined) {
-                        hooks?.onTextDelta?.(delta);
-                    }
+                    emit(handleSseLine(line, state), hooks);
                 }
             }
-            const tail = handleSseLine(buffer, state);
-            if (tail !== undefined) {
-                hooks?.onTextDelta?.(tail);
-            }
+            emit(handleSseLine(buffer, state), hooks);
             return {
                 text: state.text,
+                citations: state.citations,
                 usage: { input_tokens: state.inputTokens, output_tokens: state.outputTokens },
                 stop_reason: state.stopReason,
                 model: state.model,
@@ -231,15 +239,27 @@ export class AnthropicClient {
 
 interface StreamState {
     text: string;
+    citations: Record<string, unknown>[];
     inputTokens: number;
     outputTokens: number;
     stopReason: string | null;
     model: string;
 }
 
+type SseEmission = { text?: string; citation?: Record<string, unknown> } | undefined;
+
+function emit(emission: SseEmission, hooks: CompleteHooks | undefined): void {
+    if (emission?.text !== undefined) {
+        hooks?.onTextDelta?.(emission.text);
+    }
+    if (emission?.citation !== undefined) {
+        hooks?.onCitation?.(emission.citation);
+    }
+}
+
 // One SSE line. Only `data:` lines matter — the payload's own `type` field routes it.
-// Returns the text delta appended by this line, if any.
-function handleSseLine(line: string, state: StreamState): string | undefined {
+// Returns the text/citation delta carried by this line, if any.
+function handleSseLine(line: string, state: StreamState): SseEmission {
     if (!line.startsWith('data:')) {
         return undefined;
     }
@@ -264,7 +284,13 @@ function handleSseLine(line: string, state: StreamState): string | undefined {
             const delta = isRecord(event['delta']) ? event['delta'] : undefined;
             if (delta?.['type'] === 'text_delta' && typeof delta['text'] === 'string') {
                 state.text += delta['text'];
-                return delta['text'];
+                return { text: delta['text'] };
+            }
+            // Citations API: each citations_delta carries ONE citation supporting the
+            // text block currently streaming.
+            if (delta?.['type'] === 'citations_delta' && isRecord(delta['citation'])) {
+                state.citations.push(delta['citation']);
+                return { citation: delta['citation'] };
             }
             return undefined;
         }

@@ -1,7 +1,14 @@
-// Chat tests (S2.3): streaming SSE contract, citation-token validation against the
-// bundle, persistence, and the pre-stream guards. No Postgres, no live Anthropic.
+// Chat tests (S2.3, reworked R4/R5): Citations-API document blocks, streamed citation
+// verification, SSE wire contract, persistence, pre-stream guards. No live Anthropic.
 import { describe, expect, it, vi } from 'vitest';
-import { buildChatSystemPrompt, parseCitations, ChatService, type ChatMessageInput, type StoredChatMessage } from '../src/chat/chat.js';
+import {
+    buildChatSystemPrompt,
+    citableDocuments,
+    verifyCitation,
+    ChatService,
+    type ChatMessageInput,
+    type StoredChatMessage,
+} from '../src/chat/chat.js';
 import { loadConfig } from '../src/config.js';
 import { AnthropicClient, type FetchLike } from '../src/prep/anthropic.js';
 import { BudgetExceededError, type LlmCallRecord } from '../src/prep/budget.js';
@@ -13,57 +20,82 @@ import Fastify from 'fastify';
 
 const silentLogger: PrepLogger = { info: () => {}, warn: () => {}, error: () => {} };
 
+const DOC_TEXT = 'Current medications: Plaquenil 200 mg daily since January 2019. Allergies: penicillin (rash).';
+
 function tinyBundle(): FactBundle {
     return {
         patient: { id: 'margaret-chen', openemr_patient_id: null, name: 'Margaret L. Chen', demographics: {} },
-        facts: [
-            {
-                id: 'med-hcq-001',
-                patient_id: 'margaret-chen',
-                fact_type: 'medication',
-                content: { name: 'Hydroxychloroquine', dose: '200mg', start_date: '2019-01-15' },
-                is_current: true,
-                laterality: null,
-                verification: { status: 'unverified' },
-                source_document_id: 'doc-mc-004',
-                sources: [{ excerpt_text: 'Plaquenil 200 mg daily' }],
-                created_date: null,
-                updated_date: null,
-            },
-            {
-                id: 'allergy-001',
-                patient_id: 'margaret-chen',
-                fact_type: 'allergy',
-                content: { substance: 'Penicillin' },
-                is_current: true,
-                laterality: null,
-                verification: { status: 'unverified' },
-                source_document_id: 'doc-mc-001',
-                sources: [{ excerpt_text: 'Allergic to penicillin' }],
-                created_date: null,
-                updated_date: null,
-            },
-        ],
+        facts: [],
         contradictions: [],
         images: [],
         treatments: [],
-        documents: [],
+        documents: [
+            {
+                id: 'doc-mc-004',
+                document_type: 'pharmacy_record',
+                document_date: '2024-11-01',
+                content: { text_content: DOC_TEXT },
+                metadata: {},
+                extras: {},
+            },
+            {
+                id: 'doc-mc-009',
+                document_type: 'imaging_report',
+                document_date: '2024-12-01',
+                content: { format: 'structured' }, // no text_content -> not citable
+                metadata: {},
+                extras: {},
+            },
+        ],
     };
 }
 
-const REPLY = 'On HCQ 200mg daily since 2019 [[fact:med-hcq-001]]. Penicillin allergy [[fact:allergy-001]] [[fact:invented-9]].';
+const REPLY = 'On Plaquenil 200 mg daily since 2019. Penicillin allergy (rash).';
+const CITED = 'Plaquenil 200 mg daily';
 
 function sse(events: Record<string, unknown>[]): string {
     return events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join('');
 }
 
+// A streamed reply with one exact-range citation and one wrong-range (recoverable) one.
 function chatResponse(text: string): Response {
     const mid = Math.ceil(text.length / 2);
+    const start = DOC_TEXT.indexOf(CITED);
     return new Response(
         sse([
             { type: 'message_start', message: { model: 'claude-haiku-4-5', usage: { input_tokens: 900, output_tokens: 1 } } },
             { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: text.slice(0, mid) } },
+            {
+                type: 'content_block_delta',
+                index: 0,
+                delta: {
+                    type: 'citations_delta',
+                    citation: {
+                        type: 'char_location',
+                        cited_text: CITED,
+                        document_index: 0,
+                        document_title: 'pharmacy_record (2024-11-01)',
+                        start_char_index: start,
+                        end_char_index: start + CITED.length,
+                    },
+                },
+            },
             { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: text.slice(mid) } },
+            {
+                type: 'content_block_delta',
+                index: 0,
+                delta: {
+                    type: 'citations_delta',
+                    citation: {
+                        type: 'char_location',
+                        cited_text: 'penicillin (rash)',
+                        document_index: 0,
+                        document_title: 'pharmacy_record (2024-11-01)',
+                        start_char_index: 3, // wrong range on purpose -> verbatim-search recovery
+                        end_char_index: 9,
+                    },
+                },
+            },
             { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 120 } },
             { type: 'message_stop' },
         ]),
@@ -123,60 +155,95 @@ function chatApp(deps?: ChatRouteDeps) {
     return app;
 }
 
-describe('buildChatSystemPrompt', () => {
-    // Guards: the model's world drifting — facts must be id-addressable and the citation
-    // contract + only-from-record rule must be verbatim present.
-    it('serializes facts with ids and states the citation contract', () => {
+describe('buildChatSystemPrompt + citableDocuments', () => {
+    // Guards: the brevity + grounding contract drifting out of the prompt, and documents
+    // without text sneaking into the citable list (misaligning document_index mapping).
+    it('states brevity and only-from-documents rules; citable list skips textless docs', () => {
         const prompt = buildChatSystemPrompt(tinyBundle());
-        expect(prompt).toContain('[med-hcq-001]');
-        expect(prompt).toContain('Plaquenil 200 mg daily');
-        expect(prompt).toContain('[[fact:<id>]]');
-        expect(prompt).toContain('ONLY from the patient record');
+        expect(prompt).toContain('BE BRIEF');
+        expect(prompt).toContain('at most 3 short bullets');
+        expect(prompt).toContain('ONLY from the attached source documents');
+        const docs = citableDocuments(tinyBundle());
+        expect(docs).toHaveLength(1);
+        expect(docs[0]!.id).toBe('doc-mc-004');
     });
 });
 
-describe('parseCitations', () => {
-    // Guards: an invented citation rendering as provenance — it must be split out.
-    it('separates known fact ids from invented ones', () => {
-        const { valid, invalid } = parseCitations(REPLY, tinyBundle());
-        expect(valid.sort()).toEqual(['allergy-001', 'med-hcq-001']);
-        expect(invalid).toEqual(['invented-9']);
+describe('verifyCitation', () => {
+    const docs = citableDocuments(tinyBundle());
+
+    // Guards: the gate philosophy for chat — exact ranges verify, drifted ranges recover
+    // by verbatim search, and spans absent from our copy are NEVER verified.
+    it('verifies exact ranges, recovers wrong ranges, rejects absent spans', () => {
+        const start = DOC_TEXT.indexOf(CITED);
+        const exact = verifyCitation(
+            { cited_text: CITED, document_index: 0, start_char_index: start, end_char_index: start + CITED.length },
+            docs,
+        );
+        expect(exact).toMatchObject({ document_id: 'doc-mc-004', verified: true, start_char: start });
+
+        const drifted = verifyCitation(
+            { cited_text: 'penicillin (rash)', document_index: 0, start_char_index: 1, end_char_index: 4 },
+            docs,
+        );
+        expect(drifted?.verified).toBe(true);
+        expect(drifted?.start_char).toBe(DOC_TEXT.indexOf('penicillin (rash)'));
+
+        const invented = verifyCitation(
+            { cited_text: 'patient has no allergies whatsoever', document_index: 0, start_char_index: 0, end_char_index: 10 },
+            docs,
+        );
+        expect(invented?.verified).toBe(false);
+
+        expect(verifyCitation({ cited_text: CITED, document_index: 9 }, docs)).toBeNull();
     });
 });
 
 describe('ChatService.turn', () => {
-    // Guards: the streaming + persistence + spend contract in one pass — deltas relayed,
-    // both turns persisted only after success, the call ledgered as chat_turn.
-    it('streams deltas, persists the turn, ledgers spend, and validates citations', async () => {
+    // Guards: the full turn contract — document blocks sent with citations enabled,
+    // deltas + verified citations streamed, turns persisted, spend ledgered.
+    it('sends document blocks, streams citations, persists, and ledgers spend', async () => {
         const store = new FakeChatStore();
         const spendGuard = new FakeSpendGuard();
-        const { service } = chatService(store, spendGuard, chatResponse(REPLY));
+        const { service, fetchMock } = chatService(store, spendGuard, chatResponse(REPLY));
         const deltas: string[] = [];
+        const streamed: unknown[] = [];
         const result = await service.turn(
             { bundle: tinyBundle(), conversationId: 'conv-1', message: 'What meds is she on?', correlationId: 'corr-c1' },
             silentLogger,
-            (text) => deltas.push(text),
+            { onTextDelta: (text) => deltas.push(text), onCitation: (citation) => streamed.push(citation) },
         );
         expect(deltas.join('')).toBe(REPLY);
-        expect(result.cited_fact_ids.sort()).toEqual(['allergy-001', 'med-hcq-001']);
-        expect(result.invalid_citation_ids).toEqual(['invented-9']);
+        expect(result.citations).toHaveLength(2);
+        expect(result.citations.every((c) => c.verified)).toBe(true);
+        expect(result.unverified_count).toBe(0);
+        expect(streamed).toHaveLength(2);
         expect(store.messages.map((m) => m.role)).toEqual(['user', 'assistant']);
         expect(spendGuard.recorded).toEqual([
             { model: 'claude-haiku-4-5', inputTokens: 900, outputTokens: 120, correlationId: 'corr-c1', purpose: 'chat_turn' },
         ]);
+        // Wire shape: latest user message carries document blocks with citations enabled.
+        const body = JSON.parse(String(fetchMock.mock.calls[0]![1]?.body)) as {
+            messages: { role: string; content: unknown }[];
+        };
+        const content = body.messages.at(-1)!.content as Record<string, unknown>[];
+        expect(content[0]).toMatchObject({ type: 'document', citations: { enabled: true } });
+        expect((content.at(-1) as { text: string }).text).toBe('What meds is she on?');
     });
 
     // Guards: history amnesia — the second turn must replay the first turn to the model.
-    it('feeds prior conversation turns back to the model', async () => {
+    it('feeds prior conversation turns back as plain text', async () => {
         const store = new FakeChatStore();
-        const { service, fetchMock } = chatService(store, undefined, chatResponse(REPLY), chatResponse('Follow-up [[fact:med-hcq-001]].'));
+        const { service, fetchMock } = chatService(store, undefined, chatResponse(REPLY), chatResponse('Short.'));
         const bundle = tinyBundle();
         await service.turn({ bundle, conversationId: 'c', message: 'first?', correlationId: 'x1' }, silentLogger);
         await service.turn({ bundle, conversationId: 'c', message: 'second?', correlationId: 'x2' }, silentLogger);
-        const secondBody = JSON.parse(String(fetchMock.mock.calls[1]![1]?.body)) as { messages: { role: string; content: string }[] };
+        const secondBody = JSON.parse(String(fetchMock.mock.calls[1]![1]?.body)) as {
+            messages: { role: string; content: unknown }[];
+        };
         expect(secondBody.messages.map((m) => m.role)).toEqual(['user', 'assistant', 'user']);
+        expect(secondBody.messages[0]!.content).toBe('first?'); // history is plain text
         expect(secondBody.messages[1]!.content).toBe(REPLY);
-        expect(secondBody.messages[2]!.content).toBe('second?');
     });
 
     // Guards: a failed LLM call leaving a half-persisted turn in the conversation.
@@ -199,9 +266,9 @@ describe('chat routes', () => {
         return { deps, store };
     }
 
-    // Guards: the SSE wire contract the panel parses — delta events then a done event
-    // with the validated citation ids, correlation ID on the response.
-    it('POST streams delta events and a done event with validated citations', async () => {
+    // Guards: the SSE wire contract the panel parses — delta + citation events, then a
+    // done event carrying the verified citation list.
+    it('POST streams delta and citation events and a done event', async () => {
         const { deps } = routeDeps();
         const res = await chatApp(deps).inject({
             method: 'POST',
@@ -217,10 +284,11 @@ describe('chat routes', () => {
             .map((chunk) => JSON.parse(chunk.slice(6)) as Record<string, unknown>);
         const text = events.filter((e) => e['type'] === 'delta').map((e) => e['text']).join('');
         expect(text).toBe(REPLY);
+        expect(events.filter((e) => e['type'] === 'citation')).toHaveLength(2);
         const done = events.at(-1)!;
         expect(done['type']).toBe('done');
-        expect((done['cited_fact_ids'] as string[]).sort()).toEqual(['allergy-001', 'med-hcq-001']);
-        expect(done['invalid_citation_ids']).toEqual(['invented-9']);
+        expect(done['citations']).toHaveLength(2);
+        expect(done['unverified_count']).toBe(0);
         expect(typeof done['conversation_id']).toBe('string');
     });
 

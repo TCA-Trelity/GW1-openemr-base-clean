@@ -74,13 +74,17 @@ export function registerChatRoutes(app: FastifyInstance, deps: ChatRouteDeps | u
             const result = await deps.service.turn(
                 { bundle, conversationId, message, correlationId: String(request.id) },
                 request.log,
-                (text) => writeEvent({ type: 'delta', text }),
+                {
+                    onTextDelta: (text) => writeEvent({ type: 'delta', text }),
+                    // Verified citations stream live so chips render as the text arrives.
+                    onCitation: (citation) => writeEvent({ type: 'citation', citation }),
+                },
             );
             writeEvent({
                 type: 'done',
                 conversation_id: result.conversation_id,
-                cited_fact_ids: result.cited_fact_ids,
-                invalid_citation_ids: result.invalid_citation_ids,
+                citations: result.citations,
+                unverified_count: result.unverified_count,
             });
         } catch (error) {
             request.log.error({ correlationId: request.id, err: String(error) }, 'chat turn failed');

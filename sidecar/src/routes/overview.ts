@@ -60,10 +60,45 @@ export function buildOverview(
     // Same payload -> engine-shape parse the prep document source performs.
     const treatments = bundle.treatments.map((treatment) => TreatmentRecordSchema.parse(treatment.payload));
 
+    const riskFlags = computeMedicationRiskFlags(medicationInputs, profile);
+    const intervalAnalysis = analyzeIntervalPatterns(bundle.images, treatments);
+    const hcqProgression = analyzeHCQProgression(bundle.images);
+    const injections = treatments
+        .filter((treatment) => treatment.injection_details !== null)
+        .sort((a, b) => new Date(a.treatment_date).getTime() - new Date(b.treatment_date).getTime());
+    const lastInjection = injections.at(-1);
+
     return {
         patient: bundle.patient,
         facts_by_type: factsByType,
-        medication_risk_flags: computeMedicationRiskFlags(medicationInputs, profile),
+        medication_risk_flags: riskFlags,
+        // Deterministic Diagnosis & Care (R3): populated on first load, no LLM anywhere.
+        care_plan: {
+            active_condition_fact_ids: (factsByType['condition'] ?? []).map((fact) => fact.id),
+            protocol:
+                lastInjection === undefined
+                    ? null
+                    : {
+                          last_treatment_date: lastInjection.treatment_date,
+                          medication: lastInjection.injection_details?.medication ?? null,
+                          treatment_count: injections.length,
+                      },
+            monitoring: [
+                ...riskFlags.map((flag) => ({
+                    text: flag.recommendation,
+                    severity: flag.severity,
+                    source: flag.source,
+                })),
+                ...(hcqProgression.progression_detected
+                    ? [{ text: hcqProgression.recommendation, severity: hcqProgression.alert_level, source: 'imaging trend analysis' }]
+                    : []),
+            ],
+            follow_up: {
+                recommendation: intervalAnalysis.recommendation === '' ? null : intervalAnalysis.recommendation,
+                optimal_interval_weeks: intervalAnalysis.optimal_interval,
+                confidence: intervalAnalysis.confidence,
+            },
+        },
         contradictions: bundle.contradictions,
         // Metadata only — the doc viewer loads full text via /api/facts.
         documents: bundle.documents.map((doc) => ({
@@ -82,8 +117,8 @@ export function buildOverview(
                 laterality: image.image_metadata.laterality,
                 treatment_context: computeTreatmentContext(image.image_metadata.capture_date, treatments),
             })),
-            interval_analysis: analyzeIntervalPatterns(bundle.images, treatments),
-            hcq_progression: analyzeHCQProgression(bundle.images),
+            interval_analysis: intervalAnalysis,
+            hcq_progression: hcqProgression,
         },
         latest_brief:
             latestBrief === null

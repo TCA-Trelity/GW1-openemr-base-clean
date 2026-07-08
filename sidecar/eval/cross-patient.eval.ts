@@ -7,7 +7,7 @@
 // No live LLM: the extractor is driven through the mocked SSE fetch seam (the same
 // pattern test/prep.test.ts uses).
 import { describe, it } from 'vitest';
-import { parseCitations } from '../src/chat/chat.js';
+import { citableDocuments, verifyCitation } from '../src/chat/chat.js';
 import { AnthropicClient, type FetchLike } from '../src/prep/anthropic.js';
 import { ExtractionError, FactExtractor, type PrepLogger } from '../src/prep/extraction.js';
 import { recordEval } from './collector.js';
@@ -72,29 +72,48 @@ describe('cross-patient-denial', () => {
         const williamIds = williamThompson.facts.map((fact) => fact.id);
         const margaretIds = margaretChen.facts.slice(0, 2).map((fact) => fact.id);
 
-        // Sanity: the two corpora share no fact ids, so classification is meaningful.
-        const margaretIdSet = new Set(margaretChen.facts.map((fact) => fact.id));
-        const disjoint = williamIds.every((id) => !margaretIdSet.has(id));
+        // Sanity: the corpora are distinct records; text from William's documents
+        // must never verify as provenance against Margaret's documents.
+        const margaretDocs = citableDocuments(margaretBundle);
+        const williamBundle = seededFactBundle(williamThompson);
+        const williamDocs = citableDocuments(williamBundle);
 
-        // A reply citing every William fact id plus two genuine Margaret ids.
-        const reply =
-            `Wet AMD status ${williamIds.map((id) => `[[fact:${id}]]`).join(' ')} ` +
-            `and current medication ${margaretIds.map((id) => `[[fact:${id}]]`).join(' ')}.`;
-        const { valid, invalid } = parseCitations(reply, margaretBundle);
+        // Citations quoting WILLIAM's documents, presented against MARGARET's record.
+        const crossCitations = williamDocs.map((doc) => ({
+            cited_text: doc.text.slice(0, 60),
+            document_index: 0, // claims to be Margaret's first document
+            start_char_index: 0,
+            end_char_index: 60,
+        }));
+        const crossVerified = crossCitations
+            .map((raw) => verifyCitation(raw, margaretDocs))
+            .filter((c) => c !== null && c.verified);
+
+        // Genuine spans from Margaret's own documents must verify.
+        const ownCitations = margaretDocs.slice(0, 3).map((doc, index) => ({
+            cited_text: doc.text.slice(10, 70),
+            document_index: margaretDocs.indexOf(margaretDocs[index]!),
+            start_char_index: 10,
+            end_char_index: 70,
+        }));
+        const ownVerified = ownCitations
+            .map((raw) => verifyCitation(raw, margaretDocs))
+            .filter((c) => c !== null && c.verified);
 
         const pass =
-            disjoint &&
-            williamIds.length > 0 &&
-            [...invalid].sort().join(',') === [...williamIds].sort().join(',') &&
-            [...valid].sort().join(',') === [...margaretIds].sort().join(',');
+            margaretDocs.length > 0 &&
+            williamDocs.length > 0 &&
+            ownCitations.length > 0 &&
+            crossVerified.length === 0 &&
+            ownVerified.length === ownCitations.length;
 
         recordEval({
             id: 'cross-patient-denial.chat-citations',
             description:
-                "parseCitations against Margaret's bundle marks all of William's fact ids invalid (never rendered as provenance) while her own ids stay valid",
-            metric: 'cross-patient ids classified invalid',
-            value: `${invalid.length}/${williamIds.length} william ids invalid; ${valid.length}/${margaretIds.length} margaret ids valid; corpora id sets disjoint=${disjoint}`,
-            threshold: 'all cross-patient ids invalid; all same-patient ids valid',
+                "Chat citation verification against Margaret's documents rejects spans quoted from William's record while her own document spans verify",
+            metric: 'cross-patient spans verified (must be 0)',
+            value: `${crossVerified.length}/${crossCitations.length} cross-patient spans verified; ${ownVerified.length}/${ownCitations.length} own spans verified`,
+            threshold: '0 cross-patient spans verified; all own spans verified',
             pass,
         });
     });

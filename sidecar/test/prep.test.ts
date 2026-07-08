@@ -765,6 +765,13 @@ describe('prep pipeline end-to-end', () => {
 
         // Overview IA fields derived deterministically from verified facts.
         expect(content.key_discussion_points.length).toBeGreaterThan(0);
+        // R4/R5: discussion points are terse structured items carrying citation refs.
+        for (const point of content.key_discussion_points) {
+            expect(point.text.length).toBeLessThanOrEqual(91);
+            expect(['med_change', 'risk_flag', 'contradiction', 'imaging', 'interval']).toContain(point.kind);
+        }
+        const contradictionPoint = content.key_discussion_points.find((p) => p.kind === 'contradiction');
+        expect(contradictionPoint?.contradiction_id).toBeTruthy();
         expect(content.questions_to_confirm.length).toBeGreaterThan(0);
         expect(content.why_they_are_here?.content.statement).toContain('Floaters');
         expect(content.what_they_are_hoping_for?.content.goal).toContain('floaters');
@@ -1306,6 +1313,10 @@ describe('overview routes (deterministic landing page)', () => {
         expect(flagText.toLowerCase()).toContain('hydroxychloroquine');
         expect(overview.imaging.hcq_progression.alert_level).not.toBeNull();
         expect(overview.imaging.timeline_summary.length).toBe(corpus['images'].length);
+        // R3: the Diagnosis & Care tab renders from this deterministic block on first load.
+        expect(overview.care_plan.active_condition_fact_ids.length).toBeGreaterThan(0);
+        expect(overview.care_plan.monitoring.length).toBeGreaterThan(0);
+        expect(overview.care_plan.monitoring[0].text.length).toBeGreaterThan(0);
         expect(overview.documents).toHaveLength(12);
         // Metadata only — full text loads via /api/facts when the viewer opens.
         expect(overview.documents[0].content).toBeUndefined();
