@@ -36,3 +36,8 @@ architecture docs:
 - DECISION: Live verification runs in GitHub Actions (public runners reach the Railway URL; the dev session cannot) — CI smoke is the arbiter of "works in the live environment."
 - DECISION: OAuth registration + corpus seeding execute as scripts on the Railway sidecar service, not from the dev session (same egress constraint).
 - DECISION: Corpus keeps HCQ at 200mg daily since 2019-01-15 (per every cited document excerpt) over the ticket's 400mg/2021-12-01 — the corpus-as-eval-truth invariant outranks ticket text; risk flag still fires via the ≥5-year AAO branch (~5.9 years). The 2021-12-01 anchor survives as the medication_start event for the imaging series.
+
+## Ops notes (2026-07-08 Railway volume postmortem)
+
+- DECISION: The day-one volume (attached at the old whole-app mount path) had half-applied into Railway's environment config: counted by the deploy validator, never rendered on canvas, never mounted at runtime, undeletable from the UI. Resolution: repointed the existing volume instance to `/var/www/localhost/htdocs/openemr/sites` via the public GraphQL API (`volumeInstanceUpdate(volumeId, environmentId, input:{mountPath})`) rather than deleting it. Lesson: Railway staged-change validation errors cite volume IDs — a constant ID across attempts means a live server-side attachment regardless of what the canvas shows.
+- DECISION: Railway watch-path globs are unreliable for dotfiles (a `.dockerignore`-only push built; a watched shell-script push skipped) — treat any push containing dot-path files as potentially build-triggering, and never push during a volume-population boot.
