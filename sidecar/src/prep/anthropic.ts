@@ -35,13 +35,26 @@ export type OnProgress = (progress: StreamProgress) => void;
 export class AnthropicApiError extends Error {
     constructor(
         public readonly status: number,
-        apiErrorType?: string,
+        public readonly apiErrorType?: string,
         apiErrorMessage?: string,
     ) {
         const detail = [apiErrorType, apiErrorMessage].filter(Boolean).join(': ');
         super(`Anthropic request failed with status ${status}${detail ? ` (${detail})` : ''}`);
         this.name = 'AnthropicApiError';
     }
+}
+
+// Retryable failures: our own timeouts, rate limits, overload, and 5xx — one fresh
+// attempt is cheap next to a dead prep run. 4xx contract errors are never retried.
+const TRANSIENT_STATUSES = new Set([408, 429, 500, 502, 503, 504, 529]);
+export function isTransientAnthropicError(error: unknown): boolean {
+    return (
+        error instanceof AnthropicApiError &&
+        (TRANSIENT_STATUSES.has(error.status) ||
+            error.apiErrorType === 'timeout' ||
+            error.apiErrorType === 'overloaded_error' ||
+            error.apiErrorType === 'stream_error')
+    );
 }
 
 export interface AnthropicClientOptions {

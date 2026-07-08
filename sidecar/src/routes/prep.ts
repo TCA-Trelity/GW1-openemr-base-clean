@@ -4,6 +4,7 @@
 // bundle, or the 24h LLM usage summary. Without a configured store the routes answer 503.
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { BudgetExceededError, type UsageSummary } from '../prep/budget.js';
+import type { PrepTracer } from '../obs/langfuse.js';
 import { executePrep, type PrepDeps, type PrepSpendGuard, type PrepStore } from '../prep/pipeline.js';
 import type { DocumentSource } from '../prep/sources.js';
 import type { FactExtractor } from '../prep/extraction.js';
@@ -28,6 +29,8 @@ export interface PrepRouteDeps {
     extractor: FactExtractor;
     /** Spend guardrails: budget precheck + GET /api/usage (absent only in bare scaffolds). */
     spendGuard?: PrepRouteSpendGuard;
+    /** Langfuse tracing, passed through to the pipeline when configured. */
+    tracer?: PrepTracer;
     /** Reuse a brief newer than this instead of re-running (config PREP_REUSE_WINDOW_MINUTES). */
     reuseWindowMinutes?: number;
     /** Cap on concurrently executing preps in this process (config LLM_MAX_CONCURRENT_PREPS). */
@@ -103,6 +106,7 @@ export function registerPrepRoutes(app: FastifyInstance, deps: PrepRouteDeps | u
             extractor: deps.extractor,
             logger: request.log,
             ...(deps.spendGuard !== undefined ? { spendGuard: deps.spendGuard } : {}),
+            ...(deps.tracer !== undefined ? { tracer: deps.tracer } : {}),
             ...(deps.clock !== undefined ? { clock: deps.clock } : {}),
             ...(deps.providerProfile !== undefined ? { providerProfile: deps.providerProfile } : {}),
         };

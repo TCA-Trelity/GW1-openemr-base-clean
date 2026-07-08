@@ -325,6 +325,51 @@ describe('FactExtractor', () => {
     });
 });
 
+// ---- Transient-failure retry ----
+
+function apiErrorResponse(status: number, type: string): Response {
+    return new Response(JSON.stringify({ error: { type, message: 'synthetic' } }), { status });
+}
+
+describe('FactExtractor transient retry', () => {
+    // Guards: a single Anthropic blip (overload/timeout/5xx) killing an entire prep run —
+    // one fresh retry must absorb it, then succeed.
+    it('retries once after a transient API failure, then succeeds', async () => {
+        const { extractor, fetchMock } = extractorWith(
+            apiErrorResponse(529, 'overloaded_error'),
+            llmResponse({ facts: corpusFacts(), contradictions: [] }),
+        );
+        const result = await extractor.extract(
+            { patientId: PATIENT_ID, patientName: null, documents: [] },
+            'corr-transient',
+            silentLogger,
+        );
+        expect(result.facts).toHaveLength(12);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    // Guards: unbounded retry against a persistently failing API (cost + wedged runs).
+    it('gives up after the single transient retry', async () => {
+        const { extractor, fetchMock } = extractorWith(
+            apiErrorResponse(529, 'overloaded_error'),
+            apiErrorResponse(503, 'api_error'),
+        );
+        await expect(
+            extractor.extract({ patientId: PATIENT_ID, patientName: null, documents: [] }, 'corr-2x', silentLogger),
+        ).rejects.toThrow(/503/);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    // Guards: contract errors (4xx) being retried — they can never succeed and double cost.
+    it('does not retry a non-transient 400', async () => {
+        const { extractor, fetchMock } = extractorWith(apiErrorResponse(400, 'invalid_request_error'));
+        await expect(
+            extractor.extract({ patientId: PATIENT_ID, patientName: null, documents: [] }, 'corr-400', silentLogger),
+        ).rejects.toThrow(/400/);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+});
+
 // ---- Anthropic streaming client ----
 
 describe('AnthropicClient streaming', () => {
@@ -512,6 +557,70 @@ describe('FhirDocumentSource', () => {
 });
 
 // ---- Pipeline end-to-end ----
+
+// ---- Pipeline tracing ----
+
+class FakeTracer {
+    stages: string[] = [];
+    generations: { attempt: number; model: string; inputTokens: number; outputTokens: number }[] = [];
+    outcome: { status: string; error?: string; gateMetrics?: unknown } | undefined;
+
+    startTrace() {
+        return {
+            stage: (record: { name: string }) => {
+                this.stages.push(record.name);
+            },
+            generation: (record: { attempt: number; model: string; inputTokens: number; outputTokens: number }) => {
+                this.generations.push(record);
+            },
+            end: async (outcome: { status: string; error?: string; gateMetrics?: unknown }) => {
+                this.outcome = outcome;
+            },
+        };
+    }
+}
+
+describe('prep pipeline tracing', () => {
+    // Guards: the trace missing stages/generations/outcome — the S2.6 dashboard reads
+    // these; a silent wiring regression would empty it without failing anything.
+    it('emits stage spans, a generation, and a complete outcome on success', async () => {
+        const { deps, store } = pipelineDeps({ facts: corpusFacts(), contradictions: [] });
+        const tracer = new FakeTracer();
+        await runPrep({ ...deps, tracer }, PATIENT_ID, 'corr-trace');
+        expect(store.briefs).toHaveLength(1);
+        expect(tracer.stages).toEqual([
+            'load_sources',
+            'llm_extraction',
+            'citation_gate',
+            'medication_risk',
+            'imaging_analytics',
+            'brief_assembly',
+            'save_brief',
+        ]);
+        expect(tracer.generations).toHaveLength(1);
+        expect(tracer.generations[0]).toMatchObject({ attempt: 1, model: 'claude-sonnet-5', inputTokens: 1200, outputTokens: 800 });
+        expect(tracer.outcome?.status).toBe('complete');
+        expect(tracer.outcome?.gateMetrics).toBeDefined();
+    });
+
+    // Guards: failed runs vanishing from the dashboard — the error must reach the trace.
+    it('emits a failed outcome carrying the error when extraction dies', async () => {
+        const store = new FakeStore(corpusBundle());
+        const { extractor } = extractorWith(llmResponse('not json'), llmResponse('still not json'));
+        const tracer = new FakeTracer();
+        const deps: PrepDeps = {
+            store,
+            source: new StoreDocumentSource(store, corpusDb),
+            extractor,
+            tracer,
+            logger: silentLogger,
+            clock: () => NOW,
+        };
+        await expect(runPrep(deps, PATIENT_ID, 'corr-trace-fail')).rejects.toThrow(ExtractionError);
+        expect(tracer.outcome?.status).toBe('failed');
+        expect(tracer.outcome?.error).toContain('extraction failed');
+    });
+});
 
 describe('prep pipeline end-to-end', () => {
     // Guards: the whole spine — brief saved, gate at 100%, HCQ high flag, GC-progression

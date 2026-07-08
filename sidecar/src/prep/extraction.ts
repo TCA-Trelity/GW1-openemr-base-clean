@@ -9,7 +9,7 @@ import {
     type PatientFact,
     type RuntimeContradiction,
 } from '../schemas/index.js';
-import type { AnthropicClient, AnthropicMessage } from './anthropic.js';
+import { isTransientAnthropicError, type AnthropicClient, type AnthropicMessage } from './anthropic.js';
 
 // pino-compatible structural logger (FastifyBaseLogger satisfies it).
 export interface PrepLogger {
@@ -36,8 +36,15 @@ export interface ExtractionResult {
     contradictions: RuntimeContradiction[];
 }
 
-/** Spend-guardrail hook: invoked for EVERY Anthropic call this extraction makes, retries included. */
-export type OnUsage = (usage: { model: string; inputTokens: number; outputTokens: number }) => Promise<void> | void;
+/** Spend-guardrail + tracing hook: invoked for EVERY Anthropic call, retries included. */
+export type OnUsage = (usage: {
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+    attempt: number;
+    startedAt: Date;
+    endedAt: Date;
+}) => Promise<void> | void;
 
 export class ExtractionError extends Error {
     constructor(
@@ -163,16 +170,31 @@ export class FactExtractor {
     ): Promise<ExtractionResult> {
         const messages: AnthropicMessage[] = [{ role: 'user', content: buildUserContent(input) }];
         let lastIssues: string[] = [];
+        let transientRetries = 0;
+        let attempt = 1;
 
-        for (let attempt = 1; attempt <= 2; attempt += 1) {
-            // Streaming heartbeat: a long extraction logs progress every ~15s, so a silent
-            // Railway log means hung (and the client's idle timeout will kill it), not slow.
-            const completion = await this.client.complete(EXTRACTION_SYSTEM_PROMPT, messages, correlationId, (progress) =>
-                logger.info(
-                    { correlationId, attempt, text_chars: progress.textChars, elapsed_ms: progress.elapsedMs },
-                    'extraction stream in progress',
-                ),
-            );
+        while (attempt <= 2) {
+            const startedAt = new Date();
+            let completion;
+            try {
+                // Streaming heartbeat: a long extraction logs progress every ~15s, so a silent
+                // Railway log means hung (and the client's idle timeout will kill it), not slow.
+                completion = await this.client.complete(EXTRACTION_SYSTEM_PROMPT, messages, correlationId, (progress) =>
+                    logger.info(
+                        { correlationId, attempt, text_chars: progress.textChars, elapsed_ms: progress.elapsedMs },
+                        'extraction stream in progress',
+                    ),
+                );
+            } catch (error) {
+                // ONE fresh retry across the whole extraction for transient failures
+                // (timeout/overloaded/5xx) — a blip must not kill the prep run outright.
+                if (isTransientAnthropicError(error) && transientRetries < 1) {
+                    transientRetries += 1;
+                    logger.warn({ correlationId, attempt, err: String(error) }, 'transient llm failure, retrying');
+                    continue;
+                }
+                throw error;
+            }
             // Token usage feeds the cost-tracking requirement — always logged with the correlation ID.
             logger.info(
                 {
@@ -184,11 +206,14 @@ export class FactExtractor {
                 },
                 'extraction llm call complete',
             );
-            // Spend guardrails: every attempt cost tokens, so report it before validation.
+            // Spend guardrails + tracing: every attempt cost tokens, so report it before validation.
             await onUsage?.({
                 model: completion.model,
                 inputTokens: completion.usage.input_tokens,
                 outputTokens: completion.usage.output_tokens,
+                attempt,
+                startedAt,
+                endedAt: new Date(),
             });
             const validation = validateResponse(completion.text, input.patientId, completion.stop_reason);
             if (validation.ok) {
@@ -209,6 +234,7 @@ export class FactExtractor {
                         .join('\n')}\nReply again with a single corrected JSON object only.`,
                 },
             );
+            attempt += 1;
         }
         throw new ExtractionError(2, lastIssues);
     }

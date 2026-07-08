@@ -11,6 +11,7 @@ import {
     type MedicationInput,
 } from '../engines/index.js';
 import { runCitationGate, type Claim } from '../gate/citationGate.js';
+import type { PrepTracer, PrepTraceHandle } from '../obs/langfuse.js';
 import { DEFAULT_PROVIDER_PROFILE, type PatientFact, type ProviderProfile } from '../schemas/index.js';
 import type { BriefInput, PrepRunStatus, StoredBrief } from '../store/index.js';
 import { assembleBrief, type BriefContent } from './brief.js';
@@ -40,6 +41,8 @@ export interface PrepDeps {
     logger: PrepLogger;
     /** Spend guardrails: 24h budget gate before the LLM call + per-call ledger writes. */
     spendGuard?: PrepSpendGuard;
+    /** Langfuse tracing: one trace per run, spans per stage, generations per LLM attempt. */
+    tracer?: PrepTracer;
     /** Injected clock (PSR-20 spirit): medication-duration arithmetic and prepared_at. */
     clock?: () => Date;
     providerProfile?: ProviderProfile;
@@ -73,11 +76,15 @@ export async function executePrep(deps: PrepDeps, ctx: PrepRunContext): Promise<
     const now = (deps.clock ?? (() => new Date()))();
     const profile = deps.providerProfile ?? DEFAULT_PROVIDER_PROFILE;
     const spendGuard = deps.spendGuard;
+    const trace: PrepTraceHandle | undefined = deps.tracer?.startTrace({ correlationId, patientId, prepRunId });
     // Stamp the stage being ENTERED on the prep_run row before running it: a running run
     // shows where it is, a failed run shows where it died.
     const runStage = async <T>(name: string, fn: () => T | Promise<T>): Promise<T> => {
         await deps.store.setPrepRunStage?.(prepRunId, name);
-        return stage(logger, correlationId, name, fn);
+        const startedAt = new Date();
+        const result = await stage(logger, correlationId, name, fn);
+        trace?.stage({ name, startedAt, durationMs: Date.now() - startedAt.getTime() });
+        return result;
     };
     try {
         // Budget gate BEFORE any token is bought: a blown 24h budget throws
@@ -96,10 +103,24 @@ export async function executePrep(deps: PrepDeps, ctx: PrepRunContext): Promise<
                 { patientId, patientName: sources.patient.name, documents: sources.documents },
                 correlationId,
                 logger,
-                // Ledger every Anthropic call (both attempts) under this run's correlation ID.
-                spendGuard === undefined
-                    ? undefined
-                    : (usage) => spendGuard.recordCall({ ...usage, correlationId, purpose: 'prep_extraction' }),
+                // Ledger + trace every Anthropic call (all attempts) under this run's ID.
+                async (usage) => {
+                    trace?.generation({
+                        attempt: usage.attempt,
+                        model: usage.model,
+                        inputTokens: usage.inputTokens,
+                        outputTokens: usage.outputTokens,
+                        startedAt: usage.startedAt,
+                        endedAt: usage.endedAt,
+                    });
+                    await spendGuard?.recordCall({
+                        model: usage.model,
+                        inputTokens: usage.inputTokens,
+                        outputTokens: usage.outputTokens,
+                        correlationId,
+                        purpose: 'prep_extraction',
+                    });
+                },
             ),
         );
 
@@ -168,6 +189,7 @@ export async function executePrep(deps: PrepDeps, ctx: PrepRunContext): Promise<
 
         await deps.store.finishPrepRun(prepRunId, 'complete');
         logger.info({ correlationId, prepRunId, patientId, briefId: brief.id }, 'prep run complete');
+        await trace?.end({ status: 'complete', gateMetrics: metrics });
         return { prepRunId, brief, content };
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -180,6 +202,7 @@ export async function executePrep(deps: PrepDeps, ctx: PrepRunContext): Promise<
                     'failed to record prep run failure',
                 ),
             );
+        await trace?.end({ status: 'failed', error: message });
         throw error;
     }
 }

@@ -8,7 +8,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { Langfuse } from 'langfuse';
 import { loadConfig, type Config } from './config.js';
+import { LangfuseTracer } from './obs/langfuse.js';
 import { AnthropicClient } from './prep/anthropic.js';
 import { SpendGuard } from './prep/budget.js';
 import { FactExtractor } from './prep/extraction.js';
@@ -47,6 +49,22 @@ export function buildDeps(config: Config): AppDeps | undefined {
         inputUsdPerMtok: config.LLM_INPUT_USD_PER_MTOK,
         outputUsdPerMtok: config.LLM_OUTPUT_USD_PER_MTOK,
     });
+    // Langfuse tracing (S2.6) engages only when fully configured; a bare pino logger is
+    // fine here — tracer warnings carry the correlation ID themselves.
+    const tracer =
+        config.LANGFUSE_HOST !== undefined &&
+        config.LANGFUSE_PUBLIC_KEY !== undefined &&
+        config.LANGFUSE_SECRET_KEY !== undefined
+            ? new LangfuseTracer(
+                  new Langfuse({
+                      baseUrl: config.LANGFUSE_HOST,
+                      publicKey: config.LANGFUSE_PUBLIC_KEY,
+                      secretKey: config.LANGFUSE_SECRET_KEY,
+                      requestTimeout: 10_000,
+                  }),
+                  console,
+              )
+            : undefined;
     return {
         checkPostgres: async () => {
             await pool.query('SELECT 1');
@@ -59,6 +77,7 @@ export function buildDeps(config: Config): AppDeps | undefined {
             source: new StoreDocumentSource(store, pool),
             extractor,
             spendGuard,
+            ...(tracer !== undefined ? { tracer } : {}),
             reuseWindowMinutes: config.PREP_REUSE_WINDOW_MINUTES,
             maxConcurrentPreps: config.LLM_MAX_CONCURRENT_PREPS,
         },

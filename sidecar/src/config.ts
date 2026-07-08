@@ -10,6 +10,9 @@ const EnvSchema = z.object({
     ANTHROPIC_API_KEY: z.string().min(1).optional(),
     ANTHROPIC_MODEL_PREP: z.string().min(1).default('claude-sonnet-5'),
     LANGFUSE_HOST: z.string().url().optional(),
+    // Tracing engages only when host + both keys are present; otherwise a silent no-op.
+    LANGFUSE_PUBLIC_KEY: z.string().min(1).optional(),
+    LANGFUSE_SECRET_KEY: z.string().min(1).optional(),
     DATABASE_URL: z.string().min(1).optional(),
     REDIS_URL: z.string().min(1).optional(),
     // LLM spend guardrails. The per-MTok rates price each call into the llm_calls ledger
