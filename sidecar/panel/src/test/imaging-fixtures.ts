@@ -7,12 +7,33 @@ import type {
     FactBundle,
     HcqProgressionAnalysis,
     ImageRecord,
+    ImagingScanFinding,
     IntervalPatternAnalysis,
     OverviewPayload,
     PatientRecord,
     TreatmentWireRecord,
 } from '../types';
 import { briefContent, factBundle } from './fixtures';
+
+// Per-scan findings faithful to sidecar/seed/william-thompson.json: the two active-fluid scans
+// carry subretinal_fluid; the treated-dry scans carry only persistent drusen + PED (no fluid) —
+// so the derived wet/dry chip reads wet at baseline/leak and dry on the controlled scans.
+const DRY_FINDINGS: ImagingScanFinding[] = [
+    { finding_type: 'drusen', severity: 'moderate', confidence: 0.93, location: 'macular' },
+    { finding_type: 'pigment_epithelial_detachment', severity: 'mild', confidence: 0.86, location: 'subfoveal' },
+];
+const WT_FINDINGS: Record<string, ImagingScanFinding[]> = {
+    'img-wt-001': [
+        { finding_type: 'subretinal_fluid', severity: 'moderate', confidence: 0.92, location: 'foveal' },
+        ...DRY_FINDINGS,
+    ],
+    'img-wt-002': DRY_FINDINGS,
+    'img-wt-003': DRY_FINDINGS,
+    'img-wt-004': DRY_FINDINGS,
+    // img-wt-005 (the 10-week leak) keeps its tuned findings inline below.
+    'img-wt-006': DRY_FINDINGS,
+    'img-wt-007': DRY_FINDINGS,
+};
 
 interface WtImageSpec {
     id: string;
@@ -53,7 +74,8 @@ export const wtImages: ImageRecord[] = IMAGE_SPECS.map((spec) => ({
         treatment_cycle_number: spec.treatment_cycle_number,
     },
     ai_analysis: {
-        // The leak scan carries authored findings + a high alert (exercises the R6 combined view).
+        // The leak scan carries tuned authored findings + a high alert (exercises the workspace);
+        // every other scan gets its seed-faithful findings so the wet/dry chip derives correctly.
         findings:
             spec.id === 'img-wt-005'
                 ? [
@@ -74,7 +96,7 @@ export const wtImages: ImageRecord[] = IMAGE_SPECS.map((spec) => ({
                           description: 'Shallow PED, unchanged',
                       },
                   ]
-                : [],
+                : (WT_FINDINGS[spec.id] ?? []),
         measurements: [
             { measurement_type: 'central_retinal_thickness', value: spec.crt, unit: 'microns', reference_range: { normal_min: 240, normal_max: 280 } },
         ],
@@ -206,3 +228,112 @@ export const mcGcImages: ImageRecord[] = [
         ai_analysis: { measurements: [{ measurement_type: 'ganglion_cell_thickness', value: 70, unit: 'microns' }] },
     },
 ];
+
+// Full Margaret Chen imaging fixture, faithful to sidecar/seed/margaret-chen.json: 6 annual HCQ
+// screening OCTs (OD), each with BOTH central_retinal_thickness and ganglion_cell_thickness, the
+// GC-IPL declining 82 -> 70 µm as parafoveal RPE/thinning findings appear. No injections, so no
+// interval analysis — exercises graceful degradation (CST + GC cards, no interval card; HCQ card
+// present; CRT-recurrence context absent).
+interface McImageSpec {
+    id: string;
+    capture_date: string;
+    crt: number;
+    gc: number;
+    headline: string;
+    overall_change?: 'stable' | 'worsened';
+    findings: ImagingScanFinding[];
+}
+
+const MC_NORMAL: ImagingScanFinding[] = [{ finding_type: 'normal', severity: 'mild', confidence: 0.94, location: 'macula' }];
+
+const MC_IMAGE_SPECS: McImageSpec[] = [
+    { id: 'img-mc-001', capture_date: '2021-12-15T14:00:00Z', crt: 262, gc: 82, headline: 'Normal baseline HCQ screening', findings: MC_NORMAL },
+    { id: 'img-mc-002', capture_date: '2022-06-21T10:15:00Z', crt: 261, gc: 80, headline: 'Stable - no HCQ toxicity', overall_change: 'stable', findings: MC_NORMAL },
+    { id: 'img-mc-003', capture_date: '2023-01-10T09:40:00Z', crt: 260, gc: 78, headline: 'Stable - GC-IPL within normal limits', overall_change: 'stable', findings: MC_NORMAL },
+    { id: 'img-mc-004', capture_date: '2023-08-15T11:05:00Z', crt: 259, gc: 75, headline: 'Borderline GC-IPL decline - continue annual screening', overall_change: 'worsened', findings: MC_NORMAL },
+    {
+        id: 'img-mc-005',
+        capture_date: '2024-03-19T10:20:00Z',
+        crt: 258,
+        gc: 72,
+        headline: 'Subtle parafoveal changes - possible early HCQ toxicity',
+        overall_change: 'worsened',
+        findings: [
+            { finding_type: 'rpe_changes', severity: 'mild', confidence: 0.72, location: 'parafoveal' },
+            { finding_type: 'retinal_thinning', severity: 'mild', confidence: 0.74, location: 'parafoveal' },
+        ],
+    },
+    {
+        id: 'img-mc-006',
+        capture_date: '2024-12-26T10:35:00Z',
+        crt: 268,
+        gc: 70,
+        headline: 'GC-IPL thinning with progressive RPE changes - HCQ toxicity review recommended',
+        overall_change: 'worsened',
+        findings: [
+            { finding_type: 'rpe_changes', severity: 'moderate', confidence: 0.81, location: 'parafoveal' },
+            { finding_type: 'retinal_thinning', severity: 'mild', confidence: 0.74, location: 'parafoveal' },
+        ],
+    },
+];
+
+export const mcImages: ImageRecord[] = MC_IMAGE_SPECS.map((spec) => ({
+    id: spec.id,
+    patient_id: 'margaret-chen',
+    image_metadata: {
+        capture_date: spec.capture_date,
+        capture_device: 'Cirrus HD-OCT 5000',
+        modality: 'oct',
+        laterality: 'od',
+        scan_type: 'Macular cube 512x128',
+        scan_quality: 8,
+    },
+    ai_analysis: {
+        findings: spec.findings,
+        measurements: [
+            { measurement_type: 'central_retinal_thickness', value: spec.crt, unit: 'microns', reference_range: { normal_min: 240, normal_max: 280 } },
+            { measurement_type: 'ganglion_cell_thickness', value: spec.gc, unit: 'microns', reference_range: { normal_min: 70, normal_max: 95 } },
+        ],
+        comparison_to_prior: spec.overall_change === undefined ? null : { overall_change: spec.overall_change, treatment_response: null },
+        summary: { headline: spec.headline },
+    },
+}));
+
+// HCQ toxicity progression flagged by the server-side analyzer (alert_level medium).
+export const mcHcqProgression: HcqProgressionAnalysis = {
+    gc_thickness_trend: MC_IMAGE_SPECS.map((spec) => ({ date: spec.capture_date, value: spec.gc, image_id: spec.id })),
+    rpe_changes_trend: [
+        { date: '2024-03-19T10:20:00Z', severity: 'mild', confidence: 0.72, image_id: 'img-mc-005' },
+        { date: '2024-12-26T10:35:00Z', severity: 'moderate', confidence: 0.81, image_id: 'img-mc-006' },
+    ],
+    progression_detected: true,
+    progression_description: 'Ganglion cell layer declined 12µm across serial OCTs',
+    alert_level: 'medium',
+    recommendation: 'Correlate with visual fields; discuss HCQ dosing with rheumatology',
+};
+
+// Margaret has no anti-VEGF injections — the interval engine returns an empty analysis.
+export const mcIntervalAnalysis: IntervalPatternAnalysis = {
+    intervals: [],
+    pattern_summary: { total_cycles: 0, good_response_count: 0, poor_response_count: 0, average_interval: null },
+    optimal_interval: null,
+    recommendation: '',
+    confidence: 'low',
+};
+
+export const mcImaging: BriefContent['imaging'] = {
+    timeline_summary: mcImages.map((image) => ({
+        image_id: image.id,
+        capture_date: image.image_metadata.capture_date,
+        modality: image.image_metadata.modality,
+        laterality: image.image_metadata.laterality,
+        treatment_context: {
+            days_since_last_treatment: null,
+            last_treatment: null,
+            interval_from_prior_image: null,
+            treatment_cycle_number: null,
+        },
+    })),
+    interval_analysis: mcIntervalAnalysis,
+    hcq_progression: mcHcqProgression,
+};

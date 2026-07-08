@@ -2,7 +2,17 @@
 // and tooltip recolored for the panel's light surface. Series extraction is display math;
 // the HCQ progression judgment renders from the brief (server-computed), never here.
 import { AlertTriangle, CheckCircle, TrendingUp } from 'lucide-react';
-import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import {
+    CartesianGrid,
+    Line,
+    LineChart,
+    ReferenceDot,
+    ReferenceLine,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
 import type { HcqProgressionAnalysis, ImageRecord } from '../types';
 import { Card } from '../ui';
 
@@ -37,7 +47,35 @@ const AXIS_STROKE = '#64748b'; // slate-500 (unchanged)
 const TOOLTIP_STYLE = { backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px' } as const;
 const TOOLTIP_LABEL_STYLE = { color: '#64748b' } as const;
 
-function CrtChart({ data }: { data: SeriesPoint[] }) {
+/** The point in the series matching the workspace's selected scan date, if any. */
+export function selectedPoint(data: SeriesPoint[], selectedDate: string | undefined): SeriesPoint | null {
+    if (selectedDate === undefined) {
+        return null;
+    }
+    return data.find((point) => point.date === selectedDate) ?? null;
+}
+
+/** A ring marker on the currently-selected scan's point so image + trend read as one story. */
+function SelectedMarker({ point, color }: { point: SeriesPoint | null; color: string }) {
+    if (point === null) {
+        return null;
+    }
+    return (
+        <ReferenceDot
+            x={point.dateLabel}
+            y={point.value}
+            r={7}
+            fill={color}
+            stroke="#ffffff"
+            strokeWidth={2}
+            isFront
+        />
+    );
+}
+
+function CrtChart({ data, selectedDate }: { data: SeriesPoint[]; selectedDate?: string }) {
+    const baseline = data[0]?.value; // first scan in the series — the "change from baseline" datum
+    const selected = selectedPoint(data, selectedDate);
     return (
         <Card className="p-5">
             <h3 className="text-base font-semibold text-slate-800 mb-3">Central Retinal Thickness Over Time</h3>
@@ -48,9 +86,13 @@ function CrtChart({ data }: { data: SeriesPoint[] }) {
                         <XAxis dataKey="dateLabel" stroke={AXIS_STROKE} fontSize={12} />
                         <YAxis stroke={AXIS_STROKE} fontSize={12} domain={['auto', 'auto']} />
                         <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} />
-                        {/* Normal range references (TrendAnalysis.jsx: 280/240 µm) */}
+                        {/* Normal range references (research brief §1: 240–280 µm central subfield). */}
                         <ReferenceLine y={280} stroke="#22c55e" strokeDasharray="3 3" label={{ value: 'Upper Normal', fill: '#15803d', fontSize: 10 }} />
                         <ReferenceLine y={240} stroke="#22c55e" strokeDasharray="3 3" label={{ value: 'Lower Normal', fill: '#15803d', fontSize: 10 }} />
+                        {/* Dashed baseline (first-scan value) so change-from-baseline is visible (brief §3 must-have #5). */}
+                        {baseline !== undefined && (
+                            <ReferenceLine y={baseline} stroke="#94a3b8" strokeDasharray="2 4" label={{ value: 'Baseline', fill: '#64748b', fontSize: 10, position: 'insideBottomRight' }} />
+                        )}
                         <Line
                             type="monotone"
                             dataKey="value"
@@ -60,15 +102,17 @@ function CrtChart({ data }: { data: SeriesPoint[] }) {
                             dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
                             activeDot={{ r: 6, fill: '#60a5fa' }}
                         />
+                        <SelectedMarker point={selected} color="#2563eb" />
                     </LineChart>
                 </ResponsiveContainer>
             </div>
-            <p className="text-xs text-slate-500 mt-2">Central retinal thickness (microns) — dashed lines mark the normal range</p>
+            <p className="text-xs text-slate-500 mt-2">Central retinal thickness (microns) — dashed lines mark the normal range and baseline</p>
         </Card>
     );
 }
 
-function GcChart({ data, hcq }: { data: SeriesPoint[]; hcq: HcqProgressionAnalysis }) {
+function GcChart({ data, hcq, selectedDate }: { data: SeriesPoint[]; hcq: HcqProgressionAnalysis; selectedDate?: string }) {
+    const selected = selectedPoint(data, selectedDate);
     const lineColor = hcq.progression_detected ? '#ef4444' : '#22c55e';
     return (
         <Card className={`p-5 ${hcq.progression_detected ? 'bg-red-50/60 border-red-200' : ''}`}>
@@ -93,6 +137,7 @@ function GcChart({ data, hcq }: { data: SeriesPoint[]; hcq: HcqProgressionAnalys
                         <XAxis dataKey="dateLabel" stroke={AXIS_STROKE} fontSize={12} />
                         <YAxis stroke={AXIS_STROKE} fontSize={12} domain={[60, 100]} />
                         <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} />
+                        {/* GC-IPL lower-normal band ~70 µm (research brief §1 HCQ row; seed uses 70–95). */}
                         <ReferenceLine y={70} stroke="#ef4444" strokeDasharray="3 3" label={{ value: 'Lower Normal', fill: '#b91c1c', fontSize: 10 }} />
                         <Line
                             type="monotone"
@@ -102,6 +147,7 @@ function GcChart({ data, hcq }: { data: SeriesPoint[]; hcq: HcqProgressionAnalys
                             strokeWidth={2}
                             dot={{ fill: lineColor, strokeWidth: 2, r: 4 }}
                         />
+                        <SelectedMarker point={selected} color={lineColor} />
                     </LineChart>
                 </ResponsiveContainer>
             </div>
@@ -112,7 +158,16 @@ function GcChart({ data, hcq }: { data: SeriesPoint[]; hcq: HcqProgressionAnalys
     );
 }
 
-export default function Trends({ images, hcq }: { images: ImageRecord[]; hcq: HcqProgressionAnalysis }) {
+export default function Trends({
+    images,
+    hcq,
+    selectedDate,
+}: {
+    images: ImageRecord[];
+    hcq: HcqProgressionAnalysis;
+    /** Raw capture_date of the workspace's selected scan — highlighted on each chart. */
+    selectedDate?: string;
+}) {
     const crtData = extractMeasurementSeries(images, 'central_retinal_thickness', 'day');
     const gcData = extractMeasurementSeries(images, 'ganglion_cell_thickness', 'month-year');
 
@@ -128,8 +183,8 @@ export default function Trends({ images, hcq }: { images: ImageRecord[]; hcq: Hc
 
     return (
         <div className="space-y-6">
-            {crtData.length > 0 && <CrtChart data={crtData} />}
-            {gcData.length > 0 && <GcChart data={gcData} hcq={hcq} />}
+            {crtData.length > 0 && <CrtChart data={crtData} selectedDate={selectedDate} />}
+            {gcData.length > 0 && <GcChart data={gcData} hcq={hcq} selectedDate={selectedDate} />}
         </div>
     );
 }

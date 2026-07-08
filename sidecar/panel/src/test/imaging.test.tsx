@@ -5,10 +5,28 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import App from '../App';
 import Imaging, { mergeTimeline } from '../imaging/Imaging';
-import Trends, { extractMeasurementSeries } from '../imaging/Trends';
+import Trends, { extractMeasurementSeries, selectedPoint } from '../imaging/Trends';
 import ScanImage from '../imaging/ScanImage';
+import { deriveFluidStatus } from '../imaging/fluid';
+import { buildLadderData, OUTCOME_FILL } from '../imaging/IntervalLadder';
 import { briefContent } from './fixtures';
-import { mcGcImages, wtFactBundle, wtImages, wtImaging, wtOverview, wtPatient, wtTreatments } from './imaging-fixtures';
+import {
+    mcGcImages,
+    mcImages,
+    mcImaging,
+    wtFactBundle,
+    wtImages,
+    wtImaging,
+    wtIntervalAnalysis,
+    wtOverview,
+    wtPatient,
+    wtTreatments,
+} from './imaging-fixtures';
+
+/** Click the Timeline sub-tab (the merged image+injection stream is no longer the default view). */
+function openTimeline() {
+    fireEvent.click(screen.getByRole('tab', { name: /Timeline/ }));
+}
 
 afterEach(() => {
     vi.unstubAllGlobals();
@@ -29,6 +47,7 @@ describe('Imaging timeline', () => {
         expect(dates).toEqual([...dates].sort((a, b) => b - a));
 
         renderImaging();
+        openTimeline();
         const rows = screen.getAllByTestId('timeline-event');
         expect(rows).toHaveLength(11);
         expect(within(rows[0]!).getByText('Dec 10, 2025')).toBeInTheDocument(); // newest: img-wt-007
@@ -44,6 +63,7 @@ describe('Imaging timeline', () => {
     // doctor can no longer read response-at-interval off the timeline.
     it('renders days-post-injection badges from treatment_context', () => {
         renderImaging();
+        openTimeline();
         expect(screen.getByText(/71d post-Eylea/)).toBeInTheDocument(); // the 10-week leak scan
         expect(screen.getByText(/28d post-Eylea/)).toBeInTheDocument(); // rescue check
         expect(screen.getAllByText(/49d post-Eylea/)).toHaveLength(4);
@@ -53,6 +73,7 @@ describe('Imaging timeline', () => {
     // good_response) or the CRT value disappears from image rows.
     it('shows CRT values and color-coded treatment response badges', () => {
         renderImaging();
+        openTimeline();
         expect(screen.getByText('CRT: 385µm')).toBeInTheDocument();
         expect(screen.getAllByText('Good response')).toHaveLength(5);
         const worsened = screen.getByText('Worsened');
@@ -64,6 +85,7 @@ describe('Imaging timeline', () => {
     // on the default view — it must ride the Timeline sub-tab as in the prototype.
     it('renders the interval recommendation banner with counts and confidence', () => {
         renderImaging();
+        openTimeline();
         const banner = screen.getByTestId('interval-banner');
         expect(banner).toHaveTextContent('Optimal interval: 7 weeks');
         expect(banner).toHaveTextContent('5 dry');

@@ -238,6 +238,29 @@ export class FactStore {
         }
     }
 
+    /** Identity + EHR linkage for one patient (EHR sync resolves the openemr uuid here). */
+    public async getPatient(patientId: string): Promise<{ id: string; openemr_patient_id: string | null } | null> {
+        const result = await this.pool.query<{ id: string; openemr_patient_id: string | null }>(
+            'SELECT id, openemr_patient_id FROM patients WHERE id = $1',
+            [patientId],
+        );
+        return result.rows[0] ?? null;
+    }
+
+    /** Refresh lever for EHR sync: drop the prior snapshot's facts then the snapshot doc. */
+    public async wipeEhrSnapshot(patientId: string, snapshotDocumentId: string): Promise<void> {
+        await this.withTransaction(async (client) => {
+            await client.query('DELETE FROM patient_facts WHERE patient_id = $1 AND source_document_id = $2', [
+                patientId,
+                snapshotDocumentId,
+            ]);
+            await client.query('DELETE FROM source_documents WHERE patient_id = $1 AND id = $2', [
+                patientId,
+                snapshotDocumentId,
+            ]);
+        });
+    }
+
     /** Strips demo-only intentional_issues (sources.ts: never persisted to the EHR-facing store). */
     public async insertSourceDocuments(patientId: string, documents: SourceDocumentInput[]): Promise<number> {
         return this.withTransaction(async (client) => {

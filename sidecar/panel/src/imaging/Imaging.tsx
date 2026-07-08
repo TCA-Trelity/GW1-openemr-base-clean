@@ -1,11 +1,12 @@
-// Imaging workstation tab (S2.2, R6 combined view) — port of ImagingView.jsx into the
-// panel's light shell: Timeline / Trends / Intervals / Compare sub-tabs over the fact
-// bundle's image+treatment records. Selecting a scan from the timeline opens the combined
-// image + analysis view (ScanDetail). Timeline merging and series extraction are display
-// math only; the clinical judgments (interval recommendation, HCQ progression) render
-// from the overview's imaging block.
+// Imaging workstation tab — the image-first workspace: a visit summary strip across the top,
+// then Workspace / Timeline / Trends / Intervals / Compare sub-tabs over the fact bundle's
+// image+treatment records. The Workspace (default) puts the selected B-scan center-stage on a
+// dark surround with acquisition metadata + findings/measurements in the margins and the trend
+// charts beneath; the Timeline keeps the merged image+injection stream. Timeline merging, series
+// extraction, and the visit summary are display math only; the clinical judgments (interval
+// recommendation, HCQ progression) render from the overview's server-computed imaging block.
 import { useState } from 'react';
-import { AlertTriangle, CalendarRange, CheckCircle, Clock, GitCompare, Syringe, TrendingUp } from 'lucide-react';
+import { AlertTriangle, CalendarRange, CheckCircle, Clock, GitCompare, LayoutDashboard, Syringe, TrendingUp } from 'lucide-react';
 import type {
     BriefContent,
     ImageRecord,
@@ -16,13 +17,17 @@ import type {
 import { Card, formatDate, titleCase } from '../ui';
 import { CHANGE_ICONS, RESPONSE_BADGES, TreatmentContextBadge, medicationLabel } from './badges';
 import ScanImage, { modalityLabel } from './ScanImage';
-import ScanDetail from './ScanDetail';
+import Workspace from './Workspace';
 import Trends from './Trends';
 import Compare from './Compare';
+import IntervalLadder from './IntervalLadder';
+import VisitSummaryStrip from './VisitSummaryStrip';
+import { computeVisitSummary } from './summary';
 
-type SubTabId = 'timeline' | 'trends' | 'intervals' | 'compare';
+type SubTabId = 'workspace' | 'timeline' | 'trends' | 'intervals' | 'compare';
 
 const SUB_TABS: { id: SubTabId; label: string; icon: typeof Clock }[] = [
+    { id: 'workspace', label: 'Workspace', icon: LayoutDashboard },
     { id: 'timeline', label: 'Timeline', icon: Clock },
     { id: 'trends', label: 'Trends', icon: TrendingUp },
     { id: 'intervals', label: 'Intervals', icon: CalendarRange },
@@ -213,7 +218,10 @@ function IntervalsView({ analysis }: { analysis: IntervalPatternAnalysis }) {
         { value: analysis.pattern_summary.average_interval !== null ? String(analysis.pattern_summary.average_interval) : '—', label: 'Avg Interval (wks)', className: 'text-blue-600' },
     ];
     return (
-        <Card className="p-5">
+        <div className="space-y-6">
+            {/* The treat-and-extend ladder (must-have #3) reads the same intervals[] as the table below. */}
+            <IntervalLadder analysis={analysis} />
+            <Card className="p-5">
             <h3 className="text-base font-semibold text-slate-800 mb-4 flex items-center gap-2">
                 <Syringe className="w-5 h-5 text-purple-600" />
                 Treatment Interval Analysis
@@ -253,7 +261,8 @@ function IntervalsView({ analysis }: { analysis: IntervalPatternAnalysis }) {
                     </li>
                 ))}
             </ul>
-        </Card>
+            </Card>
+        </div>
     );
 }
 
@@ -268,10 +277,27 @@ export default function Imaging({
     images: ImageRecord[];
     treatments: TreatmentWireRecord[];
 }) {
-    const [activeSubTab, setActiveSubTab] = useState<SubTabId>('timeline');
+    const hasImages = images.length > 0;
+    // Land on the image-first Workspace when there are scans; fall back to Timeline otherwise.
+    const [activeSubTab, setActiveSubTab] = useState<SubTabId>(hasImages ? 'workspace' : 'timeline');
     const [compareIds, setCompareIds] = useState<string[]>([]);
-    const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
-    const selectedImage = images.find((image) => image.id === selectedImageId) ?? null;
+    // Default the workspace to the most recent scan so it is never empty on first paint.
+    const [selectedImageId, setSelectedImageId] = useState<string | null>(() => latestImageId(images));
+    // True only when the workspace was opened by clicking a timeline row (shows a back link).
+    const [fromTimeline, setFromTimeline] = useState(false);
+
+    const summary = computeVisitSummary(images, imaging.interval_analysis, imaging.hcq_progression);
+
+    const selectTab = (id: SubTabId) => {
+        setFromTimeline(false);
+        setActiveSubTab(id);
+    };
+
+    const openInWorkspace = (id: string) => {
+        setSelectedImageId(id);
+        setFromTimeline(true);
+        setActiveSubTab('workspace');
+    };
 
     if (images.length === 0 && treatments.length === 0) {
         return (
@@ -298,8 +324,11 @@ export default function Imaging({
                 )}
             </div>
 
+            {/* Visit summary strip across the top of the tab (must-have #4) — always visible. */}
+            {hasImages && <VisitSummaryStrip summary={summary} />}
+
             {/* Sub-tab bar */}
-            <div role="tablist" aria-label="Imaging views" className="inline-flex p-1 bg-slate-100 rounded-xl mb-5">
+            <div role="tablist" aria-label="Imaging views" className="inline-flex p-1 bg-slate-100 rounded-xl mb-5 flex-wrap">
                 {SUB_TABS.map((tab) => {
                     const Icon = tab.icon;
                     return (
@@ -307,7 +336,7 @@ export default function Imaging({
                             key={tab.id}
                             role="tab"
                             aria-selected={activeSubTab === tab.id}
-                            onClick={() => setActiveSubTab(tab.id)}
+                            onClick={() => selectTab(tab.id)}
                             className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
                                 activeSubTab === tab.id ? 'text-slate-800 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-700'
                             }`}
@@ -320,17 +349,18 @@ export default function Imaging({
             </div>
 
             <div role="tabpanel">
-                {activeSubTab === 'timeline' && selectedImage !== null && (
-                    <ScanDetail
-                        image={selectedImage}
+                {activeSubTab === 'workspace' && (
+                    <Workspace
                         images={images}
+                        selectedId={selectedImageId}
+                        onSelect={setSelectedImageId}
                         hcq={imaging.hcq_progression}
-                        onBack={() => setSelectedImageId(null)}
+                        onBack={fromTimeline ? () => setActiveSubTab('timeline') : undefined}
                     />
                 )}
-                {activeSubTab === 'timeline' && selectedImage === null && (
+                {activeSubTab === 'timeline' && (
                     <>
-                        <Timeline images={images} treatments={treatments} onSelectImage={setSelectedImageId} />
+                        <Timeline images={images} treatments={treatments} onSelectImage={openInWorkspace} />
                         <IntervalRecommendationBanner analysis={imaging.interval_analysis} />
                     </>
                 )}
@@ -339,5 +369,15 @@ export default function Imaging({
                 {activeSubTab === 'compare' && <Compare images={images} selectedIds={compareIds} onChange={setCompareIds} />}
             </div>
         </div>
+    );
+}
+
+/** Most recent scan's id by capture date, or null when there are no scans. */
+function latestImageId(images: ImageRecord[]): string | null {
+    return (
+        [...images].sort(
+            (a, b) =>
+                new Date(b.image_metadata.capture_date).getTime() - new Date(a.image_metadata.capture_date).getTime(),
+        )[0]?.id ?? null
     );
 }

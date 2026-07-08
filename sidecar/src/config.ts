@@ -7,6 +7,10 @@ const EnvSchema = z.object({
     PORT: z.coerce.number().int().positive().default(8080),
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     OPENEMR_BASE_URL: z.string().url().optional(),
+    // EHR FHIR-read client (E2 sync). System client_credentials — system role is permitted
+    // on /fhir/ routes; sync engages only when base URL + client id + private key are all set.
+    OPENEMR_CLIENT_ID: z.string().min(1).optional(),
+    OPENEMR_PRIVATE_KEY: z.string().min(1).optional(),
     ANTHROPIC_API_KEY: z.string().min(1).optional(),
     // Haiku 4.5 for all prep extraction (user call, 2026-07-08): no default thinking to
     // spiral, 1/5 the Sonnet price, and per-document calls fit comfortably in its window.

@@ -10,6 +10,9 @@ import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { Langfuse } from 'langfuse';
 import { ChatService } from './chat/chat.js';
+import { EhrSyncService } from './openemr/ehrSync.js';
+import { OpenEmrAuthClient } from './openemr/auth.js';
+import { FhirClient } from './openemr/fhir.js';
 import { loadConfig, type Config } from './config.js';
 import { LangfuseTracer } from './obs/langfuse.js';
 import { AnthropicClient } from './prep/anthropic.js';
@@ -17,6 +20,7 @@ import { SpendGuard } from './prep/budget.js';
 import { FactExtractor } from './prep/extraction.js';
 import { StoreDocumentSource } from './prep/sources.js';
 import { registerChatRoutes, type ChatRouteDeps } from './routes/chat.js';
+import { registerEhrRoutes, type EhrRouteDeps } from './routes/ehr.js';
 import { registerHealthRoutes } from './routes/health.js';
 import { registerOverviewRoutes, type OverviewRouteDeps } from './routes/overview.js';
 import { registerPrepRoutes, type PrepRouteDeps } from './routes/prep.js';
@@ -33,6 +37,8 @@ export interface AppDeps {
     overview: OverviewRouteDeps;
     /** Streaming chat over the stored fact bundle (S2.3). */
     chat: ChatRouteDeps;
+    /** Live EHR FHIR sync (E2); absent until the OpenEMR read client is configured. */
+    ehr?: EhrRouteDeps;
 }
 
 // Store-backed dependencies exist only when DATABASE_URL is configured; without it the
@@ -89,6 +95,25 @@ export function buildDeps(config: Config): AppDeps | undefined {
             maxConcurrentPreps: config.LLM_MAX_CONCURRENT_PREPS,
         },
         overview: { store },
+        ...(config.OPENEMR_BASE_URL !== undefined &&
+        config.OPENEMR_CLIENT_ID !== undefined &&
+        config.OPENEMR_PRIVATE_KEY !== undefined
+            ? {
+                  ehr: {
+                      service: new EhrSyncService(
+                          new FhirClient({
+                              baseUrl: config.OPENEMR_BASE_URL,
+                              tokenProvider: new OpenEmrAuthClient({
+                                  baseUrl: config.OPENEMR_BASE_URL,
+                                  clientId: config.OPENEMR_CLIENT_ID,
+                                  privateKeyPem: config.OPENEMR_PRIVATE_KEY,
+                              }),
+                          }),
+                          store,
+                      ),
+                  },
+              }
+            : {}),
         chat: {
             store,
             service: new ChatService(
@@ -121,6 +146,7 @@ export function buildServer(config: Config, deps?: AppDeps): FastifyInstance {
     registerPrepRoutes(app, deps?.prep);
     registerOverviewRoutes(app, deps?.overview);
     registerChatRoutes(app, deps?.chat);
+    registerEhrRoutes(app, deps?.ehr);
 
     // Scan images (S2.13): image_records carry a storage_key; the panel loads
     // /api/images/<storage_key>. fastify-static owns traversal safety.
