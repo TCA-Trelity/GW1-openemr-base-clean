@@ -1,6 +1,7 @@
-// OpenEMR OAuth2 system client (SMART Backend Services): dynamic registration + client_credentials
-// token grant with an RS384-signed JWT assertion. Contract: src/RestControllers/AuthorizationController.php:268-357
-// (registration), src/Services/JWTClientAuthenticationService.php:201-407 (assertion), Documentation/api/AUTHENTICATION.md:496-570.
+// OpenEMR OAuth2 clients: dynamic registration, client_credentials (SMART Backend Services,
+// RS384 JWT assertion, FHIR reads) and password grant (user-role token, standard-API writes for
+// EHR seeding). Contract: src/RestControllers/AuthorizationController.php:268-357 (registration),
+// src/Services/JWTClientAuthenticationService.php:201-407 (assertion), Documentation/api/AUTHENTICATION.md:496-570,609-640.
 import {
     createHash,
     createPrivateKey,
@@ -42,6 +43,26 @@ export const SYSTEM_SCOPES: readonly string[] = [
     'system/Observation.read',
     'system/DiagnosticReport.read',
     'system/DocumentReference.read',
+];
+
+// Standard-API ('api:oemr') scopes the EHR seeding script needs. There is no system-client
+// path here: /api/ routes reject the 'system' role outright (src/RestControllers/Subscriber/
+// AuthorizationListener.php:170-175, src/RestControllers/Authorization/
+// BearerTokenAuthorizationStrategy.php:383-395) and the server's standard-API scope list
+// contains no system/* entries at all (src/Common/Auth/OpenIDConnect/Entities/
+// ServerScopeListEntity.php:206-260) — so writes ride a password-grant *user* token instead.
+// Scope strings verbatim from ServerScopeListEntity::apiScopes(); 'write' covers POST/PUT and
+// 'read' covers GET/search per ScopePermissionObject::createFromString ('read'→rs, 'write'→cud).
+export const STANDARD_API_SEED_SCOPES: readonly string[] = [
+    'api:oemr',
+    'user/patient.read',
+    'user/patient.write',
+    'user/medical_problem.read',
+    'user/medical_problem.write',
+    'user/allergy.read',
+    'user/allergy.write',
+    'user/medication.read',
+    'user/medication.write',
 ];
 
 // Typed OAuth failure: carries HTTP status and the OAuth error code/description only —
@@ -99,6 +120,8 @@ export interface RegisterSystemClientOptions {
     scopes?: readonly string[];
     contacts?: readonly string[];
     redirectUris?: readonly string[];
+    /** Defaults to ['client_credentials']; add 'password' when the client also seeds via the standard API. */
+    grantTypes?: readonly string[];
     fetchImpl?: FetchLike;
 }
 
@@ -120,7 +143,7 @@ export async function registerSystemClient(options: RegisterSystemClientOptions)
         application_type: 'private',
         client_name: options.clientName,
         token_endpoint_auth_method: 'private_key_jwt',
-        grant_types: ['client_credentials'],
+        grant_types: options.grantTypes ?? ['client_credentials'],
         // Never followed under client_credentials, but registration rejects its absence.
         redirect_uris: options.redirectUris ?? [`${base}/sidecar-backend-service-unused-callback`],
         scope: (options.scopes ?? SYSTEM_SCOPES).join(' '),
@@ -243,6 +266,81 @@ export class OpenEmrAuthClient {
         const signingInput = `${base64UrlJson(header)}.${base64UrlJson(claims)}`;
         const signature = cryptoSign('sha384', Buffer.from(signingInput), this.privateKey).toString('base64url');
         return `${signingInput}.${signature}`;
+    }
+}
+
+export interface OpenEmrPasswordAuthClientOptions {
+    baseUrl: string;
+    clientId: string;
+    /** OpenEMR user credentials (e.g. the admin account) — the token acts AS this user. */
+    username: string;
+    password: string;
+    scopes?: readonly string[];
+    fetchImpl?: FetchLike;
+    /** Epoch-milliseconds clock, injectable for deterministic expiry tests. */
+    now?: () => number;
+}
+
+// OAuth2 password grant for a *user-role* token — the only headless path to the standard
+// ('api:oemr') API, which is closed to system clients (see STANDARD_API_SEED_SCOPES note).
+// Server side: the grant is enabled only when the 'oauth_password_grant' global is on
+// (src/RestControllers/AuthorizationController.php:736-748) and requires username/password/
+// user_role form fields (src/Common/Auth/OpenIDConnect/Grant/CustomPasswordGrant.php:51-110);
+// granted scopes are intersected with the client's *registered* scopes
+// (src/Common/Auth/OpenIDConnect/Repositories/ScopeRepository.php:137-188), so the client must
+// have been registered with STANDARD_API_SEED_SCOPES for writes to work.
+export class OpenEmrPasswordAuthClient {
+    private readonly fetchImpl: FetchLike;
+    private readonly now: () => number;
+    private readonly tokenUrl: string;
+    private readonly clientId: string;
+    private readonly username: string;
+    private readonly password: string;
+    private readonly scopes: readonly string[];
+    private cached: { token: string; expiresAtMs: number } | undefined;
+
+    constructor(options: OpenEmrPasswordAuthClientOptions) {
+        this.fetchImpl = options.fetchImpl ?? globalThis.fetch;
+        this.now = options.now ?? Date.now;
+        this.tokenUrl = `${options.baseUrl.replace(/\/+$/, '')}/oauth2/default/token`;
+        this.clientId = options.clientId;
+        this.username = options.username;
+        this.password = options.password;
+        this.scopes = options.scopes ?? STANDARD_API_SEED_SCOPES;
+    }
+
+    // Returns a valid user-role bearer token, reusing the cached one until near expiry.
+    async getAccessToken(): Promise<string> {
+        if (this.cached !== undefined && this.now() < this.cached.expiresAtMs) {
+            return this.cached.token;
+        }
+        // Form parameters per Documentation/api/AUTHENTICATION.md:609-640: no client secret —
+        // ClientRepository::validateClient() accepts password-grant clients by id alone
+        // (src/Common/Auth/OpenIDConnect/Repositories/ClientRepository.php:218-221).
+        const form = new URLSearchParams({
+            grant_type: 'password',
+            client_id: this.clientId,
+            user_role: 'users',
+            username: this.username,
+            password: this.password,
+            scope: this.scopes.join(' '),
+        });
+        const response = await this.fetchImpl(this.tokenUrl, {
+            method: 'POST',
+            headers: { 'content-type': 'application/x-www-form-urlencoded' },
+            body: form.toString(),
+        });
+        const payload = await parseJsonBody(response);
+        if (!response.ok) {
+            throw authErrorFrom('password token request', response.status, payload);
+        }
+        const token = payload?.['access_token'];
+        if (typeof token !== 'string' || token === '') {
+            throw new OpenEmrAuthError('password token request', response.status, undefined, 'response missing access_token');
+        }
+        const expiresIn = typeof payload?.['expires_in'] === 'number' ? payload['expires_in'] : 60;
+        this.cached = { token, expiresAtMs: this.now() + expiresIn * 1000 - TOKEN_EXPIRY_SKEW_MS };
+        return token;
     }
 }
 

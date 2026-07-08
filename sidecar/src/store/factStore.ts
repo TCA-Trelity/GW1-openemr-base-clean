@@ -224,6 +224,20 @@ export class FactStore {
         );
     }
 
+    /**
+     * Links a seeded patient to their OpenEMR record (E1: seed-ehr writes back the uuid the
+     * standard API returned). Narrow UPDATE so demographics/name stay whatever seed.ts loaded.
+     */
+    public async setOpenemrPatientId(patientId: string, openemrPatientId: string): Promise<void> {
+        const result = await this.pool.query(
+            'UPDATE patients SET openemr_patient_id = $2, updated_at = now() WHERE id = $1',
+            [patientId, openemrPatientId],
+        );
+        if (result.rowCount !== 1) {
+            throw new Error(`patient ${patientId} is not in the fact store (run the seed script first)`);
+        }
+    }
+
     /** Strips demo-only intentional_issues (sources.ts: never persisted to the EHR-facing store). */
     public async insertSourceDocuments(patientId: string, documents: SourceDocumentInput[]): Promise<number> {
         return this.withTransaction(async (client) => {
