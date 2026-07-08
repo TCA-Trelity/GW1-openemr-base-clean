@@ -118,10 +118,11 @@ function FactRow({ fact }: { fact: PatientFact }) {
     return (
         <div className="flex items-start justify-between gap-3 py-3 border-b border-slate-100 last:border-0">
             <div className="min-w-0">
-                <p className="text-sm font-medium text-slate-700">
+                {/* div, not p: the chip popover nests block elements */}
+                <div className="text-sm font-medium text-slate-700">
                     {primary}
                     <CitationChips citations={fact.sources} />
-                </p>
+                </div>
                 {secondary.length > 0 && <p className="text-xs text-slate-500 mt-0.5">{secondary.join(' · ')}</p>}
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">

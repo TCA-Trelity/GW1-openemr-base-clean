@@ -65,7 +65,7 @@ deploy logs).
 
 | ID | Ticket | Agent | Depends | Verify | Done |
 |---|---|---|---|---|---|
-| S2.1 | React panel shell: Vite + Tailwind/shadcn (ported design system), brief tabs per manifest §4 (Overview / Medical Background / Diagnosis & Care / Sources), citation chips → source cards (verbatim excerpt highlight, attribution, deep link) | sub/wt | S1.2 | screenshot | ☐ |
+| S2.1 | React panel shell: Vite + Tailwind/shadcn (ported design system), brief tabs per manifest §4 (Overview / Medical Background / Diagnosis & Care / Sources), citation chips → source cards (verbatim excerpt highlight, attribution, deep link) | sub/wt | S1.2 | screenshot | ☑ |
 | S2.2 | Imaging spine + all four features: ImagingTimeline (+days-post-injection badges), TrendAnalysis (CRT/GC w/ thresholds), IntervalAnalysis (treat-and-extend recommendation), ImageComparison (≤4 side-by-side); images served from sidecar `ImageStore` | sub/wt | S1.4, S2.1 | screenshot | ☐ |
 | S2.3 | Chat loop: Haiku 4.5 over prepared fact bundle, strict inline citation token contract + parse-back to chips (manifest §5), streaming, conversation persistence, quick prompts | main | S1.7, S1.8 | ci-live + screenshot | ☐ |
 | S2.4 | **Embed (committed for Thu):** `oe-module-clinical-copilot` — brief card into patient chart via `SectionEvent`/`CardRenderEvent`, iframe → SMART-launched panel, patient-bound token. Timeboxed to Thu AM; fallback = chart link to standalone panel (decision point 1 PM CT) | main | S2.1, S1.5 | screenshot | ☐ |

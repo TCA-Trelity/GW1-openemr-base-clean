@@ -1,6 +1,5 @@
 // Vite + Vitest config: dev proxies /api to the sidecar on :8080; tests run in jsdom.
-/// <reference types="vitest/config" />
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({

@@ -3,6 +3,10 @@
 // LLM interaction, so a full trace reconstructs from logs alone (project brief
 // engineering requirement). Store-backed deps wire in only when DATABASE_URL is set.
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { loadConfig, type Config } from './config.js';
 import { AnthropicClient } from './prep/anthropic.js';
@@ -61,6 +65,19 @@ export function buildServer(config: Config, deps?: AppDeps): FastifyInstance {
 
     registerHealthRoutes(app, config, deps === undefined ? undefined : { checkPostgres: deps.checkPostgres });
     registerPrepRoutes(app, deps?.prep);
+
+    // Serve the built panel when present (panel/dist ships in the image); SPA
+    // fallback for non-API GETs so ?patient= URLs deep-link correctly.
+    const panelDist = fileURLToPath(new URL('../panel/dist/', import.meta.url));
+    if (existsSync(path.join(panelDist, 'index.html'))) {
+        void app.register(fastifyStatic, { root: panelDist, index: ['index.html'] });
+        app.setNotFoundHandler((request, reply) => {
+            if (request.method === 'GET' && !request.url.startsWith('/api')) {
+                return reply.sendFile('index.html');
+            }
+            return reply.status(404).send({ message: `Route ${request.method}:${request.url} not found`, error: 'Not Found', statusCode: 404 });
+        });
+    }
     return app;
 }
 

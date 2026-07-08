@@ -142,12 +142,23 @@ export interface StoredTreatment {
     payload: Record<string, unknown>;
 }
 
+export interface StoredSourceDocument {
+    id: string;
+    document_type: string;
+    document_date: string | null;
+    content: Record<string, unknown>;
+    metadata: Record<string, unknown>;
+    extras: Record<string, unknown>;
+}
+
 export interface FactBundle {
     patient: StoredPatient;
     facts: StoredFact[];
     contradictions: StoredContradiction[];
     images: StoredImageRecord[];
     treatments: StoredTreatment[];
+    /** Full source documents — the Sources tab and citation deep-links render from these. */
+    documents: StoredSourceDocument[];
 }
 
 export interface StoredBrief {
@@ -371,7 +382,7 @@ export class FactStore {
         if (patientRow === undefined) {
             return null;
         }
-        const [factRows, contradictionRows, imageRows, treatmentRows] = await Promise.all([
+        const [factRows, contradictionRows, imageRows, treatmentRows, documentRows] = await Promise.all([
             this.pool.query<FactRow>(
                 `SELECT id, patient_id, fact_type, content, is_current, laterality, verification,
                         source_document_id, sources, created_date, updated_date
@@ -390,6 +401,18 @@ export class FactStore {
             this.pool.query<TreatmentRow>(
                 `SELECT id, patient_id, treatment_date::text AS treatment_date, payload
                  FROM treatments WHERE patient_id = $1 ORDER BY treatment_date, id`,
+                [patientId],
+            ),
+            this.pool.query<{
+                id: string;
+                document_type: string;
+                document_date: string | null;
+                content: unknown;
+                metadata: unknown;
+                extras: unknown;
+            }>(
+                `SELECT id, document_type, document_date::text AS document_date, content, metadata, extras
+                 FROM source_documents WHERE patient_id = $1 ORDER BY document_date, id`,
                 [patientId],
             ),
         ]);
@@ -436,6 +459,14 @@ export class FactStore {
                 patient_id: row.patient_id,
                 treatment_date: row.treatment_date,
                 payload: JsonObjectSchema.parse(row.payload),
+            })),
+            documents: documentRows.rows.map((row) => ({
+                id: row.id,
+                document_type: row.document_type,
+                document_date: row.document_date,
+                content: JsonObjectSchema.parse(row.content),
+                metadata: JsonObjectSchema.parse(row.metadata),
+                extras: JsonObjectSchema.parse(row.extras),
             })),
         };
     }

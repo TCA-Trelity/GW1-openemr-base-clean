@@ -70,7 +70,8 @@ function ContradictionAlerts({ alerts }: { alerts: RuntimeContradiction[] }) {
                     <ul className="space-y-3">
                         {alerts.map((alert) => (
                             <li key={alert.id}>
-                                <p className={`text-sm ${config.subText}`}>
+                                {/* div, not p: the chip popover nests block elements */}
+                                <div className={`text-sm ${config.subText}`}>
                                     <span className="font-medium">{titleCase(alert.type)}:</span> {alert.description}
                                     <CitationChips
                                         citations={[
@@ -78,7 +79,7 @@ function ContradictionAlerts({ alerts }: { alerts: RuntimeContradiction[] }) {
                                             ...(alert.source_b !== null ? [contradictionCitation(alert.id, 'b', alert.source_b)] : []),
                                         ]}
                                     />
-                                </p>
+                                </div>
                                 {alert.suggested_question !== null && alert.suggested_question !== '' && (
                                     <p className="text-sm text-slate-600 italic mt-0.5">→ {alert.suggested_question}</p>
                                 )}
@@ -231,10 +232,10 @@ export default function Overview({ brief }: { brief: BriefContent }) {
             {why !== null && (
                 <section>
                     <SectionLabel>Why They&rsquo;re Here</SectionLabel>
-                    <p className="text-lg text-slate-700 leading-relaxed">
+                    <div className="text-lg text-slate-700 leading-relaxed">
                         {why.content.statement}
                         {whyFact !== undefined && <CitationChips citations={whyFact.sources} />}
-                    </p>
+                    </div>
                     <div className="mt-2 text-sm text-slate-500 space-y-0.5">
                         {why.content.onset !== undefined && <p>Onset: {why.content.onset}</p>}
                         {why.content.progression !== undefined && <p>Progression: {why.content.progression}</p>}
@@ -253,10 +254,10 @@ export default function Overview({ brief }: { brief: BriefContent }) {
                         <h2 className="text-xs font-bold uppercase tracking-wider text-blue-700 mb-3">
                             What They&rsquo;re Hoping For
                         </h2>
-                        <p className="text-[17px] text-slate-800 leading-relaxed font-medium">
+                        <div className="text-[17px] text-slate-800 leading-relaxed font-medium">
                             {hoping.content.goal}
                             {goalFact !== undefined && <CitationChips citations={goalFact.sources} />}
-                        </p>
+                        </div>
                         {hoping.content.specific_concerns !== undefined && hoping.content.specific_concerns.length > 0 && (
                             <ul className="mt-3 space-y-1">
                                 {hoping.content.specific_concerns.map((concern, i) => (
