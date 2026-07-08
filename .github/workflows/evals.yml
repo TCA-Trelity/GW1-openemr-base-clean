@@ -1,0 +1,53 @@
+# Clinical Co-Pilot eval suite (S2.5): corpus-level acceptance checks over the authored
+# ground-truth corpora — deterministic, no live LLM. Regenerates
+# docs/execution/eval-results.md and publishes it as a run artifact; the job fails on any
+# eval failure (sidecar/eval/run.ts exits non-zero).
+name: Sidecar Evals
+
+on:
+  push:
+    paths:
+      - 'sidecar/**'
+      - '.github/workflows/evals.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evals:
+    runs-on: ubuntu-24.04
+    name: Run eval suite
+    defaults:
+      run:
+        working-directory: sidecar
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: sidecar/package-lock.json
+
+      - name: Install sidecar dependencies
+        run: npm ci
+
+      - name: Run evals and regenerate results doc
+        run: npm run eval
+
+      # The results doc is regenerated even when evals fail (run.ts always writes it
+      # before exiting non-zero), so upload on failure too.
+      - name: Upload eval results doc
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: eval-results
+          path: docs/execution/eval-results.md
+          if-no-files-found: error

@@ -12,7 +12,9 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "eval": "tsx eval/run.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:eval": "tsc -p eval --noEmit"
   },
   "dependencies": {
     "@fastify/static": "^9.1.3",
