@@ -104,6 +104,19 @@ export function buildServer(config: Config, deps?: AppDeps): FastifyInstance {
     registerPrepRoutes(app, deps?.prep);
     registerOverviewRoutes(app, deps?.overview);
 
+    // Scan images (S2.13): image_records carry a storage_key; the panel loads
+    // /api/images/<storage_key>. fastify-static owns traversal safety.
+    const imagesDir = config.SCAN_IMAGES_DIR ?? fileURLToPath(new URL('../seed/images/', import.meta.url));
+    if (existsSync(imagesDir)) {
+        void app.register(fastifyStatic, {
+            root: imagesDir,
+            prefix: '/api/images/',
+            decorateReply: false,
+            index: false,
+            maxAge: '7d',
+        });
+    }
+
     // Serve the built panel when present (panel/dist ships in the image); SPA
     // fallback for non-API GETs so ?patient= URLs deep-link correctly.
     const panelDist = fileURLToPath(new URL('../panel/dist/', import.meta.url));

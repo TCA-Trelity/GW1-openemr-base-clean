@@ -12,6 +12,8 @@ const EnvSchema = z.object({
     // spiral, 1/5 the Sonnet price, and per-document calls fit comfortably in its window.
     ANTHROPIC_MODEL_PREP: z.string().min(1).default('claude-haiku-4-5'),
     LANGFUSE_HOST: z.string().url().optional(),
+    // Scan-image directory for /api/images (defaults to the baked-in seed/images).
+    SCAN_IMAGES_DIR: z.string().min(1).optional(),
     // Tracing engages only when host + both keys are present; otherwise a silent no-op.
     LANGFUSE_PUBLIC_KEY: z.string().min(1).optional(),
     LANGFUSE_SECRET_KEY: z.string().min(1).optional(),

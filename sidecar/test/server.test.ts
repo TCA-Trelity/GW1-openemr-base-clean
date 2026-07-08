@@ -1,5 +1,8 @@
-// Scaffold tests: health/readiness contract and correlation-ID propagation.
-// Each test names the failure mode it guards (project convention).
+// Scaffold tests: health/readiness contract, correlation-ID propagation, and the
+// scan-image static route. Each test names the failure mode it guards.
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
@@ -35,6 +38,35 @@ describe('health endpoints', () => {
         const res = await app.inject({ method: 'GET', url: '/ready' });
         expect(res.statusCode).toBe(503);
         expect(res.json().ready).toBe(false);
+    });
+});
+
+describe('scan images route', () => {
+    // 1x1 transparent PNG.
+    const PNG = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+        'base64',
+    );
+
+    function imageServer() {
+        const dir = mkdtempSync(path.join(tmpdir(), 'scan-images-'));
+        writeFileSync(path.join(dir, 'oct-test.png'), PNG);
+        return buildServer(loadConfig({ NODE_ENV: 'test', SCAN_IMAGES_DIR: dir }));
+    }
+
+    // Guards: the ScanImage seam contract — a stored storage_key must resolve to bytes.
+    it('serves an image by storage key with an image content type', async () => {
+        const res = await imageServer().inject({ method: 'GET', url: '/api/images/oct-test.png' });
+        expect(res.statusCode).toBe(200);
+        expect(res.headers['content-type']).toContain('image/png');
+        expect(res.rawPayload.length).toBe(PNG.length);
+    });
+
+    // Guards: path traversal out of the images directory and silent 200s on misses.
+    it('rejects traversal and answers 404 for unknown keys', async () => {
+        const app = imageServer();
+        expect((await app.inject({ method: 'GET', url: '/api/images/../server.ts' })).statusCode).toBeGreaterThanOrEqual(400);
+        expect((await app.inject({ method: 'GET', url: '/api/images/nope.png' })).statusCode).toBe(404);
     });
 });
 
