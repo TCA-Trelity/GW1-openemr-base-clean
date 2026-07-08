@@ -1,0 +1,2046 @@
+{
+  "patient": {
+    "patient_id": "margaret-chen",
+    "name": "Margaret L. Chen",
+    "dob": "1967-03-14",
+    "sex": "F",
+    "mrn": "FPA-2019-4521",
+    "address": "4521 Maple Street, Orlando, FL 32801",
+    "phone": "(407) 555-6789",
+    "appointment_date": "2024-12-26",
+    "appointment_time": "10:30",
+    "visit_type": "new_patient"
+  },
+  "medications": [
+    {
+      "id": "fact-mc-med-001",
+      "patient_id": "margaret-chen",
+      "fact_type": "medication",
+      "content": {
+        "name": "Hydroxychloroquine (Plaquenil)",
+        "generic_name": "hydroxychloroquine sulfate",
+        "dose": "200mg",
+        "frequency": "daily",
+        "route": "PO",
+        "start_date": "2019-01-15",
+        "end_date": null,
+        "prescriber": "Anita Patel, MD (Rheumatology)",
+        "indication": "Rheumatoid arthritis",
+        "risk_flags": []
+      },
+      "is_current": true,
+      "source_document_id": "doc-mc-002",
+      "sources": [
+        {
+          "id": "cit-mc-001",
+          "fact_id": "fact-mc-med-001",
+          "source_label": "Rheumatology office note - Dr. Anita Patel",
+          "source_type": "prior_visit_note",
+          "excerpt_text": "Hydroxychloroquine 200mg PO daily - initiated 01/15/2019",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 2516,
+            "end_char": 2572,
+            "context_before": "ointment.\n\nCURRENT MEDICATIONS (confirmed with patient):\n1. ",
+            "context_after": "\n2. Methotrexate 15mg PO weekly (6 tablets of 2.5mg) - initi"
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Anita Patel, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-mc-003",
+          "document_date": "2024-09-10"
+        },
+        {
+          "id": "cit-mc-002",
+          "fact_id": "fact-mc-med-001",
+          "source_label": "SureScripts pharmacy history",
+          "source_type": "pharmacy_record",
+          "excerpt_text": "\"first_fill_date\": \"2019-01-15\"",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 738,
+            "end_char": 769,
+            "context_before": "11-15\",\n    \"refills_remaining\": 5, \"status\": \"active\",\n    ",
+            "context_after": ", \"cumulative_fills\": 71,\n    \"compliance_indicator\": \"good\""
+          },
+          "attribution": {
+            "speaker_role": "system",
+            "speaker_name": "SureScripts",
+            "confidence": 0.99
+          },
+          "source_document_id": "doc-mc-002",
+          "document_date": "2024-12-26"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": null,
+      "created_date": "2024-12-26T09:53:00Z",
+      "updated_date": "2024-12-26T09:53:00Z"
+    },
+    {
+      "id": "fact-mc-med-002",
+      "patient_id": "margaret-chen",
+      "fact_type": "medication",
+      "content": {
+        "name": "Methotrexate",
+        "generic_name": "methotrexate sodium",
+        "dose": "15mg (six 2.5mg tablets)",
+        "frequency": "weekly",
+        "route": "PO",
+        "start_date": "2019-02-01",
+        "end_date": null,
+        "prescriber": "Anita Patel, MD (Rheumatology)",
+        "indication": "Rheumatoid arthritis",
+        "risk_flags": []
+      },
+      "is_current": true,
+      "source_document_id": "doc-mc-003",
+      "sources": [
+        {
+          "id": "cit-mc-003",
+          "fact_id": "fact-mc-med-002",
+          "source_label": "Rheumatology office note - Dr. Anita Patel",
+          "source_type": "prior_visit_note",
+          "excerpt_text": "Methotrexate 15mg PO weekly (6 tablets of 2.5mg) - initiated 02/2019",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 2576,
+            "end_char": 2644,
+            "context_before": "Hydroxychloroquine 200mg PO daily - initiated 01/15/2019\n2. ",
+            "context_after": "\n3. Folic acid 1mg PO daily\n4. Lisinopril 10mg PO daily (pre"
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Anita Patel, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-mc-003",
+          "document_date": "2024-09-10"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": null,
+      "created_date": "2024-12-26T09:53:00Z",
+      "updated_date": "2024-12-26T09:53:00Z"
+    },
+    {
+      "id": "fact-mc-med-003",
+      "patient_id": "margaret-chen",
+      "fact_type": "medication",
+      "content": {
+        "name": "Folic acid",
+        "generic_name": "folic acid",
+        "dose": "1mg",
+        "frequency": "daily",
+        "route": "PO",
+        "start_date": "2019-02-01",
+        "end_date": null,
+        "prescriber": "Anita Patel, MD (Rheumatology)",
+        "indication": "Methotrexate side-effect prophylaxis",
+        "risk_flags": []
+      },
+      "is_current": true,
+      "source_document_id": "doc-mc-003",
+      "sources": [
+        {
+          "id": "cit-mc-004",
+          "fact_id": "fact-mc-med-003",
+          "source_label": "Rheumatology office note - Dr. Anita Patel",
+          "source_type": "prior_visit_note",
+          "excerpt_text": "Folic acid 1mg PO daily",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 2648,
+            "end_char": 2671,
+            "context_before": " 15mg PO weekly (6 tablets of 2.5mg) - initiated 02/2019\n3. ",
+            "context_after": "\n4. Lisinopril 10mg PO daily (prescribed by PCP for hyperten"
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Anita Patel, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-mc-003",
+          "document_date": "2024-09-10"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": null,
+      "created_date": "2024-12-26T09:53:00Z",
+      "updated_date": "2024-12-26T09:53:00Z"
+    },
+    {
+      "id": "fact-mc-med-004",
+      "patient_id": "margaret-chen",
+      "fact_type": "medication",
+      "content": {
+        "name": "Lisinopril",
+        "generic_name": "lisinopril",
+        "dose": "10mg",
+        "frequency": "daily",
+        "route": "PO",
+        "start_date": "2018-06-01",
+        "end_date": null,
+        "prescriber": "Sarah Warren, MD (PCP)",
+        "indication": "Hypertension",
+        "risk_flags": []
+      },
+      "is_current": true,
+      "source_document_id": "doc-mc-003",
+      "sources": [
+        {
+          "id": "cit-mc-005",
+          "fact_id": "fact-mc-med-004",
+          "source_label": "Rheumatology office note - Dr. Anita Patel",
+          "source_type": "prior_visit_note",
+          "excerpt_text": "Lisinopril 10mg PO daily (prescribed by PCP for hypertension)",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 2675,
+            "end_char": 2736,
+            "context_before": "of 2.5mg) - initiated 02/2019\n3. Folic acid 1mg PO daily\n4. ",
+            "context_after": "\n5. Vitamin D3 2000 IU PO daily (OTC supplement)\n\nALLERGIES:"
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Anita Patel, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-mc-003",
+          "document_date": "2024-09-10"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": null,
+      "created_date": "2024-12-26T09:53:00Z",
+      "updated_date": "2024-12-26T09:53:00Z"
+    },
+    {
+      "id": "fact-mc-med-005",
+      "patient_id": "margaret-chen",
+      "fact_type": "medication",
+      "content": {
+        "name": "Vitamin D3",
+        "generic_name": "cholecalciferol",
+        "dose": "2000 IU",
+        "frequency": "daily",
+        "route": "PO",
+        "start_date": null,
+        "end_date": null,
+        "prescriber": null,
+        "indication": "OTC supplement",
+        "risk_flags": []
+      },
+      "is_current": true,
+      "source_document_id": "doc-mc-003",
+      "sources": [
+        {
+          "id": "cit-mc-006",
+          "fact_id": "fact-mc-med-005",
+          "source_label": "Rheumatology office note - Dr. Anita Patel",
+          "source_type": "prior_visit_note",
+          "excerpt_text": "Vitamin D3 2000 IU PO daily (OTC supplement)",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 2740,
+            "end_char": 2784,
+            "context_before": "opril 10mg PO daily (prescribed by PCP for hypertension)\n5. ",
+            "context_after": "\n\nALLERGIES: Sulfonamides - patient reports rash with previo"
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Anita Patel, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-mc-003",
+          "document_date": "2024-09-10"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": null,
+      "created_date": "2024-12-26T09:53:00Z",
+      "updated_date": "2024-12-26T09:53:00Z"
+    }
+  ],
+  "allergies": [
+    {
+      "id": "fact-mc-alg-001",
+      "patient_id": "margaret-chen",
+      "fact_type": "allergy",
+      "content": {
+        "substance": "Sulfonamides",
+        "reaction": "rash",
+        "severity": "moderate",
+        "verified": false,
+        "source": "patient-reported (intake, rheumatology note); absent from PCP referral and pharmacy record"
+      },
+      "is_current": true,
+      "source_document_id": "doc-mc-012",
+      "sources": [
+        {
+          "id": "cit-mc-007",
+          "fact_id": "fact-mc-alg-001",
+          "source_label": "Conversational intake transcript",
+          "source_type": "intake_transcript",
+          "excerpt_text": "Yes, I'm allergic to sulfa drugs. I had a bad rash when I was given one years ago - I think it was Bactrim or something like that.",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 2525,
+            "end_char": 2655,
+            "context_before": "ISTANT: Do you have any allergies to medications?\n\nPATIENT: ",
+            "context_after": " It was pretty uncomfortable.\n\nASSISTANT: Thank you for lett"
+          },
+          "attribution": {
+            "speaker_role": "patient",
+            "speaker_name": "Margaret Chen",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-mc-012",
+          "document_date": "2024-12-26"
+        },
+        {
+          "id": "cit-mc-008",
+          "fact_id": "fact-mc-alg-001",
+          "source_label": "Rheumatology office note - Dr. Anita Patel",
+          "source_type": "prior_visit_note",
+          "excerpt_text": "ALLERGIES: Sulfonamides - patient reports rash with previous exposure (not verified in medical record, patient-reported only)",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 2786,
+            "end_char": 2911,
+            "context_before": "ertension)\n5. Vitamin D3 2000 IU PO daily (OTC supplement)\n\n",
+            "context_after": "\n\nREVIEW OF SYSTEMS:\nConstitutional: No fever, chills, night"
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Anita Patel, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-mc-003",
+          "document_date": "2024-09-10"
+        }
+      ],
+      "verification": {
+        "status": "patient_reported",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": null,
+      "created_date": "2024-12-26T09:53:00Z",
+      "updated_date": "2024-12-26T09:53:00Z"
+    }
+  ],
+  "conditions": [
+    {
+      "id": "fact-mc-con-001",
+      "patient_id": "margaret-chen",
+      "fact_type": "condition",
+      "content": {
+        "name": "Rheumatoid arthritis (seropositive)",
+        "icd10": "M05.79",
+        "status": "controlled",
+        "since": "2018-03",
+        "severity": "in clinical remission (DAS28-CRP 2.1)"
+      },
+      "is_current": true,
+      "source_document_id": "doc-mc-003",
+      "sources": [
+        {
+          "id": "cit-mc-009",
+          "fact_id": "fact-mc-con-001",
+          "source_label": "Rheumatology office note - Dr. Anita Patel",
+          "source_type": "prior_visit_note",
+          "excerpt_text": "Rheumatoid arthritis (ICD-10: M05.79) - in clinical remission on current DMARD therapy",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 4047,
+            "end_char": 4133,
+            "context_before": "ill review and contact patient if abnormal.\n\nASSESSMENT:\n1. ",
+            "context_after": ". Seropositive, RF+ and anti-CCP+. Excellent disease control"
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Anita Patel, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-mc-003",
+          "document_date": "2024-09-10"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": null,
+      "created_date": "2024-12-26T09:53:00Z",
+      "updated_date": "2024-12-26T09:53:00Z"
+    },
+    {
+      "id": "fact-mc-con-002",
+      "patient_id": "margaret-chen",
+      "fact_type": "condition",
+      "content": {
+        "name": "Essential hypertension",
+        "icd10": "I10",
+        "status": "controlled",
+        "since": "2018",
+        "severity": "well-controlled on lisinopril"
+      },
+      "is_current": true,
+      "source_document_id": "doc-mc-001",
+      "sources": [
+        {
+          "id": "cit-mc-010",
+          "fact_id": "fact-mc-con-002",
+          "source_label": "Referral letter - Dr. Sarah Warren (PCP)",
+          "source_type": "referral_letter",
+          "excerpt_text": "Hypertension (well-controlled on lisinopril)",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 906,
+            "end_char": 950,
+            "context_before": "id arthritis (managed by Dr. Patel, Orlando Rheumatology)\n- ",
+            "context_after": "\n\nPatient describes seeing \"black spots that move around\" in"
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Sarah Warren, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-mc-001",
+          "document_date": "2024-12-15"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": null,
+      "created_date": "2024-12-26T09:53:00Z",
+      "updated_date": "2024-12-26T09:53:00Z"
+    }
+  ],
+  "family_history": [
+    {
+      "id": "fact-mc-fam-001",
+      "patient_id": "margaret-chen",
+      "fact_type": "family_history",
+      "content": {
+        "relative": "Mother",
+        "condition": "Retinal detachment",
+        "age_at_diagnosis": 60,
+        "outcome": "Emergency surgical repair at Tampa General; patient told it could be hereditary"
+      },
+      "is_current": true,
+      "source_document_id": "doc-mc-012",
+      "sources": [
+        {
+          "id": "cit-mc-011",
+          "fact_id": "fact-mc-fam-001",
+          "source_label": "Conversational intake transcript",
+          "source_type": "intake_transcript",
+          "excerpt_text": "my mother had a retinal detachment when she was around 60. She had to have emergency surgery for it at Tampa General.",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 2826,
+            "end_char": 2943,
+            "context_before": "lems, particularly issues with their retina?\n\nPATIENT: Yes, ",
+            "context_after": " The eye doctor told her it could be hereditary. That's part"
+          },
+          "attribution": {
+            "speaker_role": "patient",
+            "speaker_name": "Margaret Chen",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-mc-012",
+          "document_date": "2024-12-26"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": null,
+      "created_date": "2024-12-26T09:53:00Z",
+      "updated_date": "2024-12-26T09:53:00Z"
+    },
+    {
+      "id": "fact-mc-fam-002",
+      "patient_id": "margaret-chen",
+      "fact_type": "family_history",
+      "content": {
+        "relative": "Father",
+        "condition": "Glaucoma",
+        "age_at_diagnosis": null,
+        "outcome": "Managed with drops for years; currently age 82"
+      },
+      "is_current": true,
+      "source_document_id": "doc-mc-012",
+      "sources": [
+        {
+          "id": "cit-mc-012",
+          "fact_id": "fact-mc-fam-002",
+          "source_label": "Conversational intake transcript",
+          "source_type": "intake_transcript",
+          "excerpt_text": "My father has glaucoma - he's been using eye drops for years. He's 82 now.",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 3193,
+            "end_char": 3267,
+            "context_before": "oes anyone else in your family have eye problems?\n\nPATIENT: ",
+            "context_after": "\n\nASSISTANT: When was your last comprehensive eye exam - not"
+          },
+          "attribution": {
+            "speaker_role": "patient",
+            "speaker_name": "Margaret Chen",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-mc-012",
+          "document_date": "2024-12-26"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": null,
+      "created_date": "2024-12-26T09:53:00Z",
+      "updated_date": "2024-12-26T09:53:00Z"
+    }
+  ],
+  "patient_goals": [
+    {
+      "id": "fact-mc-goal-001",
+      "patient_id": "margaret-chen",
+      "fact_type": "patient_goal",
+      "content": {
+        "goal": "Understand what is causing the floaters and rule out the retinal detachment her mother had",
+        "specific_concerns": [
+          "Worried about having the same condition as her mother (retinal detachment)",
+          "Needs to maintain vision for caregiving duties - husband David has Parkinson's disease",
+          "Needs to drive her husband to appointments",
+          "Daughter Emily's wedding in about 6 weeks - wants good vision for it"
+        ],
+        "verbatim_quotes": [
+          "I really can't afford any vision problems right now",
+          "I keep thinking about what happened to her",
+          "I've been reading online about retinal detachment and it's been making me anxious"
+        ],
+        "emotional_state": "anxious; has been researching online"
+      },
+      "is_current": true,
+      "source_document_id": "doc-mc-012",
+      "sources": [
+        {
+          "id": "cit-mc-013",
+          "fact_id": "fact-mc-goal-001",
+          "source_label": "Conversational intake transcript",
+          "source_type": "intake_transcript",
+          "excerpt_text": "I really want to understand what's causing these floaters and make sure I don't have what my mother had.",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 3676,
+            "end_char": 3780,
+            "context_before": "ecific you're hoping to get out of today's visit?\n\nPATIENT: ",
+            "context_after": " I've been reading online about retinal detachment and it's "
+          },
+          "attribution": {
+            "speaker_role": "patient",
+            "speaker_name": "Margaret Chen",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-mc-012",
+          "document_date": "2024-12-26"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": null,
+      "created_date": "2024-12-26T09:53:00Z",
+      "updated_date": "2024-12-26T09:53:00Z"
+    }
+  ],
+  "chief_complaint": {
+    "id": "fact-mc-cc-001",
+    "patient_id": "margaret-chen",
+    "fact_type": "chief_complaint",
+    "content": {
+      "statement": "Floaters and flashes x 2-3 weeks, worse OD",
+      "onset": "approximately 2-3 weeks before 2024-12-26 visit",
+      "onset_context": "Started around the time of heavy lifting (helping daughter move)",
+      "laterality": "OU, worse OD",
+      "progression": "slightly worsening / more noticeable",
+      "pertinent_negatives": [
+        "No curtain or shadow",
+        "No vision loss",
+        "No trauma",
+        "No prior eye surgery"
+      ]
+    },
+    "is_current": true,
+    "source_document_id": "doc-mc-012",
+    "sources": [
+      {
+        "id": "cit-mc-014",
+        "fact_id": "fact-mc-cc-001",
+        "source_label": "Conversational intake transcript",
+        "source_type": "intake_transcript",
+        "excerpt_text": "I've been seeing these floaters in my vision, especially in my right eye.",
+        "excerpt_location": {
+          "type": "character_range",
+          "start_char": 581,
+          "end_char": 654,
+          "context_before": "ent. What's the main reason for your visit today?\n\nPATIENT: ",
+          "context_after": " They look like little cobwebs or spots that drift around wh"
+        },
+        "attribution": {
+          "speaker_role": "patient",
+          "speaker_name": "Margaret Chen",
+          "confidence": 0.95
+        },
+        "source_document_id": "doc-mc-012",
+        "document_date": "2024-12-26"
+      }
+    ],
+    "verification": {
+      "status": "unverified",
+      "verified_by_user_id": null,
+      "verified_at": null,
+      "verifier_role": null
+    },
+    "laterality": "OD",
+    "created_date": "2024-12-26T09:53:00Z",
+    "updated_date": "2024-12-26T09:53:00Z"
+  },
+  "source_documents": [
+    {
+      "document_id": "doc-mc-001",
+      "filename": "referral-letter-pcp-2024-12-15.txt",
+      "document_type": "referral_letter",
+      "document_date": "2024-12-15",
+      "received_date": "2024-12-16",
+      "received_method": "fax",
+      "content": {
+        "format": "text",
+        "text_content": "FAX TRANSMISSION\nFROM: FAMILY PRACTICE ASSOCIATES\nTO: MONTZKA EYE CLINIC\nPAGES: 1 of 1\nDATE: 12/15/2024 14:22\n\nFAMILY PRACTICE ASSOCIATES\nSarah Warren, MD - Family Medicine\n123 Medical Plaza Drive, Suite 200\nOrlando, FL 32801\nPhone: (407) 555-1234 | Fax: (407) 555-1235 | NPI: 0987654321\n\nDate: December 15, 2024\n\nRE: REFERRAL FOR OPHTHALMOLOGY EVALUATION\n\nPatient Name: Margaret L. Chen\nDate of Birth: 03/14/1967 (57 years old)\nMedical Record #: FPA-2019-4521\nAddress: 4521 Maple Street, Orlando, FL 32801\nPhone: (407) 555-6789\n\nDear Colleague,\n\nI am referring Ms. Margaret Chen for ophthalmologic evaluation of new-onset visual disturbances.\n\nCHIEF COMPLAINT:\nPatient presents with complaint of \"floaters\" in right eye x approximately 3 weeks duration.\n\nCLINICAL CONTEXT:\n57-year-old female with past medical history significant for:\n- Rheumatoid arthritis (managed by Dr. Patel, Orlando Rheumatology)\n- Hypertension (well-controlled on lisinopril)\n\nPatient describes seeing \"black spots that move around\" in her right visual field, more noticeable against light backgrounds. Denies frank vision loss, eye pain, or history of eye trauma. No associated headaches. She reports occasional \"flashing lights\" but unable to characterize frequency or pattern.\n\nPERTINENT HISTORY:\n- No prior eye surgeries or significant ocular history\n- Family history: Mother had \"retinal detachment\" requiring surgery (patient unsure of details)\n- No history of diabetes mellitus\n- Non-smoker\n\nCURRENT MEDICATIONS (as documented in chart):\n1. Hydroxychloroquine (Plaquenil) 200mg daily - for RA, ~4 years duration\n2. Methotrexate - weekly (rheumatology-managed, exact dose not documented in my records)\n3. Lisinopril 10mg daily - for HTN\n4. Daily vitamin D supplement (OTC)\n\nALLERGIES: No known drug allergies (NKDA)\n\nRECENT VITALS (from 12/10/2024 visit):\nBP: 132/82 | HR: 74 | BMI: 24.3\n\nASSESSMENT:\nNew onset floaters, right eye. Differential includes vitreous floaters (most likely given age), posterior vitreous detachment, less likely retinal tear or detachment given lack of vision loss.\n\nREQUEST:\nPlease evaluate for:\n1. Vitreous pathology vs retinal pathology\n2. Assessment of fundus and peripheral retina\n3. Appropriate management/surveillance plan\n\nGiven patient's chronic hydroxychloroquine use for RA, concurrent baseline ophthalmologic screening for drug-induced retinopathy would be appropriate per AAO guidelines (though this was not the primary reason for referral).\n\nThank you for seeing Ms. Chen. Please send consultation report to my attention. Patient may follow up with me as needed for coordination of care.\n\nSincerely,\n\n[Signature - partially legible]\nSarah Warren, MD\nFamily Practice Associates\nFL Medical License: ME987654\n\n[End of fax transmission]",
+        "ocr_quality": 0.92,
+        "ocr_artifacts": [
+          "slight blur on fax header",
+          "signature partially legible",
+          "minor skew corrected"
+        ]
+      },
+      "extracted_data": {
+        "referring_provider": {
+          "name": "Sarah Warren, MD",
+          "specialty": "Family Medicine",
+          "practice": "Family Practice Associates",
+          "npi": "0987654321"
+        },
+        "chief_complaint": "Floaters in right eye x approximately 3 weeks",
+        "medications_mentioned": [
+          {
+            "name": "Hydroxychloroquine (Plaquenil)",
+            "dose": "200mg daily",
+            "duration": "~4 years",
+            "indication": "RA"
+          },
+          {
+            "name": "Methotrexate",
+            "dose": "weekly",
+            "indication": "RA",
+            "note": "exact dose not documented"
+          },
+          {
+            "name": "Lisinopril",
+            "dose": "10mg daily",
+            "indication": "HTN"
+          },
+          {
+            "name": "Vitamin D",
+            "dose": "OTC supplement"
+          }
+        ],
+        "allergies_mentioned": {
+          "stated": "NKDA"
+        },
+        "family_history_mentioned": [
+          {
+            "relative": "Mother",
+            "condition": "Retinal detachment",
+            "details": "required surgery, patient unsure of details"
+          }
+        ],
+        "recent_vitals": {
+          "bp": "132/82",
+          "hr": 74,
+          "bmi": 24.3,
+          "date": "2024-12-10"
+        }
+      },
+      "intentional_issues": {
+        "hcq_duration": {
+          "issue": "Duration stated as '~4 years' - hedged/uncertain",
+          "actual": "5 years 11 months per pharmacy records (first fill 2019-01-15)",
+          "clinical_impact": "Underestimates time on HCQ, may affect urgency of retinal screening"
+        },
+        "missing_allergy": {
+          "issue": "States 'NKDA' (No Known Drug Allergies)",
+          "actual": "Patient reports sulfa allergy (rash) in intake and rheum note",
+          "clinical_impact": "Safety risk if sulfa-containing medications prescribed"
+        },
+        "incomplete_medications": {
+          "issue": "Methotrexate dose missing, folic acid not listed",
+          "actual": "MTX 15mg weekly, Folic acid 1mg daily per pharmacy",
+          "clinical_impact": "Incomplete medication reconciliation"
+        }
+      },
+      "metadata": {
+        "source_system": "fax_intake",
+        "imported_at": "2024-12-16T09:30:00Z",
+        "imported_by": "front_desk",
+        "pages": 1,
+        "original_filename": "referral_chen_margaret_20241215.pdf"
+      }
+    },
+    {
+      "document_id": "doc-mc-002",
+      "filename": "pharmacy-pull-2024-12-26.json",
+      "document_type": "pharmacy_record",
+      "document_date": "2024-12-26",
+      "content": {
+        "format": "text",
+        "text_content": "SURESCRIPTS MEDICATION HISTORY RESPONSE\nQuery performer: Montzka Eye Clinic\nPatient: CHEN, MARGARET L | DOB: 1967-03-14\nQuery date: 2024-12-26T09:15:00Z | Fill history: 24 months | Pharmacies queried: 3\nPatient match confidence: 0.98 (name, dob, address)\n\n\"medication_history\": [\n  {\n    \"drug_name\": \"HYDROXYCHLOROQUINE SULFATE\", \"brand_name\": \"PLAQUENIL\",\n    \"strength\": \"200 MG\", \"form\": \"TABLET\", \"quantity\": 30, \"days_supply\": 30,\n    \"directions\": \"TAKE 1 TABLET BY MOUTH ONCE DAILY\",\n    \"prescriber\": \"PATEL, A\", \"prescriber_npi\": \"1234567890\",\n    \"pharmacy\": \"WALGREENS #5432, 2100 Colonial Dr, Orlando FL 32801\",\n    \"fill_date\": \"2024-11-20\", \"written_date\": \"2024-11-15\",\n    \"refills_remaining\": 5, \"status\": \"active\",\n    \"first_fill_date\": \"2019-01-15\", \"cumulative_fills\": 71,\n    \"compliance_indicator\": \"good\"\n  },\n  {\n    \"drug_name\": \"HYDROXYCHLOROQUINE SULFATE\", \"brand_name\": \"PLAQUENIL\",\n    \"strength\": \"200 MG\", \"form\": \"TABLET\",\n    \"prescriber\": \"PATEL, ANITA MD\", \"pharmacy\": \"WALGREENS #5432\",\n    \"fill_date\": \"2024-10-22\", \"status\": \"superseded\",\n    \"first_fill_date\": \"2019-01-15\"\n  },\n  {\n    \"drug_name\": \"METHOTREXATE SODIUM\", \"strength\": \"2.5 MG\", \"form\": \"TABLET\",\n    \"quantity\": 24, \"directions\": \"TAKE 6 TABLETS BY MOUTH ONCE WEEKLY\",\n    \"prescriber\": \"PATEL, ANITA MD\", \"pharmacy\": \"WALGREENS #5432\",\n    \"fill_date\": \"2024-11-15\", \"days_supply\": 28,\n    \"refills_remaining\": 2, \"status\": \"active\",\n    \"first_fill_date\": \"2019-02-01\", \"cumulative_fills\": 69,\n    \"compliance_indicator\": \"concerning\",\n    \"compliance_note\": \"Last fill 41 days ago, expected refill ~Dec 13\"\n  },\n  {\n    \"drug_name\": \"FOLIC ACID\", \"strength\": \"1 MG\", \"form\": \"TABLET\",\n    \"quantity\": 30, \"days_supply\": 30, \"directions\": \"TAKE 1 TABLET BY MOUTH DAILY\",\n    \"prescriber\": \"PATEL, ANITA MD\", \"pharmacy\": \"WALGREENS #5432\",\n    \"fill_date\": \"2024-11-15\", \"refills_remaining\": 5, \"status\": \"active\",\n    \"first_fill_date\": \"2019-02-01\"\n  },\n  {\n    \"drug_name\": \"LISINOPRIL\", \"brand_name\": \"ZESTRIL\", \"strength\": \"10 MG\",\n    \"form\": \"TABLET\", \"quantity\": 30, \"days_supply\": 30,\n    \"directions\": \"TAKE 1 TABLET BY MOUTH DAILY\",\n    \"prescriber\": \"WARREN, SARAH MD\", \"prescriber_npi\": \"0987654321\",\n    \"pharmacy\": \"WALGREENS #5432\",\n    \"fill_date\": \"2024-11-20\", \"refills_remaining\": 11, \"status\": \"active\",\n    \"first_fill_date\": \"2018-06-01\"\n  },\n  {\n    \"drug_name\": \"PREDNISONE\", \"strength\": \"10 MG\", \"form\": \"TABLET\",\n    \"quantity\": 21, \"days_supply\": 7,\n    \"directions\": \"TAKE AS DIRECTED FOR RA FLARE - TAPER\",\n    \"prescriber\": \"PATEL, ANITA MD\", \"pharmacy\": \"WALGREENS #5432\",\n    \"fill_date\": \"2024-08-10\", \"status\": \"discontinued\",\n    \"discontinue_reason\": \"completed course\", \"discontinue_date\": \"2024-08-17\"\n  },\n  {\n    \"drug_name\": \"LISINOPRIL\", \"strength\": \"5 MG\", \"form\": \"TABLET\",\n    \"prescriber\": \"WARREN, S\", \"pharmacy\": \"CVS #8821\",\n    \"fill_date\": \"2024-05-20\", \"status\": \"discontinued\",\n    \"discontinue_reason\": \"dose_change\", \"discontinue_date\": \"2024-05-20\"\n  }\n],\n\"allergies\": [],\n\"pharmacy_notes\": {\n  \"auto_refill_enrolled\": [\"HYDROXYCHLOROQUINE SULFATE\", \"LISINOPRIL\"],\n  \"preferred_pharmacy\": \"WALGREENS #5432\",\n  \"last_pharmacist_counseling\": \"2024-11-20\"\n}\n\nEND OF SURESCRIPTS RESPONSE"
+      },
+      "extracted_data": {
+        "active_medications": [
+          {
+            "name": "Hydroxychloroquine sulfate 200mg",
+            "first_fill_date": "2019-01-15",
+            "cumulative_fills": 71
+          },
+          {
+            "name": "Methotrexate 2.5mg (6 tabs weekly)",
+            "first_fill_date": "2019-02-01",
+            "last_fill": "2024-11-15",
+            "days_supply": 28,
+            "compliance": "concerning"
+          },
+          {
+            "name": "Folic acid 1mg",
+            "first_fill_date": "2019-02-01"
+          },
+          {
+            "name": "Lisinopril 10mg",
+            "first_fill_date": "2018-06-01"
+          }
+        ],
+        "discontinued": [
+          {
+            "name": "Prednisone 10mg taper",
+            "fill_date": "2024-08-10",
+            "reason": "completed course"
+          },
+          {
+            "name": "Lisinopril 5mg",
+            "reason": "dose_change"
+          }
+        ],
+        "allergies_on_file": []
+      },
+      "intentional_issues": {
+        "empty_allergy_list": {
+          "issue": "Allergies array is empty",
+          "actual": "Patient reports sulfa allergy (rash) - documented in rheum note and intake",
+          "clinical_impact": "CRITICAL: Missing allergy information is patient safety risk"
+        },
+        "hcq_duration_definitive": {
+          "issue": "first_fill_date: 2019-01-15 provides ground truth",
+          "contradiction_with": [
+            "Referral letter (~4 years)",
+            "Patient report (4-5 years)"
+          ],
+          "actual_duration": "5 years 11 months as of Dec 26, 2024"
+        },
+        "mtx_compliance_gap": {
+          "issue": "Methotrexate last filled Nov 15, 28-day supply, query date Dec 26 = 41 days",
+          "expected_refill": "December 13, 2024",
+          "days_overdue": 13,
+          "clinical_impact": "Low - may indicate non-compliance or fills elsewhere"
+        },
+        "prescriber_name_variations": {
+          "issue": "Same prescriber appears as 'PATEL, A', 'PATEL, ANITA MD'; 'WARREN, SARAH MD', 'WARREN, S'",
+          "clinical_impact": "Data quality issue for prescriber matching"
+        },
+        "hidden_prednisone_course": {
+          "issue": "August 2024 prednisone taper for RA flare not mentioned in patient intake",
+          "clinical_impact": "Minor - patient may have forgotten short course"
+        }
+      },
+      "metadata": {
+        "source_system": "surescripts",
+        "query_type": "medication_history",
+        "imported_at": "2024-12-26T09:15:15Z",
+        "imported_by": "system"
+      }
+    },
+    {
+      "document_id": "doc-mc-003",
+      "filename": "rheumatology-note-2024-09-10.txt",
+      "document_type": "clinical_note",
+      "document_date": "2024-09-10",
+      "received_date": "2024-12-16",
+      "received_method": "patient_upload",
+      "content": {
+        "format": "text",
+        "text_content": "ORLANDO RHEUMATOLOGY ASSOCIATES\n2500 Medical Center Parkway, Suite 400, Orlando, FL 32803\nPhone: (407) 555-7890 | Fax: (407) 555-7891\n\nOFFICE VISIT NOTE\n\nPatient: Margaret L. Chen\nDOB: 03/14/1967 (57 years old)\nMRN: ORA-2018-7423\nDate of Service: September 10, 2024\nVisit Type: Follow-up - Established Patient\nProvider: Anita Patel, MD, FACR\n\nCHIEF COMPLAINT:\nRoutine RA follow-up, discussion of hydroxychloroquine monitoring\n\nHISTORY OF PRESENT ILLNESS:\nMrs. Chen is a pleasant 57-year-old woman with a history of seropositive rheumatoid arthritis, initially diagnosed in March 2018. She presents today for routine follow-up evaluation. She reports excellent disease control on her current medication regimen consisting of hydroxychloroquine and methotrexate.\n\nShe describes minimal morning stiffness, typically resolving within 10-15 minutes of waking. No active joint pain or swelling currently. She did experience a mild disease flare in early August 2024, which she attributes to increased stress related to her daughter's upcoming wedding planning. For that episode, I prescribed a short tapering course of prednisone (10mg x 3 days, 5mg x 2 days, 2.5mg x 2 days), which successfully resolved her symptoms within one week.\n\nMEDICATION HISTORY REVIEW:\nMrs. Chen has been on hydroxychloroquine 200mg daily since January 15, 2019 - approaching her 6-year anniversary of continuous use. She has been on methotrexate 15mg weekly (administered as six 2.5mg tablets once weekly) since February 2019. She also takes folic acid 1mg daily to mitigate methotrexate side effects.\n\nCRITICAL CLINICAL CONCERN - OPHTHALMOLOGY SCREENING:\nPer American Academy of Ophthalmology guidelines for hydroxychloroquine retinopathy screening, baseline retinal examination should be performed within the first year of HCQ use, with annual screening recommended after 5 years of use. Mrs. Chen is now approaching the 6-year mark of HCQ therapy, placing her at increased risk for cumulative dose-related retinal toxicity.\n\nWhen questioned, patient states she has not had a comprehensive eye examination in \"a couple of years\" - last exam was for glasses at a retail optical center (LensCrafters), not a full ophthalmologic evaluation with fundus photography and OCT imaging required for HCQ screening.\n\nStrongly counseled patient on importance of immediate ophthalmology referral for baseline HCQ retinopathy screening. Patient verbalized understanding and agreed to schedule appointment.\n\nCURRENT MEDICATIONS (confirmed with patient):\n1. Hydroxychloroquine 200mg PO daily - initiated 01/15/2019\n2. Methotrexate 15mg PO weekly (6 tablets of 2.5mg) - initiated 02/2019\n3. Folic acid 1mg PO daily\n4. Lisinopril 10mg PO daily (prescribed by PCP for hypertension)\n5. Vitamin D3 2000 IU PO daily (OTC supplement)\n\nALLERGIES: Sulfonamides - patient reports rash with previous exposure (not verified in medical record, patient-reported only)\n\nREVIEW OF SYSTEMS:\nConstitutional: No fever, chills, night sweats, or unintentional weight change\nHEENT: Denies vision changes, dry eyes, dry mouth\nMusculoskeletal: Minimal morning stiffness <15 min, no active joint pain\nSkin: Denies rash, new lesions, photosensitivity\nAll other systems reviewed and negative.\n\nPHYSICAL EXAMINATION:\nVitals: BP 128/78, HR 72, Temp 98.4 F, Weight 148 lbs (stable)\nGeneral: Well-appearing woman in no acute distress\nHands: Mild synovial thickening MCPs bilaterally, non-tender; no warmth, erythema, or active synovitis; full range of motion all MCP and PIP joints bilaterally; no ulnar deviation or swan-neck deformities\nWrists, elbows, shoulders, knees, ankles: Non-tender, full ROM, no effusions\n\nDISEASE ACTIVITY ASSESSMENT:\nDAS28-CRP: 2.1 (remission, score <2.6)\nTender joint count: 0 | Swollen joint count: 0 | CRP: 2.1 mg/L | Patient global assessment (VAS 0-100): 15\n\nLABORATORY STUDIES ORDERED TODAY:\nComplete Blood Count with differential; Comprehensive Metabolic Panel; Hepatic Function Panel; C-Reactive Protein. Results pending, will review and contact patient if abnormal.\n\nASSESSMENT:\n1. Rheumatoid arthritis (ICD-10: M05.79) - in clinical remission on current DMARD therapy. Seropositive, RF+ and anti-CCP+. Excellent disease control on hydroxychloroquine + methotrexate regimen. No evidence of progressive joint damage on recent hand films (May 2024).\n2. Hydroxychloroquine use approaching 6-year threshold - URGENT ophthalmology screening required. AAO guidelines recommend annual screening after 5 years. Patient has not had appropriate baseline HCQ retinopathy screening. Risk factors: cumulative dose approaching ~440g total (200mg x ~2100 days). Will provide referral to ophthalmology today.\n3. Methotrexate-induced liver enzyme monitoring - current labs pending. No clinical signs of hepatotoxicity. Patient tolerating MTX well without nausea or fatigue.\n4. Hypertension - stable on lisinopril per PCP. BP well-controlled in office today.\n\nPLAN:\n1. Continue current medication regimen: hydroxychloroquine 200mg daily; methotrexate 15mg weekly (six 2.5mg tablets once weekly); folic acid 1mg daily; lisinopril 10mg daily (PCP management).\n2. Laboratory monitoring: CBC, CMP, LFTs ordered today. Will review results within 48 hours.\n3. URGENT: Ophthalmology referral for HCQ retinopathy screening. Faxing referral to patient's chosen ophthalmology practice today. Patient to schedule appointment within 2-4 weeks. Need baseline fundus photography, OCT, visual fields. Will request copy of ophthalmology report for records.\n4. Follow-up: Return to rheumatology clinic in 3 months (December 2024). Earlier return PRN if disease flare symptoms.\n5. Patient to contact office immediately if: new or worsening joint pain/swelling; unusual bruising or bleeding; vision changes; new rash or skin changes; persistent nausea or abdominal pain.\n\nTotal face-to-face time: 25 minutes. Time spent counseling: 12 minutes (>50% of visit time).\n\n[ELECTRONIC SIGNATURE APPLIED]\nAnita Patel, MD, FACR\nBoard Certified - Rheumatology\nFlorida License: ME123456\nDictated: 09/10/2024 16:45 | Signed: 09/10/2024 17:15",
+        "ocr_quality": 0.88,
+        "ocr_artifacts": [
+          "scanned from photocopy",
+          "slight skew corrected"
+        ]
+      },
+      "extracted_data": {
+        "provider": {
+          "name": "Anita Patel, MD, FACR",
+          "specialty": "Rheumatology",
+          "practice": "Orlando Rheumatology Associates"
+        },
+        "diagnoses": [
+          {
+            "condition": "Rheumatoid arthritis",
+            "icd10": "M05.79",
+            "status": "in clinical remission",
+            "onset": "March 2018",
+            "serostatus": "RF+ and anti-CCP+"
+          }
+        ],
+        "disease_activity": {
+          "das28_crp": 2.1,
+          "interpretation": "remission (score <2.6)"
+        },
+        "medications_documented": [
+          {
+            "name": "Hydroxychloroquine",
+            "dose": "200mg",
+            "frequency": "daily",
+            "start_date": "2019-01-15"
+          },
+          {
+            "name": "Methotrexate",
+            "dose": "15mg",
+            "frequency": "weekly",
+            "start_date": "2019-02"
+          },
+          {
+            "name": "Folic acid",
+            "dose": "1mg",
+            "frequency": "daily"
+          },
+          {
+            "name": "Lisinopril",
+            "dose": "10mg",
+            "frequency": "daily",
+            "prescriber": "PCP"
+          },
+          {
+            "name": "Vitamin D3",
+            "dose": "2000 IU",
+            "frequency": "daily",
+            "otc": true
+          }
+        ],
+        "allergies": [
+          {
+            "substance": "Sulfonamides",
+            "reaction": "rash",
+            "verified": false,
+            "source": "patient-reported only"
+          }
+        ],
+        "hcq_screening": {
+          "urgency": "URGENT",
+          "years_on_hcq": "approaching 6 years",
+          "cumulative_dose_estimate": "~440g",
+          "appropriate_screening": false,
+          "referral_sent": true
+        }
+      },
+      "intentional_issues": {
+        "hcq_duration_precise": {
+          "issue": "States 'since January 15, 2019 - approaching 6-year anniversary'",
+          "matches": "Pharmacy record first_fill_date 2019-01-15",
+          "contradicts": [
+            "Referral letter (~4 years)",
+            "Patient report (4-5 years)"
+          ],
+          "clinical_impact": "This is the accurate duration - contradicts other sources"
+        },
+        "sulfa_allergy_documented": {
+          "issue": "Documents sulfa allergy as 'patient-reported only, not verified'",
+          "contradicts": [
+            "Referral letter (NKDA)",
+            "Pharmacy record (empty allergies)"
+          ],
+          "clinical_impact": "Safety-critical information present here but missing elsewhere"
+        },
+        "ophth_referral_urgent": {
+          "issue": "Urgent ophthalmology referral made September 2024; patient seen December 2024, prompted by floaters not screening",
+          "clinical_impact": "Shows gap between recommendation and patient action"
+        }
+      },
+      "metadata": {
+        "source_system": "patient_upload",
+        "imported_at": "2024-12-16T15:30:00Z",
+        "imported_by": "patient_portal",
+        "original_filename": "rheum_note_sept2024.pdf",
+        "pages": 2
+      }
+    },
+    {
+      "document_id": "doc-mc-004",
+      "filename": "lab-report-cmp-cbc-2024-11-01.txt",
+      "document_type": "lab_report",
+      "document_date": "2024-11-01",
+      "received_date": "2024-11-03",
+      "content": {
+        "format": "text",
+        "text_content": "QUEST DIAGNOSTICS - FINAL REPORT\n4000 Hollywood Blvd, Hollywood, FL 33021 | CLIA: 10D0685337\nAccession: QD-2024-8834521\n\nPatient: CHEN, MARGARET L | DOB: 03/14/1967 | Sex: F | Fasting: Yes\nOrdering provider: Anita Patel, MD (NPI 1234567890), Orlando Rheumatology Associates\nCollected: 2024-11-01 07:30 | Reported: 2024-11-01 14:22\n\nCOMPREHENSIVE METABOLIC PANEL (CMP)\nGlucose            94    mg/dL       (74-106)\nBUN                16    mg/dL       (6-20)\nCreatinine         0.85  mg/dL       (0.57-1.00)\neGFR               82    mL/min/1.73m2  (>59)\nSodium             141   mEq/L       (134-144)\nPotassium          4.3   mEq/L       (3.5-5.2)\nChloride           102   mEq/L       (96-106)\nCO2                25    mEq/L       (18-29)\nCalcium            9.6   mg/dL       (8.7-10.2)\nTotal Protein      7.2   g/dL        (6.0-8.5)\nAlbumin            4.3   g/dL        (3.5-5.5)\nBilirubin Total    0.5   mg/dL       (0.0-1.2)\nAlkaline Phosphatase 62  IU/L        (39-117)\nAST (SGOT)         24    IU/L        (0-40)\nALT (SGPT)         21    IU/L        (0-32)\n\nCOMPLETE BLOOD COUNT WITH DIFFERENTIAL\nWBC                6.8   x10E3/uL    (3.4-10.8)\nRBC                4.42  x10E6/uL    (3.77-5.28)\nHemoglobin         13.2  g/dL        (11.1-15.9)\nHematocrit         39.8  %           (34.0-46.6)\nMCV                90    fL          (79-97)\nPlatelets          245   x10E3/uL    (150-379)\nNeutrophils        58    %           (40-74)\nLymphocytes        32    %           (14-46)\nMonocytes          7     %           (4-12)\n\nINFLAMMATORY MARKERS\nCRP                2.1   mg/L        (0.0-4.9)\nESR                18    mm/hr       (0-30)\n\nCLINICAL COMMENTS:\nAll values within normal limits.\nHepatic function normal - safe to continue methotrexate.\nRenal function normal - no dose adjustment needed for current medications.\nInflammatory markers (CRP, ESR) consistent with RA in remission."
+      },
+      "extracted_data": {
+        "abnormal_values": [],
+        "renal_function": {
+          "egfr": 82,
+          "creatinine": 0.85,
+          "assessment": "Normal renal function - adequate kidney function for HCQ clearance"
+        },
+        "hepatic_function": {
+          "ast": 24,
+          "alt": 21,
+          "assessment": "Normal liver enzymes - safe to continue methotrexate"
+        },
+        "inflammatory_markers": {
+          "crp": 2.1,
+          "esr": 18,
+          "assessment": "Low-level inflammation consistent with well-controlled RA"
+        }
+      },
+      "metadata": {
+        "source_system": "quest_diagnostics",
+        "imported_at": "2024-11-03T14:00:00Z",
+        "imported_by": "lab_interface",
+        "accession": "QD-2024-8834521",
+        "report_status": "final"
+      }
+    },
+    {
+      "document_id": "doc-mc-005",
+      "filename": "portal-message-2024-12-20.txt",
+      "document_type": "patient_portal_message",
+      "document_date": "2024-12-20",
+      "content": {
+        "format": "text",
+        "text_content": "PATIENT PORTAL MESSAGE THREAD - MyChart, Family Practice Associates\nThread: MSG-2024-88432\n\n--- Message 1 | From: Margaret Chen (patient) | 2024-12-20 14:22 ---\nSubject: Worried about floaters in my vision - need advice\n\nDr. Warren,\n\nI hope you're doing well. I wanted to reach out because I've been experiencing something concerning with my eyes over the past 2-3 weeks that's getting worse.\n\nI'm seeing these dark spots that float around in my vision, especially in my right eye. They look like little cobwebs or specks that drift when I move my eyes. At first I thought it was just tiredness, but they haven't gone away.\n\nWhat's really worrying me is that I've also been seeing flashing lights, particularly when I'm in a dark room or when I move my eyes quickly from side to side. I've noticed the flashing lights seem to happen more often when I'm tired at night.\n\nI think it started around the time I was helping my daughter move to her new apartment. I was lifting some heavy boxes up stairs - maybe I strained something?\n\nI'm especially concerned because of my mother - she had a retinal detachment when she was about 60 years old and had to have emergency surgery at Tampa General. The eye doctor told her it was hereditary. Is this something I should be worried about?\n\nAlso, I've been meaning to ask - I've been taking the Plaquenil (hydroxychloroquine) for my rheumatoid arthritis for maybe 4-5 years now? Dr. Patel mentioned something at my last appointment about needing an eye exam because of the medication. I haven't had a real eye exam in several years - just got reading glasses at LensCrafters maybe 2 years ago.\n\nShould I schedule an appointment with an eye doctor? Is this urgent or can it wait until after the holidays?\n\nI really can't afford to have vision problems right now - I'm the primary caregiver for my husband David (he has Parkinson's disease and needs help with a lot of daily activities), and our daughter Emily's wedding is coming up in about 6 weeks. I need to be able to drive and help with all the preparations.\n\nThank you for any guidance you can give me.\n\nBest regards,\nMargaret Chen\n(407) 555-6789\n\n--- Message 2 | From: Dr. Sarah Warren (provider) | 2024-12-21 09:15 ---\nSubject: RE: Worried about floaters in my vision - need advice\n\nDear Margaret,\n\nThank you for reaching out about this - I'm glad you did because these symptoms do warrant prompt evaluation.\n\nGiven what you're describing (new floaters, flashing lights, especially after physical exertion like lifting), combined with your family history of retinal detachment, I think you should be seen by an ophthalmologist fairly soon - ideally within the next week.\n\nI'm sending a referral to Montzka Eye Clinic. They have retina specialists who can do a thorough examination. Their office should call you to schedule, but if you don't hear from them by Monday, please call them directly at (407) 555-3200.\n\nIMPORTANT - Please go to the emergency room immediately if you experience any of the following:\n- Sudden increase in the number of floaters\n- A \"curtain\" or shadow coming across your vision\n- Any sudden loss of vision\n- Seeing many more flashes of light\n\nYou're also right that you're overdue for a Plaquenil eye screening. The ophthalmologist can address both concerns at your visit.\n\nPlease don't delay on this, Margaret. I know the timing isn't ideal with the holidays and wedding preparations, but your vision is too important.\n\nTake care,\nDr. Warren\n\nSarah Warren, MD\nFamily Practice Associates\n(407) 555-1234\n\n--- Message 3 | From: Margaret Chen (patient) | 2024-12-21 11:45 ---\nSubject: RE: RE: Worried about floaters in my vision - need advice\n\nDr. Warren,\n\nThank you so much for getting back to me so quickly. I have to admit, I've been doing some reading online (I know, I know - \"Dr. Google\" is dangerous!) and I've been worrying myself sick about retinal detachment.\n\nI called Montzka Eye Clinic right away and they were able to squeeze me in for December 26th at 10:30 AM. The scheduler said they had a cancellation and wanted to get me in quickly given my symptoms.\n\nI'll make sure to watch for those warning signs you mentioned. So far the floaters are annoying but stable - no curtain or shadow, thank goodness.\n\nI'm a bit anxious about all this, but I'll feel better once I have some answers. Thank you for taking my concerns seriously.\n\nI'll let you know how the appointment goes.\n\nGratefully,\nMargaret"
+      },
+      "extracted_data": {
+        "chief_concern": "Floaters and flashing lights, worse OD, 2-3 weeks duration",
+        "symptom_details": {
+          "floaters": "dark spots like cobwebs or specks, worse OD, drift with eye movement",
+          "photopsia": "flashing lights in dark rooms, with eye movement, worse when tired at night",
+          "precipitating_event": "heavy lifting while helping daughter move"
+        },
+        "family_history_mentioned": {
+          "relative": "mother",
+          "condition": "retinal detachment",
+          "age_at_diagnosis": "about 60",
+          "treatment": "emergency surgery at Tampa General"
+        },
+        "hcq_details": {
+          "patient_estimate": "maybe 4-5 years",
+          "last_eye_exam": "LensCrafters reading glasses ~2 years ago"
+        },
+        "patient_context": {
+          "caregiver_role": "Primary caregiver for husband David with Parkinson's disease",
+          "upcoming_event": "Daughter Emily's wedding in about 6 weeks"
+        },
+        "appointment_scheduled": {
+          "clinic": "Montzka Eye Clinic",
+          "date": "2024-12-26",
+          "time": "10:30"
+        }
+      },
+      "intentional_issues": {
+        "hcq_duration_uncertain": {
+          "issue": "Patient states 'maybe 4-5 years now?'",
+          "actual": "5 years 11 months per pharmacy (first fill 2019-01-15)",
+          "clinical_impact": "Patient uncertainty contributes to HCQ duration contradiction"
+        },
+        "photopsia_pattern_detail": {
+          "issue": "Patient notes flashing lights happen more often when tired at night",
+          "not_mentioned_in": "Intake conversation",
+          "clinical_impact": "Additional symptom characterization that may help with differential"
+        },
+        "family_history_detail": {
+          "issue": "More detail than referral letter: 'emergency surgery at Tampa General', 'hereditary'",
+          "clinical_impact": "Patient actually knows more than PCP documented"
+        }
+      },
+      "metadata": {
+        "source_system": "patient_portal",
+        "portal_name": "MyChart",
+        "imported_at": "2024-12-22T10:00:00Z",
+        "imported_by": "system",
+        "thread_id": "MSG-2024-88432",
+        "message_count": 3
+      }
+    },
+    {
+      "document_id": "doc-mc-006",
+      "filename": "patient-photo-2024-12-20.jpg",
+      "document_type": "patient_upload",
+      "document_date": "2024-12-20",
+      "content": {
+        "format": "text",
+        "text_content": "PATIENT UPLOAD - EXTERNAL EYE PHOTOGRAPH\nUploaded: 2024-12-20 08:45 via patient portal (iPhone 13)\nFile: my_eye_12_20.jpg (JPEG, 3024x4032)\n\nPatient description: \"This is what my right eye looks like today. A little bloodshot but no pain. The floaters are driving me crazy!\"\n\nAutomated image triage (ImageTriage v1.2):\n- Image type: external eye photograph, right eye\n- Finding: mild conjunctival injection, temporal sclera (confidence 0.78)\n- Quality: in focus, adequate lighting; diagnostic utility limited - external photo only\n- Note: symptoms described (floaters, flashes) cannot be evaluated from an external photograph; clinical examination required."
+      },
+      "extracted_data": {
+        "finding": "mild conjunctival injection, temporal sclera",
+        "diagnostic_utility": "limited - external photo only"
+      },
+      "metadata": {
+        "source_system": "patient_portal",
+        "device_info": "iPhone 13",
+        "imported_at": "2024-12-20T08:45:00Z",
+        "imported_by": "patient_portal_upload"
+      }
+    },
+    {
+      "document_id": "doc-mc-007",
+      "filename": "tech-workup-2024-12-26.txt",
+      "document_type": "tech_workup",
+      "document_date": "2024-12-26",
+      "content": {
+        "format": "text",
+        "text_content": "MONTZKA EYE CLINIC - TECHNICIAN WORKUP\nDate: 2024-12-26 10:15 | Workstation: EXAM-2\nTechnician: Maria Santos, COA\nPatient: Margaret L. Chen | DOB: 03/14/1967\n\nChief complaint recorded: Floaters and flashes x 2-3 weeks, worse OD\n\nVISUAL ACUITY\nOD: distance uncorrected 20/30, corrected 20/25, near J1, pinhole 20/20\nOS: distance uncorrected 20/25, corrected 20/20, near J1, pinhole 20/20\n\nINTRAOCULAR PRESSURE (applanation, 10:22 AM)\nOD: 16 mmHg | OS: 15 mmHg\n\nPUPILS\nOD: 3mm light / 5mm dark, brisk, no RAPD\nOS: 3mm light / 5mm dark, brisk, no RAPD\n\nCONFRONTATION FIELDS: full to finger counting OU\nMOTILITY: versions and ductions full OU; ortho at distance and near\nCOLOR VISION (Ishihara): OD 14/14, OS 14/14\n\nTech notes: Patient reports floaters more noticeable when looking at bright backgrounds. Denies photophobia. Alert and oriented. Accompanied by daughter."
+      },
+      "extracted_data": {
+        "visual_acuity": {
+          "od_corrected": "20/25",
+          "os_corrected": "20/20"
+        },
+        "iop": {
+          "od": 16,
+          "os": 15,
+          "unit": "mmHg",
+          "method": "applanation"
+        },
+        "pupils": "brisk OU, no RAPD",
+        "color_vision": "Ishihara 14/14 OU"
+      },
+      "metadata": {
+        "source_system": "tech_workup",
+        "workstation": "EXAM-2",
+        "imported_at": "2024-12-26T10:30:00Z",
+        "imported_by": "maria.santos@montzkaeye.com"
+      }
+    },
+    {
+      "document_id": "doc-mc-008",
+      "filename": "imaging-oct-od-2024-12-26.txt",
+      "document_type": "imaging",
+      "document_date": "2024-12-26",
+      "content": {
+        "format": "text",
+        "text_content": "OCT REPORT - MACULAR CUBE OD\nMontzka Eye Clinic | Heidelberg Spectralis (software 6.16.4)\nCapture: 2024-12-26 10:35 | Operator: Maria Santos, COA\nScan: Macular Cube, 61 B-scans x 768 A-scans | Signal strength 8/10\n\nAUTOMATED MEASUREMENTS\nCentral subfield thickness: 268 um (reference 240-300)\nAverage thickness: 285 um | Total volume: 8.1 mm3\nGanglion cell-inner plexiform layer (GC-IPL), parafoveal ring: 70 um (reference 70-95)\n\nAI ANALYSIS (RetinaAI v2.3.1, confidence 0.92)\nHeadline: Vitreous changes consistent with acute PVD; early parafoveal changes noted on HCQ screening indices\nKey findings:\n- Complete posterior vitreous detachment with visible Weiss ring\n- No vitreoretinal traction identified\n- Foveal contour normal; no intraretinal or subretinal fluid\n- GC-IPL thinning at 70 um with subtle parafoveal RPE irregularity - correlate with hydroxychloroquine exposure history and prior imaging\n\nHCQ screening flags: no bull's eye pattern; no paracentral loss on structural scan; subtle parafoveal RPE changes present - recommend 10-2 visual field and fundus autofluorescence"
+      },
+      "extracted_data": {
+        "modality": "OCT",
+        "laterality": "OD",
+        "central_subfield_thickness_um": 268,
+        "gc_ipl_um": 70,
+        "key_findings": [
+          "Complete PVD with Weiss ring",
+          "No vitreoretinal traction",
+          "GC-IPL 70 um with subtle parafoveal RPE irregularity"
+        ],
+        "image_record_id": "img-mc-006"
+      },
+      "metadata": {
+        "source_system": "heidelberg_spectralis",
+        "imported_at": "2024-12-26T10:36:30Z",
+        "imported_by": "imaging_interface"
+      }
+    },
+    {
+      "document_id": "doc-mc-009",
+      "filename": "imaging-oct-os-2024-12-26.txt",
+      "document_type": "imaging",
+      "document_date": "2024-12-26",
+      "content": {
+        "format": "text",
+        "text_content": "OCT REPORT - MACULAR CUBE OS\nMontzka Eye Clinic | Heidelberg Spectralis (software 6.16.4)\nCapture: 2024-12-26 10:40 | Operator: Maria Santos, COA\nSignal strength 9/10\n\nAUTOMATED MEASUREMENTS\nCentral subfield thickness: 262 um (reference 240-300)\nGC-IPL, parafoveal ring: 73 um (reference 70-95)\n\nAI ANALYSIS (RetinaAI v2.3.1, confidence 0.91)\nHeadline: Early PVD changes; mild symmetric GC-IPL thinning\nKey findings:\n- Partial posterior vitreous detachment\n- No vitreoretinal traction\n- Foveal contour normal\n- Mild GC-IPL thinning symmetric with fellow eye - bilateral symmetric pattern supports medication-related etiology over focal pathology"
+      },
+      "extracted_data": {
+        "modality": "OCT",
+        "laterality": "OS",
+        "central_subfield_thickness_um": 262,
+        "gc_ipl_um": 73,
+        "key_findings": [
+          "Partial PVD",
+          "Mild symmetric GC-IPL thinning"
+        ]
+      },
+      "metadata": {
+        "source_system": "heidelberg_spectralis",
+        "imported_at": "2024-12-26T10:41:30Z",
+        "imported_by": "imaging_interface"
+      }
+    },
+    {
+      "document_id": "doc-mc-010",
+      "filename": "imaging-fundus-od-2024-12-26.txt",
+      "document_type": "imaging",
+      "document_date": "2024-12-26",
+      "content": {
+        "format": "text",
+        "text_content": "FUNDUS PHOTOGRAPH REPORT - COLOR 45 DEGREE OD\nMontzka Eye Clinic | Topcon TRC-NW400\nCapture: 2024-12-26 10:45 | Quality: good, well-centered on macula\n\nAI ANALYSIS (RetinaAI v2.3.1, confidence 0.89)\nHeadline: Vitreous opacity consistent with PVD; subtle parafoveal pigmentary changes\nKey findings:\n- Optic disc: healthy appearance, CDR 0.3\n- Macula: normal foveal reflex; subtle parafoveal RPE mottling, no bull's eye pattern\n- Vitreous opacity - Weiss ring\n- No hemorrhage, tear, or detachment visible in posterior pole"
+      },
+      "extracted_data": {
+        "modality": "fundus_photo",
+        "laterality": "OD",
+        "key_findings": [
+          "Weiss ring",
+          "Subtle parafoveal RPE mottling",
+          "CDR 0.3"
+        ]
+      },
+      "metadata": {
+        "source_system": "topcon_fundus",
+        "imported_at": "2024-12-26T10:46:30Z",
+        "imported_by": "imaging_interface"
+      }
+    },
+    {
+      "document_id": "doc-mc-011",
+      "filename": "imaging-fundus-os-2024-12-26.txt",
+      "document_type": "imaging",
+      "document_date": "2024-12-26",
+      "content": {
+        "format": "text",
+        "text_content": "FUNDUS PHOTOGRAPH REPORT - COLOR 45 DEGREE OS\nMontzka Eye Clinic | Topcon TRC-NW400\nCapture: 2024-12-26 10:48 | Quality: good, well-centered on macula\n\nAI ANALYSIS (RetinaAI v2.3.1, confidence 0.90)\nHeadline: Normal fundus appearance\nKey findings:\n- Optic disc: healthy appearance, CDR 0.3\n- Macula: normal foveal reflex\n- Vessels: normal caliber\n- No hemorrhage or pigmentary disruption beyond faint parafoveal change"
+      },
+      "extracted_data": {
+        "modality": "fundus_photo",
+        "laterality": "OS",
+        "key_findings": [
+          "Normal fundus appearance",
+          "CDR 0.3"
+        ]
+      },
+      "metadata": {
+        "source_system": "topcon_fundus",
+        "imported_at": "2024-12-26T10:49:30Z",
+        "imported_by": "imaging_interface"
+      }
+    },
+    {
+      "document_id": "doc-mc-012",
+      "filename": "intake-transcript-2024-12-26.txt",
+      "document_type": "intake_transcript",
+      "document_date": "2024-12-26",
+      "content": {
+        "format": "text",
+        "text_content": "CONVERSATIONAL INTAKE TRANSCRIPT\nMontzka Eye Clinic | 2024-12-26 09:45 | Channel: web (tablet kiosk, waiting room)\nPatient: Margaret Chen | Duration: 478 seconds | Status: complete\n\nASSISTANT: Hi there! I'm here to help gather some information before your appointment today with Dr. Montzka. This should take about 5-7 minutes. Can you start by confirming your name and date of birth?\n\nPATIENT: Sure, I'm Margaret Chen. My birthday is March 14th, 1967.\n\nASSISTANT: Thank you, Margaret. I can see you're here as a new patient. What's the main reason for your visit today?\n\nPATIENT: I've been seeing these floaters in my vision, especially in my right eye. They look like little cobwebs or spots that drift around when I move my eyes. And sometimes I see flashing lights, especially when I move my eyes quickly or when I'm in a dark room.\n\nASSISTANT: I understand. How long have you been experiencing these floaters and flashing lights?\n\nPATIENT: It started about 2-3 weeks ago. I think it was right around the time I was helping my daughter move to her new apartment. I was carrying some heavy boxes up the stairs.\n\nASSISTANT: Have the symptoms been getting better, worse, or staying about the same?\n\nPATIENT: Maybe a little worse, or at least I'm noticing them more. The floaters are really annoying - they're there all the time now. The flashes come and go.\n\nASSISTANT: Have you noticed any shadow or curtain coming across your vision, or any areas where your vision seems blocked or missing?\n\nPATIENT: No, nothing like that, thank goodness. Dr. Warren told me to watch out for that and go to the ER if it happened.\n\nASSISTANT: That's good to hear. Now I'd like to review your medical history. I see from your records that you have rheumatoid arthritis. Are you currently taking any medications for that?\n\nPATIENT: Yes, I take hydroxychloroquine - that's Plaquenil - every day for my RA. I also take methotrexate once a week, and folic acid every day because of the methotrexate.\n\nASSISTANT: How long have you been taking the hydroxychloroquine?\n\nPATIENT: I've been taking it for my rheumatoid arthritis. I think it's been about 4 years now, maybe a little longer? Dr. Patel started me on it when I was first diagnosed. I'm not exactly sure of the exact date.\n\nASSISTANT: That's helpful. Are you taking any other medications besides those for your RA?\n\nPATIENT: Yes, I take lisinopril for my blood pressure - 10mg every day. And I take a vitamin D supplement.\n\nASSISTANT: Do you have any allergies to medications?\n\nPATIENT: Yes, I'm allergic to sulfa drugs. I had a bad rash when I was given one years ago - I think it was Bactrim or something like that. It was pretty uncomfortable.\n\nASSISTANT: Thank you for letting me know. Has anyone in your family had eye problems, particularly issues with their retina?\n\nPATIENT: Yes, my mother had a retinal detachment when she was around 60. She had to have emergency surgery for it at Tampa General. The eye doctor told her it could be hereditary. That's part of why I'm so worried about these floaters - I keep thinking about what happened to her.\n\nASSISTANT: I understand that concern. Does anyone else in your family have eye problems?\n\nPATIENT: My father has glaucoma - he's been using eye drops for years. He's 82 now.\n\nASSISTANT: When was your last comprehensive eye exam - not just for glasses, but a full dilated exam?\n\nPATIENT: Oh, it's been a while. I got reading glasses at LensCrafters maybe 2 years ago, but they didn't dilate my eyes or anything. I can't remember the last time I had a real eye exam - several years at least.\n\nASSISTANT: Is there anything specific you're hoping to get out of today's visit?\n\nPATIENT: I really want to understand what's causing these floaters and make sure I don't have what my mother had. I've been reading online about retinal detachment and it's been making me anxious. I really can't afford any vision problems right now - I'm my husband's primary caregiver. He has Parkinson's disease and needs help with a lot of daily activities. I need to be able to drive him to his appointments. Plus my daughter Emily's wedding is in about 6 weeks and I need to be able to see for all of that!\n\nASSISTANT: I completely understand. One last question - have you had any recent head trauma, eye injuries, or other eye surgeries?\n\nPATIENT: No, nothing like that. Just the heavy lifting I mentioned when helping my daughter move.\n\nASSISTANT: Thank you, Margaret. I have all the information I need. The technician will call you back shortly to start your exam. Is there anything else you'd like to mention before we finish?\n\nPATIENT: I don't think so. Oh - my daughter Emily came with me today in case my eyes get dilated and I can't drive home.\n\nASSISTANT: That's great that you have a driver. The doctor will likely want to dilate your eyes for a thorough examination. Thank you for completing the intake, Margaret. We'll take good care of you today."
+      },
+      "extracted_data": {
+        "chief_complaint": {
+          "raw_statement": "Floaters like cobwebs or spots, especially in right eye, plus flashing lights when moving eyes or in dark room",
+          "onset": "approximately 2-3 weeks",
+          "onset_context": "Started around time of heavy lifting (helping daughter move)",
+          "laterality": "bilateral, worse OD",
+          "pertinent_negatives": [
+            "No curtain/shadow",
+            "No vision loss",
+            "No trauma",
+            "No prior eye surgery"
+          ]
+        },
+        "safety_flags": [
+          {
+            "flag_type": "symptom_concern",
+            "severity": "moderate",
+            "title": "New-onset floaters with photopsia",
+            "description": "Concerning for posterior vitreous detachment; onset associated with Valsalva (heavy lifting); no curtain/shadow."
+          },
+          {
+            "flag_type": "medication_risk",
+            "severity": "high",
+            "title": "HCQ retinal toxicity screening overdue",
+            "description": "Patient reports ~4 years on HCQ but actual duration ~6 years per pharmacy. AAO guidelines recommend annual screening after 5 years."
+          },
+          {
+            "flag_type": "family_history",
+            "severity": "moderate",
+            "title": "First-degree family history of retinal detachment"
+          },
+          {
+            "flag_type": "psychosocial",
+            "severity": "low",
+            "title": "High anxiety, caregiver burden"
+          }
+        ],
+        "clarification_needed": [
+          "Exact HCQ start date - patient uncertain"
+        ]
+      },
+      "intentional_issues": {
+        "hcq_duration_underestimate": {
+          "issue": "Patient states 'about 4 years now, maybe a little longer'",
+          "actual": "5 years 11 months per pharmacy (first fill 2019-01-15)",
+          "clinical_impact": "Intake alone would under-triage HCQ screening urgency"
+        },
+        "photopsia_detail_missing": {
+          "issue": "Patient does not repeat the 'worse when tired at night' pattern from the portal message",
+          "clinical_impact": "Symptom detail available only in portal message"
+        },
+        "prednisone_not_mentioned": {
+          "issue": "Patient does not mention August 2024 prednisone taper",
+          "documented_in": [
+            "Rheumatology note",
+            "Pharmacy record"
+          ],
+          "clinical_impact": "Minor - shows patient recall limitations"
+        }
+      },
+      "metadata": {
+        "source_system": "intake_chat",
+        "channel": "web",
+        "device": "tablet_kiosk",
+        "location": "waiting_room",
+        "duration_seconds": 478,
+        "questions_asked": 14,
+        "completion_status": "complete",
+        "imported_at": "2024-12-26T09:53:00Z",
+        "imported_by": "system"
+      }
+    }
+  ],
+  "contradictions": [
+    {
+      "contradiction_id": "mc_contradiction_001",
+      "patient_id": "margaret-chen",
+      "type": "temporal_discrepancy",
+      "category": "medication_duration",
+      "severity": "high",
+      "status": "active",
+      "clinical_significance": "Affects HCQ screening urgency and risk stratification",
+      "source_documents": [
+        {
+          "source_document_id": "doc-mc-001",
+          "filename": "referral-letter-pcp-2024-12-15.txt",
+          "claim": "Hydroxychloroquine ~4 years duration",
+          "exact_text": "Hydroxychloroquine (Plaquenil) 200mg daily - for RA, ~4 years duration",
+          "certainty": "hedged"
+        },
+        {
+          "source_document_id": "doc-mc-005",
+          "filename": "portal-message-2024-12-20.txt",
+          "claim": "HCQ maybe 4-5 years",
+          "exact_text": "I've been taking the Plaquenil (hydroxychloroquine) for my rheumatoid arthritis for maybe 4-5 years now?",
+          "certainty": "uncertain"
+        },
+        {
+          "source_document_id": "doc-mc-002",
+          "filename": "pharmacy-pull-2024-12-26.json",
+          "claim": "First fill date 2019-01-15 = 5 years 11 months",
+          "exact_text": "\"first_fill_date\": \"2019-01-15\"",
+          "certainty": "definitive"
+        },
+        {
+          "source_document_id": "doc-mc-003",
+          "filename": "rheumatology-note-2024-09-10.txt",
+          "claim": "Since January 2019 - approaching 6 years",
+          "exact_text": "Mrs. Chen has been on hydroxychloroquine 200mg daily since January 15, 2019 - approaching her 6-year anniversary of continuous use.",
+          "certainty": "definitive"
+        }
+      ],
+      "ground_truth": {
+        "accurate_value": "5 years 11 months (as of Dec 26, 2024)",
+        "source": "pharmacy-pull-2024-12-26.json",
+        "rationale": "Pharmacy fill records are most reliable for medication start dates"
+      },
+      "detection_strategy": {
+        "method": "temporal_extraction_comparison",
+        "keywords": [
+          "hydroxychloroquine",
+          "HCQ",
+          "Plaquenil",
+          "years",
+          "duration"
+        ],
+        "expected_automation": true,
+        "detection_difficulty": "moderate"
+      },
+      "clinical_impact": {
+        "affects_care": true,
+        "urgency_level": "high",
+        "explanation": "AAO guidelines recommend annual HCQ retinopathy screening after 5 years. Patient is past this threshold and has never had baseline screening.",
+        "recommended_action": "Immediate comprehensive retinal examination including OCT, fundus photography, and visual fields"
+      },
+      "physician_workflow": {
+        "surface_in_briefing": true,
+        "auto_generate_question": "Patient reports taking hydroxychloroquine for 4-5 years, but pharmacy records show first fill in January 2019 (nearly 6 years). Can you confirm when you started this medication?",
+        "suggested_briefing_language": "IMPORTANT: Medication duration discrepancy may affect screening urgency"
+      }
+    },
+    {
+      "contradiction_id": "mc_contradiction_002",
+      "patient_id": "margaret-chen",
+      "type": "allergy_discrepancy",
+      "category": "drug_allergy",
+      "severity": "critical",
+      "status": "active",
+      "clinical_significance": "Safety-critical for medication prescribing",
+      "source_documents": [
+        {
+          "source_document_id": "doc-mc-001",
+          "filename": "referral-letter-pcp-2024-12-15.txt",
+          "claim": "No known drug allergies",
+          "exact_text": "ALLERGIES: No known drug allergies (NKDA)",
+          "certainty": "definitive"
+        },
+        {
+          "source_document_id": "doc-mc-002",
+          "filename": "pharmacy-pull-2024-12-26.json",
+          "claim": "No allergies on file",
+          "exact_text": "\"allergies\": []",
+          "certainty": "definitive"
+        },
+        {
+          "source_document_id": "doc-mc-003",
+          "filename": "rheumatology-note-2024-09-10.txt",
+          "claim": "Sulfonamide allergy - rash",
+          "exact_text": "ALLERGIES: Sulfonamides - patient reports rash with previous exposure (not verified in medical record, patient-reported only)",
+          "certainty": "patient_reported"
+        }
+      ],
+      "ground_truth": {
+        "accurate_value": "Sulfonamide allergy (rash) - patient-reported",
+        "source": "rheumatology-note-2024-09-10.txt",
+        "rationale": "Patient consistently reports sulfa allergy. Rheum note documents this. PCP and pharmacy records are incomplete."
+      },
+      "detection_strategy": {
+        "method": "allergy_list_comparison",
+        "keywords": [
+          "allergy",
+          "allergies",
+          "NKDA",
+          "sulfa",
+          "sulfonamide"
+        ],
+        "expected_automation": true,
+        "detection_difficulty": "easy"
+      },
+      "clinical_impact": {
+        "affects_care": true,
+        "urgency_level": "critical",
+        "explanation": "Sulfa allergy affects prescribing options for certain antibiotics and glaucoma medications (e.g., dorzolamide, brinzolamide). Missing allergy in EHR is a safety risk.",
+        "recommended_action": "Update allergy list immediately. Verify reaction details with patient."
+      },
+      "physician_workflow": {
+        "surface_in_briefing": true,
+        "auto_generate_question": "Your PCP records show no allergies, but you mentioned a sulfa allergy in your intake. Can you tell me more about that reaction?",
+        "suggested_briefing_language": "ALLERGY ALERT: Sulfa allergy reported by patient but missing from PCP records"
+      }
+    },
+    {
+      "contradiction_id": "mc_contradiction_003",
+      "patient_id": "margaret-chen",
+      "type": "medication_compliance_gap",
+      "category": "refill_pattern",
+      "severity": "moderate",
+      "status": "active",
+      "clinical_significance": "May indicate medication non-adherence or care outside this system",
+      "source_documents": [
+        {
+          "source_document_id": "doc-mc-002",
+          "filename": "pharmacy-pull-2024-12-26.json",
+          "claim": "Methotrexate last filled Nov 15 with 28-day supply",
+          "exact_text": "\"fill_date\": \"2024-11-15\", \"days_supply\": 28",
+          "certainty": "definitive"
+        }
+      ],
+      "ground_truth": {
+        "accurate_value": "Fill gap: last filled Nov 15, now Dec 26 = 41 days (13 days overdue)",
+        "source": "pharmacy-pull-2024-12-26.json",
+        "rationale": "Expected refill date ~Dec 13. Patient is 13 days overdue."
+      },
+      "detection_strategy": {
+        "method": "refill_date_calculation",
+        "keywords": [
+          "methotrexate",
+          "fill_date",
+          "days_supply"
+        ],
+        "expected_automation": true,
+        "detection_difficulty": "moderate"
+      },
+      "clinical_impact": {
+        "affects_care": false,
+        "urgency_level": "low",
+        "explanation": "May indicate non-compliance, fills at another pharmacy, or patient stockpiling. Not directly relevant to eye exam but worth noting.",
+        "recommended_action": "Optional: Ask patient about medication adherence if time permits"
+      },
+      "physician_workflow": {
+        "surface_in_briefing": false,
+        "auto_generate_question": null,
+        "suggested_briefing_language": null,
+        "note": "Low priority for ophthalmology visit, but could be flagged for rheumatologist"
+      }
+    },
+    {
+      "contradiction_id": "mc_contradiction_004",
+      "patient_id": "margaret-chen",
+      "type": "symptom_progression",
+      "category": "clinical_detail",
+      "severity": "moderate",
+      "status": "active",
+      "clinical_significance": "Additional symptom detail not captured in initial intake",
+      "source_documents": [
+        {
+          "source_document_id": "doc-mc-005",
+          "filename": "portal-message-2024-12-20.txt",
+          "claim": "Flashing lights happen more when tired at night",
+          "exact_text": "I've noticed the flashing lights seem to happen more often when I'm tired at night",
+          "certainty": "patient_reported"
+        }
+      ],
+      "ground_truth": {
+        "accurate_value": "Photopsias increase with fatigue/nighttime",
+        "source": "portal-message-2024-12-20.txt",
+        "rationale": "Patient volunteered this detail in portal message but did not mention it in intake chat"
+      },
+      "detection_strategy": {
+        "method": "symptom_detail_extraction",
+        "keywords": [
+          "flashing lights",
+          "photopsia",
+          "tired",
+          "night",
+          "evening"
+        ],
+        "expected_automation": false,
+        "detection_difficulty": "hard"
+      },
+      "clinical_impact": {
+        "affects_care": true,
+        "urgency_level": "moderate",
+        "explanation": "Pattern of photopsias may help differentiate vitreous vs retinal pathology. Fatigue-related symptoms could suggest ocular surface issues vs true vitreous/retinal events.",
+        "recommended_action": "Clarify symptom patterns during history"
+      },
+      "physician_workflow": {
+        "surface_in_briefing": true,
+        "auto_generate_question": "You mentioned the flashing lights happen more at night when you're tired. Can you describe exactly what you see?",
+        "suggested_briefing_language": "Patient notes photopsias worsen with fatigue - clarify pattern"
+      }
+    }
+  ],
+  "images": [
+    {
+      "id": "img-mc-001",
+      "patient_id": "margaret-chen",
+      "study_id": "study-img-mc-001",
+      "source_document_id": null,
+      "image_metadata": {
+        "capture_date": "2021-12-15T14:00:00Z",
+        "capture_device": "Heidelberg Spectralis OCT",
+        "modality": "oct",
+        "laterality": "od",
+        "scan_type": "Macular cube 512x128",
+        "scan_quality": 9
+      },
+      "image_file": "img-mc-001.jpeg",
+      "treatment_context": {
+        "days_since_last_treatment": null,
+        "last_treatment": null,
+        "interval_from_prior_image": null,
+        "treatment_cycle_number": null
+      },
+      "ai_analysis": {
+        "analysis_version": "1.0.0",
+        "analysis_source": "authored_at_seed",
+        "analyzed_at": "2021-12-15T14:00:00Z",
+        "findings": [
+          {
+            "finding_id": "f-img-mc-001-1",
+            "finding_type": "normal",
+            "location": "macula",
+            "severity": "mild",
+            "confidence": 0.94,
+            "description": "Macular architecture within normal limits"
+          }
+        ],
+        "measurements": [
+          {
+            "measurement_type": "central_retinal_thickness",
+            "value": 262,
+            "unit": "microns",
+            "location": "central 1mm",
+            "reference_range": {
+              "normal_min": 240,
+              "normal_max": 280
+            }
+          },
+          {
+            "measurement_type": "ganglion_cell_thickness",
+            "value": 82,
+            "unit": "microns",
+            "location": "parafoveal ring",
+            "reference_range": {
+              "normal_min": 70,
+              "normal_max": 95
+            }
+          }
+        ],
+        "comparison_to_prior": null,
+        "summary": {
+          "headline": "Normal baseline HCQ screening",
+          "key_findings": [
+            "GC-IPL 82 microns (baseline 82)",
+            "CRT 262 microns - within normal limits"
+          ],
+          "alerts": [],
+          "clinical_impression": "Normal baseline HCQ screening"
+        }
+      },
+      "metadata": {
+        "source_system": "external_import",
+        "note": "Imported external HCQ-monitoring archive scan (authored series for imaging-trends demo/eval)"
+      }
+    },
+    {
+      "id": "img-mc-002",
+      "patient_id": "margaret-chen",
+      "study_id": "study-img-mc-002",
+      "source_document_id": null,
+      "image_metadata": {
+        "capture_date": "2022-06-21T10:15:00Z",
+        "capture_device": "Heidelberg Spectralis OCT",
+        "modality": "oct",
+        "laterality": "od",
+        "scan_type": "Macular cube 512x128",
+        "scan_quality": 9
+      },
+      "image_file": "img-mc-002.jpeg",
+      "treatment_context": {
+        "days_since_last_treatment": null,
+        "last_treatment": null,
+        "interval_from_prior_image": null,
+        "treatment_cycle_number": null
+      },
+      "ai_analysis": {
+        "analysis_version": "1.0.0",
+        "analysis_source": "authored_at_seed",
+        "analyzed_at": "2022-06-21T10:15:00Z",
+        "findings": [
+          {
+            "finding_id": "f-img-mc-002-1",
+            "finding_type": "normal",
+            "location": "macula",
+            "severity": "mild",
+            "confidence": 0.94,
+            "description": "Macular architecture within normal limits"
+          }
+        ],
+        "measurements": [
+          {
+            "measurement_type": "central_retinal_thickness",
+            "value": 261,
+            "unit": "microns",
+            "location": "central 1mm",
+            "reference_range": {
+              "normal_min": 240,
+              "normal_max": 280
+            }
+          },
+          {
+            "measurement_type": "ganglion_cell_thickness",
+            "value": 80,
+            "unit": "microns",
+            "location": "parafoveal ring",
+            "reference_range": {
+              "normal_min": 70,
+              "normal_max": 95
+            }
+          }
+        ],
+        "comparison_to_prior": {
+          "prior_image_id": "img-mc-001",
+          "prior_image_date": "2021-12-15",
+          "overall_change": "stable",
+          "changes": [
+            {
+              "finding_type": "ganglion_cell_thickness",
+              "change_type": "stable",
+              "description": "GC-IPL decreased by 2 microns (-2 microns from 2021 baseline)",
+              "measurement_delta": -2
+            }
+          ],
+          "treatment_response": null
+        },
+        "summary": {
+          "headline": "Stable - no HCQ toxicity",
+          "key_findings": [
+            "GC-IPL 80 microns (baseline 82)",
+            "CRT 261 microns - within normal limits"
+          ],
+          "alerts": [],
+          "clinical_impression": "Stable - no HCQ toxicity"
+        }
+      },
+      "metadata": {
+        "source_system": "external_import",
+        "note": "Imported external HCQ-monitoring archive scan (authored series for imaging-trends demo/eval)"
+      }
+    },
+    {
+      "id": "img-mc-003",
+      "patient_id": "margaret-chen",
+      "study_id": "study-img-mc-003",
+      "source_document_id": null,
+      "image_metadata": {
+        "capture_date": "2023-01-10T09:40:00Z",
+        "capture_device": "Heidelberg Spectralis OCT",
+        "modality": "oct",
+        "laterality": "od",
+        "scan_type": "Macular cube 512x128",
+        "scan_quality": 9
+      },
+      "image_file": "img-mc-003.jpeg",
+      "treatment_context": {
+        "days_since_last_treatment": null,
+        "last_treatment": null,
+        "interval_from_prior_image": null,
+        "treatment_cycle_number": null
+      },
+      "ai_analysis": {
+        "analysis_version": "1.0.0",
+        "analysis_source": "authored_at_seed",
+        "analyzed_at": "2023-01-10T09:40:00Z",
+        "findings": [
+          {
+            "finding_id": "f-img-mc-003-1",
+            "finding_type": "normal",
+            "location": "macula",
+            "severity": "mild",
+            "confidence": 0.94,
+            "description": "Macular architecture within normal limits"
+          }
+        ],
+        "measurements": [
+          {
+            "measurement_type": "central_retinal_thickness",
+            "value": 260,
+            "unit": "microns",
+            "location": "central 1mm",
+            "reference_range": {
+              "normal_min": 240,
+              "normal_max": 280
+            }
+          },
+          {
+            "measurement_type": "ganglion_cell_thickness",
+            "value": 78,
+            "unit": "microns",
+            "location": "parafoveal ring",
+            "reference_range": {
+              "normal_min": 70,
+              "normal_max": 95
+            }
+          }
+        ],
+        "comparison_to_prior": {
+          "prior_image_id": "img-mc-002",
+          "prior_image_date": "2022-06-21",
+          "overall_change": "stable",
+          "changes": [
+            {
+              "finding_type": "ganglion_cell_thickness",
+              "change_type": "stable",
+              "description": "GC-IPL decreased by 2 microns (-4 microns from 2021 baseline)",
+              "measurement_delta": -2
+            }
+          ],
+          "treatment_response": null
+        },
+        "summary": {
+          "headline": "Stable - GC-IPL within normal limits",
+          "key_findings": [
+            "GC-IPL 78 microns (baseline 82)",
+            "CRT 260 microns - within normal limits"
+          ],
+          "alerts": [],
+          "clinical_impression": "Stable - GC-IPL within normal limits"
+        }
+      },
+      "metadata": {
+        "source_system": "external_import",
+        "note": "Imported external HCQ-monitoring archive scan (authored series for imaging-trends demo/eval)"
+      }
+    },
+    {
+      "id": "img-mc-004",
+      "patient_id": "margaret-chen",
+      "study_id": "study-img-mc-004",
+      "source_document_id": null,
+      "image_metadata": {
+        "capture_date": "2023-08-15T11:05:00Z",
+        "capture_device": "Heidelberg Spectralis OCT",
+        "modality": "oct",
+        "laterality": "od",
+        "scan_type": "Macular cube 512x128",
+        "scan_quality": 9
+      },
+      "image_file": "img-mc-004.jpeg",
+      "treatment_context": {
+        "days_since_last_treatment": null,
+        "last_treatment": null,
+        "interval_from_prior_image": null,
+        "treatment_cycle_number": null
+      },
+      "ai_analysis": {
+        "analysis_version": "1.0.0",
+        "analysis_source": "authored_at_seed",
+        "analyzed_at": "2023-08-15T11:05:00Z",
+        "findings": [
+          {
+            "finding_id": "f-img-mc-004-1",
+            "finding_type": "normal",
+            "location": "macula",
+            "severity": "mild",
+            "confidence": 0.94,
+            "description": "Macular architecture within normal limits"
+          }
+        ],
+        "measurements": [
+          {
+            "measurement_type": "central_retinal_thickness",
+            "value": 259,
+            "unit": "microns",
+            "location": "central 1mm",
+            "reference_range": {
+              "normal_min": 240,
+              "normal_max": 280
+            }
+          },
+          {
+            "measurement_type": "ganglion_cell_thickness",
+            "value": 75,
+            "unit": "microns",
+            "location": "parafoveal ring",
+            "reference_range": {
+              "normal_min": 70,
+              "normal_max": 95
+            }
+          }
+        ],
+        "comparison_to_prior": {
+          "prior_image_id": "img-mc-003",
+          "prior_image_date": "2023-01-10",
+          "overall_change": "worsened",
+          "changes": [
+            {
+              "finding_type": "ganglion_cell_thickness",
+              "change_type": "worsened",
+              "description": "GC-IPL decreased by 3 microns (-7 microns from 2021 baseline)",
+              "measurement_delta": -3
+            }
+          ],
+          "treatment_response": null
+        },
+        "summary": {
+          "headline": "Borderline GC-IPL decline - continue annual screening",
+          "key_findings": [
+            "GC-IPL 75 microns (baseline 82)",
+            "CRT 259 microns - within normal limits"
+          ],
+          "alerts": [],
+          "clinical_impression": "Borderline GC-IPL decline - continue annual screening"
+        }
+      },
+      "metadata": {
+        "source_system": "external_import",
+        "note": "Imported external HCQ-monitoring archive scan (authored series for imaging-trends demo/eval)"
+      }
+    },
+    {
+      "id": "img-mc-005",
+      "patient_id": "margaret-chen",
+      "study_id": "study-img-mc-005",
+      "source_document_id": null,
+      "image_metadata": {
+        "capture_date": "2024-03-19T10:20:00Z",
+        "capture_device": "Heidelberg Spectralis OCT",
+        "modality": "oct",
+        "laterality": "od",
+        "scan_type": "Macular cube 512x128",
+        "scan_quality": 9
+      },
+      "image_file": "img-mc-005.jpeg",
+      "treatment_context": {
+        "days_since_last_treatment": null,
+        "last_treatment": null,
+        "interval_from_prior_image": null,
+        "treatment_cycle_number": null
+      },
+      "ai_analysis": {
+        "analysis_version": "1.0.0",
+        "analysis_source": "authored_at_seed",
+        "analyzed_at": "2024-03-19T10:20:00Z",
+        "findings": [
+          {
+            "finding_id": "f-img-mc-005-1",
+            "finding_type": "rpe_changes",
+            "location": "parafoveal",
+            "severity": "mild",
+            "confidence": 0.72,
+            "description": "Subtle parafoveal RPE irregularity - possible early HCQ toxicity"
+          },
+          {
+            "finding_id": "f-img-mc-005-2",
+            "finding_type": "retinal_thinning",
+            "location": "parafoveal",
+            "severity": "mild",
+            "confidence": 0.74,
+            "description": "Parafoveal thinning in the GC-IPL layer"
+          }
+        ],
+        "measurements": [
+          {
+            "measurement_type": "central_retinal_thickness",
+            "value": 258,
+            "unit": "microns",
+            "location": "central 1mm",
+            "reference_range": {
+              "normal_min": 240,
+              "normal_max": 280
+            }
+          },
+          {
+            "measurement_type": "ganglion_cell_thickness",
+            "value": 72,
+            "unit": "microns",
+            "location": "parafoveal ring",
+            "reference_range": {
+              "normal_min": 70,
+              "normal_max": 95
+            }
+          }
+        ],
+        "comparison_to_prior": {
+          "prior_image_id": "img-mc-004",
+          "prior_image_date": "2023-08-15",
+          "overall_change": "worsened",
+          "changes": [
+            {
+              "finding_type": "ganglion_cell_thickness",
+              "change_type": "worsened",
+              "description": "GC-IPL decreased by 3 microns (-10 microns from 2021 baseline)",
+              "measurement_delta": -3
+            },
+            {
+              "finding_type": "rpe_changes",
+              "change_type": "new",
+              "description": "New subtle parafoveal RPE changes"
+            }
+          ],
+          "treatment_response": null
+        },
+        "summary": {
+          "headline": "Subtle parafoveal changes - possible early HCQ toxicity",
+          "key_findings": [
+            "GC-IPL 72 microns (baseline 82)",
+            "CRT 258 microns - within normal limits"
+          ],
+          "alerts": [
+            {
+              "level": "medium",
+              "message": "GC-IPL decline of 10 microns from baseline - exceeds expected variation"
+            }
+          ],
+          "clinical_impression": "Subtle parafoveal changes - possible early HCQ toxicity"
+        }
+      },
+      "metadata": {
+        "source_system": "external_import",
+        "note": "Imported external HCQ-monitoring archive scan (authored series for imaging-trends demo/eval)"
+      }
+    },
+    {
+      "id": "img-mc-006",
+      "patient_id": "margaret-chen",
+      "study_id": "study-img-mc-006",
+      "source_document_id": "doc-mc-008",
+      "image_metadata": {
+        "capture_date": "2024-12-26T10:35:00Z",
+        "capture_device": "Heidelberg Spectralis OCT",
+        "modality": "oct",
+        "laterality": "od",
+        "scan_type": "Macular cube 512x128",
+        "scan_quality": 9
+      },
+      "image_file": "img-mc-006.jpeg",
+      "treatment_context": {
+        "days_since_last_treatment": null,
+        "last_treatment": null,
+        "interval_from_prior_image": null,
+        "treatment_cycle_number": null
+      },
+      "ai_analysis": {
+        "analysis_version": "1.0.0",
+        "analysis_source": "authored_at_seed",
+        "analyzed_at": "2024-12-26T10:35:00Z",
+        "findings": [
+          {
+            "finding_id": "f-img-mc-006-1",
+            "finding_type": "rpe_changes",
+            "location": "parafoveal",
+            "severity": "moderate",
+            "confidence": 0.81,
+            "description": "Parafoveal RPE changes, more conspicuous than prior - concerning for early HCQ maculopathy"
+          },
+          {
+            "finding_id": "f-img-mc-006-2",
+            "finding_type": "retinal_thinning",
+            "location": "parafoveal",
+            "severity": "mild",
+            "confidence": 0.74,
+            "description": "Parafoveal thinning in the GC-IPL layer"
+          }
+        ],
+        "measurements": [
+          {
+            "measurement_type": "central_retinal_thickness",
+            "value": 268,
+            "unit": "microns",
+            "location": "central 1mm",
+            "reference_range": {
+              "normal_min": 240,
+              "normal_max": 280
+            }
+          },
+          {
+            "measurement_type": "ganglion_cell_thickness",
+            "value": 70,
+            "unit": "microns",
+            "location": "parafoveal ring",
+            "reference_range": {
+              "normal_min": 70,
+              "normal_max": 95
+            }
+          }
+        ],
+        "comparison_to_prior": {
+          "prior_image_id": "img-mc-005",
+          "prior_image_date": "2024-03-19",
+          "overall_change": "worsened",
+          "changes": [
+            {
+              "finding_type": "ganglion_cell_thickness",
+              "change_type": "stable",
+              "description": "GC-IPL decreased by 2 microns (-12 microns from 2021 baseline)",
+              "measurement_delta": -2
+            },
+            {
+              "finding_type": "rpe_changes",
+              "change_type": "worsened",
+              "description": "Parafoveal RPE changes progressed from mild to moderate"
+            }
+          ],
+          "treatment_response": null
+        },
+        "summary": {
+          "headline": "GC-IPL thinning with progressive RPE changes - HCQ toxicity review recommended",
+          "key_findings": [
+            "GC-IPL 70 microns (baseline 82)",
+            "CRT 268 microns - within normal limits"
+          ],
+          "alerts": [
+            {
+              "level": "high",
+              "message": "Possible early HCQ maculopathy - recommend 10-2 visual field, fundus autofluorescence, and rheumatology consultation"
+            },
+            {
+              "level": "medium",
+              "message": "GC-IPL thinning of 12 microns across serial scans"
+            }
+          ],
+          "clinical_impression": "GC-IPL thinning with progressive RPE changes - HCQ toxicity review recommended"
+        }
+      },
+      "metadata": {
+        "source_system": "heidelberg_spectralis",
+        "note": "Captured at 2024-12-26 visit; also filed as source document doc-mc-008"
+      }
+    }
+  ],
+  "treatments": [],
+  "events": [
+    {
+      "id": "evt-mc-001",
+      "patient_id": "margaret-chen",
+      "event_type": "medication_start",
+      "treatment_type": "medication_start",
+      "treatment_date": "2021-12-01",
+      "injection_details": null,
+      "pre_treatment_assessment": {
+        "indication": "Rheumatoid arthritis",
+        "oct_findings": "Normal baseline",
+        "visual_acuity": "20/20"
+      },
+      "outcome": null,
+      "performed_by": "Anita Patel, MD (Rheumatology)",
+      "note": "Faithful port of the prototype imaging-demo anchor (medication_start 2021-12-01); anchors the authored OCT trend series that begins 2021-12-15. The document corpus's pharmacy-verified HCQ first fill is 2019-01-15 and remains the contradiction ground truth."
+    }
+  ]
+}

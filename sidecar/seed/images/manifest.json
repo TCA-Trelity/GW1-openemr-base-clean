@@ -1,0 +1,22 @@
+{
+  "dataset": "Kermany et al. OCT dataset (Labeled Optical Coherence Tomography (OCT) and Chest X-Ray Images for Classification, Mendeley Data)",
+  "license": "CC BY 4.0",
+  "attribution": "See docs/data-sources.md for the full citation. Images are synthetic stand-ins for demo/eval only; the clinical ground truth lives in the authored ai_analysis metadata, not in the pixels.",
+  "mapping_rule": "Per DECISIONS.md: William Thompson gets 'CNV'-class scans for fluid/worsened visits and 'NORMAL'-class scans for dry post-treatment visits; Margaret Chen is 'NORMAL' throughout - early HCQ toxicity is invisible on a single B-scan, so the authored GC-IPL numbers carry the trend.",
+  "sourcing_status": "not_downloaded - a sourcing script fetches the files into this directory later; 'file' is the expected local filename",
+  "images": [
+    { "image_id": "img-mc-001", "patient": "margaret-chen", "laterality": "OD", "capture_date": "2021-12-15", "dataset_class": "NORMAL", "file": "img-mc-001.jpeg" },
+    { "image_id": "img-mc-002", "patient": "margaret-chen", "laterality": "OD", "capture_date": "2022-06-21", "dataset_class": "NORMAL", "file": "img-mc-002.jpeg" },
+    { "image_id": "img-mc-003", "patient": "margaret-chen", "laterality": "OD", "capture_date": "2023-01-10", "dataset_class": "NORMAL", "file": "img-mc-003.jpeg" },
+    { "image_id": "img-mc-004", "patient": "margaret-chen", "laterality": "OD", "capture_date": "2023-08-15", "dataset_class": "NORMAL", "file": "img-mc-004.jpeg" },
+    { "image_id": "img-mc-005", "patient": "margaret-chen", "laterality": "OD", "capture_date": "2024-03-19", "dataset_class": "NORMAL", "file": "img-mc-005.jpeg" },
+    { "image_id": "img-mc-006", "patient": "margaret-chen", "laterality": "OD", "capture_date": "2024-12-26", "dataset_class": "NORMAL", "file": "img-mc-006.jpeg" },
+    { "image_id": "img-wt-001", "patient": "william-thompson", "laterality": "OD", "capture_date": "2025-05-05", "dataset_class": "CNV", "file": "img-wt-001.jpeg" },
+    { "image_id": "img-wt-002", "patient": "william-thompson", "laterality": "OD", "capture_date": "2025-06-24", "dataset_class": "NORMAL", "file": "img-wt-002.jpeg" },
+    { "image_id": "img-wt-003", "patient": "william-thompson", "laterality": "OD", "capture_date": "2025-08-12", "dataset_class": "NORMAL", "file": "img-wt-003.jpeg" },
+    { "image_id": "img-wt-004", "patient": "william-thompson", "laterality": "OD", "capture_date": "2025-09-30", "dataset_class": "NORMAL", "file": "img-wt-004.jpeg" },
+    { "image_id": "img-wt-005", "patient": "william-thompson", "laterality": "OD", "capture_date": "2025-10-22", "dataset_class": "CNV", "file": "img-wt-005.jpeg" },
+    { "image_id": "img-wt-006", "patient": "william-thompson", "laterality": "OD", "capture_date": "2025-11-19", "dataset_class": "NORMAL", "file": "img-wt-006.jpeg" },
+    { "image_id": "img-wt-007", "patient": "william-thompson", "laterality": "OD", "capture_date": "2025-12-10", "dataset_class": "NORMAL", "file": "img-wt-007.jpeg" }
+  ]
+}

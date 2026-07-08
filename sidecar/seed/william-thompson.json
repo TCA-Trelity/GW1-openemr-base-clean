@@ -1,0 +1,1052 @@
+{
+  "patient": {
+    "patient_id": "william-thompson",
+    "name": "William R. Thompson",
+    "dob": "1946-08-22",
+    "sex": "M",
+    "mrn": "MEC-2025-1187",
+    "phone": "(407) 555-2318",
+    "appointment_date": "2025-12-10",
+    "appointment_time": "09:30",
+    "visit_type": "established_patient"
+  },
+  "medications": [],
+  "allergies": [],
+  "conditions": [
+    {
+      "id": "fact-wt-con-001",
+      "patient_id": "william-thompson",
+      "fact_type": "condition",
+      "content": {
+        "name": "Neovascular (wet) age-related macular degeneration",
+        "icd10": "H35.3211",
+        "status": "active",
+        "since": "2025-05",
+        "severity": "active CNV, controlled on Eylea treat-and-extend"
+      },
+      "is_current": true,
+      "source_document_id": "doc-wt-001",
+      "sources": [
+        {
+          "id": "cit-wt-001",
+          "fact_id": "fact-wt-con-001",
+          "source_label": "Optometry referral letter - Dr. James Liu",
+          "source_type": "referral_letter",
+          "excerpt_text": "Findings highly suspicious for neovascular (wet) age-related macular degeneration in the right eye.",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 1124,
+            "end_char": 1223,
+            "context_before": "t drusen consistent with intermediate dry AMD.\n\nIMPRESSION:\n",
+            "context_after": " Intermediate dry AMD in the left eye.\n\nMEDICAL HISTORY (per"
+          },
+          "attribution": {
+            "speaker_role": "external_provider",
+            "speaker_name": "James Liu, OD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-wt-001",
+          "document_date": "2025-04-28"
+        },
+        {
+          "id": "cit-wt-002",
+          "fact_id": "fact-wt-con-001",
+          "source_label": "Retina clinic visit note - Dr. Sarah Morrison",
+          "source_type": "prior_visit_note",
+          "excerpt_text": "Neovascular age-related macular degeneration, right eye (H35.3211) - recurrent activity at extended 10-week interval after three consecutive dry visits at 7-week intervals.",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 1097,
+            "end_char": 1269,
+            "context_before": " and no evidence of neovascular conversion.\n\nASSESSMENT:\n1. ",
+            "context_after": "\n2. Intermediate dry AMD, left eye (H35.3120) - stable; cont"
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Sarah Morrison, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-wt-002",
+          "document_date": "2025-10-22"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": "OD",
+      "created_date": "2025-12-10T09:00:00Z",
+      "updated_date": "2025-12-10T09:00:00Z"
+    },
+    {
+      "id": "fact-wt-con-002",
+      "patient_id": "william-thompson",
+      "fact_type": "condition",
+      "content": {
+        "name": "Intermediate dry age-related macular degeneration",
+        "icd10": "H35.3120",
+        "status": "active",
+        "since": "2024",
+        "severity": "intermediate; monitor for neovascular conversion"
+      },
+      "is_current": true,
+      "source_document_id": "doc-wt-002",
+      "sources": [
+        {
+          "id": "cit-wt-003",
+          "fact_id": "fact-wt-con-002",
+          "source_label": "Retina clinic visit note - Dr. Sarah Morrison",
+          "source_type": "prior_visit_note",
+          "excerpt_text": "The left eye continues to show intermediate dry AMD with soft drusen and no evidence of neovascular conversion.",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 969,
+            "end_char": 1080,
+            "context_before": "ncreased to 331 microns (from 264 microns on September 30). ",
+            "context_after": "\n\nASSESSMENT:\n1. Neovascular age-related macular degeneratio"
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Sarah Morrison, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-wt-002",
+          "document_date": "2025-10-22"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": "OS",
+      "created_date": "2025-12-10T09:00:00Z",
+      "updated_date": "2025-12-10T09:00:00Z"
+    }
+  ],
+  "family_history": [],
+  "patient_goals": [
+    {
+      "id": "fact-wt-goal-001",
+      "patient_id": "william-thompson",
+      "fact_type": "patient_goal",
+      "content": {
+        "goal": "Preserve reading and driving vision",
+        "specific_concerns": [
+          "Wants to remain independent at home",
+          "Anxious about losing central vision in his better-seeing tasks"
+        ],
+        "verbatim_quotes": [],
+        "emotional_state": "engaged, adherent to injection schedule"
+      },
+      "is_current": true,
+      "source_document_id": "doc-wt-002",
+      "sources": [
+        {
+          "id": "cit-wt-005",
+          "fact_id": "fact-wt-goal-001",
+          "source_label": "Retina clinic visit note - Dr. Sarah Morrison",
+          "source_type": "prior_visit_note",
+          "excerpt_text": "His main concern is keeping his reading and driving vision.",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 560,
+            "end_char": 619,
+            "context_before": "ght eye over the past week. He remains independent at home. ",
+            "context_after": "\n\nEXAMINATION:\nVisual acuity (corrected): OD 20/30 (was 20/2"
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Sarah Morrison, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-wt-002",
+          "document_date": "2025-10-22"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": null,
+      "created_date": "2025-12-10T09:00:00Z",
+      "updated_date": "2025-12-10T09:00:00Z"
+    }
+  ],
+  "chief_complaint": {
+    "id": "fact-wt-cc-001",
+    "patient_id": "william-thompson",
+    "fact_type": "chief_complaint",
+    "content": {
+      "statement": "Distortion of straight lines and central gray smudge, right eye",
+      "onset": "approximately 2025-04-14 (two weeks before referral)",
+      "laterality": "OD",
+      "progression": "acute onset; now controlled on anti-VEGF therapy",
+      "pertinent_negatives": [
+        "No pain",
+        "No flashes",
+        "No floaters"
+      ]
+    },
+    "is_current": true,
+    "source_document_id": "doc-wt-001",
+    "sources": [
+      {
+        "id": "cit-wt-004",
+        "fact_id": "fact-wt-cc-001",
+        "source_label": "Optometry referral letter - Dr. James Liu",
+        "source_type": "referral_letter",
+        "excerpt_text": "straight lines appear bent and there is a gray smudge near the center of his vision in the right eye, first noticed approximately two weeks ago",
+        "excerpt_location": {
+          "type": "character_range",
+          "start_char": 451,
+          "end_char": 594,
+          "context_before": "ation in the right eye.\n\nHISTORY:\nMr. Thompson reports that ",
+          "context_after": ". He denies pain, flashes, or floaters. He is anxious to pro"
+        },
+        "attribution": {
+          "speaker_role": "external_provider",
+          "speaker_name": "James Liu, OD",
+          "confidence": 0.95
+        },
+        "source_document_id": "doc-wt-001",
+        "document_date": "2025-04-28"
+      }
+    ],
+    "verification": {
+      "status": "unverified",
+      "verified_by_user_id": null,
+      "verified_at": null,
+      "verifier_role": null
+    },
+    "laterality": "OD",
+    "created_date": "2025-12-10T09:00:00Z",
+    "updated_date": "2025-12-10T09:00:00Z"
+  },
+  "source_documents": [
+    {
+      "document_id": "doc-wt-001",
+      "filename": "referral-optometry-2025-04-28.txt",
+      "document_type": "referral_letter",
+      "document_date": "2025-04-28",
+      "received_date": "2025-04-28",
+      "received_method": "fax",
+      "content": {
+        "format": "text",
+        "text_content": "CENTRAL FLORIDA OPTOMETRY GROUP\n880 Lake Baldwin Lane, Orlando, FL 32814\nPhone: (407) 555-4410 | Fax: (407) 555-4411\n\nDate: April 28, 2025\n\nRE: URGENT RETINA REFERRAL\n\nPatient Name: William R. Thompson\nDate of Birth: 08/22/1946 (78 years old)\nPhone: (407) 555-2318\n\nDear Dr. Morrison,\n\nI am urgently referring Mr. William Thompson for retina evaluation of suspected exudative macular degeneration in the right eye.\n\nHISTORY:\nMr. Thompson reports that straight lines appear bent and there is a gray smudge near the center of his vision in the right eye, first noticed approximately two weeks ago. He denies pain, flashes, or floaters. He is anxious to protect his reading and driving vision.\n\nEXAMINATION TODAY:\nBest corrected visual acuity: OD 20/50 (previously 20/25 at his 2024 exam), OS 20/30.\nAmsler grid: central distortion OD; OS unremarkable.\nDilated exam: OD - numerous soft drusen with a grayish subfoveal elevation and trace subretinal fluid suspected at the macula. OS - numerous soft drusen, no hemorrhage, no elevation. The left eye shows numerous soft drusen consistent with intermediate dry AMD.\n\nIMPRESSION:\nFindings highly suspicious for neovascular (wet) age-related macular degeneration in the right eye. Intermediate dry AMD in the left eye.\n\nMEDICAL HISTORY (per patient):\n- Hyperlipidemia on atorvastatin\n- Former smoker, quit 1998\n- Taking AREDS2 vitamin supplement since 2024\n\nREQUEST:\nOCT and evaluation for anti-VEGF therapy at your earliest availability. Patient has been counseled on the urgency.\n\nThank you for seeing him promptly.\n\nSincerely,\nJames Liu, OD\nCentral Florida Optometry Group",
+        "ocr_quality": 0.94
+      },
+      "extracted_data": {
+        "referring_provider": {
+          "name": "James Liu, OD",
+          "practice": "Central Florida Optometry Group"
+        },
+        "chief_complaint": "Metamorphopsia and central gray smudge OD x 2 weeks",
+        "visual_acuity": {
+          "od": "20/50",
+          "os": "20/30"
+        },
+        "impression": [
+          "Suspected neovascular (wet) AMD OD",
+          "Intermediate dry AMD OS"
+        ],
+        "urgency": "urgent"
+      },
+      "metadata": {
+        "source_system": "fax_intake",
+        "imported_at": "2025-04-28T15:10:00Z",
+        "imported_by": "front_desk",
+        "pages": 1
+      }
+    },
+    {
+      "document_id": "doc-wt-002",
+      "filename": "retina-visit-note-2025-10-22.txt",
+      "document_type": "prior_visit_note",
+      "document_date": "2025-10-22",
+      "content": {
+        "format": "text",
+        "text_content": "MONTZKA EYE CLINIC - RETINA SERVICE\nOFFICE VISIT NOTE\n\nPatient: William R. Thompson | DOB: 08/22/1946 (79 years old)\nDate of Service: October 22, 2025\nProvider: Sarah Morrison, MD\nVisit Type: Treat-and-extend follow-up, neovascular AMD OD\n\nINTERVAL HISTORY:\nMr. Thompson returns 10 weeks after his third Eylea injection (August 12, 2025). At his last three visits the macula was dry at 7-week intervals, so we trialed an extension to 10 weeks. Today he reports mild recurrence of distortion in the right eye over the past week. He remains independent at home. His main concern is keeping his reading and driving vision.\n\nEXAMINATION:\nVisual acuity (corrected): OD 20/30 (was 20/25), OS 20/30.\nIOP: OD 15, OS 14 mmHg.\nDilated fundus exam OD: recurrent subfoveal fluid, no new hemorrhage. OS: stable drusen, no conversion.\n\nIMAGING:\nOCT OD today shows recurrent subretinal fluid with central retinal thickness increased to 331 microns (from 264 microns on September 30). The left eye continues to show intermediate dry AMD with soft drusen and no evidence of neovascular conversion.\n\nASSESSMENT:\n1. Neovascular age-related macular degeneration, right eye (H35.3211) - recurrent activity at extended 10-week interval after three consecutive dry visits at 7-week intervals.\n2. Intermediate dry AMD, left eye (H35.3120) - stable; continue AREDS2 and home Amsler monitoring.\n\nPLAN:\nIntravitreal aflibercept (Eylea) 2mg OD administered today without complication (injection #4).\nRecurrent subretinal fluid at the 10-week interval confirms he cannot maintain extension beyond 7 weeks. We will return to 7-week dosing intervals and do not plan to extend again. Follow-up OCT and injection in 4 weeks to confirm the macula has dried, then resume the 7-week cycle.\nReturn precautions reviewed (sudden vision loss, new distortion, curtain or shadow).\n\n[ELECTRONIC SIGNATURE APPLIED]\nSarah Morrison, MD - Vitreoretinal Surgery\nSigned: 10/22/2025 16:40"
+      },
+      "extracted_data": {
+        "provider": {
+          "name": "Sarah Morrison, MD",
+          "specialty": "Vitreoretinal Surgery"
+        },
+        "assessment": [
+          {
+            "condition": "Neovascular AMD",
+            "icd10": "H35.3211",
+            "laterality": "OD",
+            "status": "recurrent activity at extended 10-week interval"
+          },
+          {
+            "condition": "Intermediate dry AMD",
+            "icd10": "H35.3120",
+            "laterality": "OS",
+            "status": "stable"
+          }
+        ],
+        "plan": "Eylea 2mg OD injection #4 today; return to 7-week intervals; do not extend again",
+        "crt_today_um": 331
+      },
+      "metadata": {
+        "source_system": "ehr_note",
+        "imported_at": "2025-10-22T16:45:00Z",
+        "imported_by": "system"
+      }
+    }
+  ],
+  "contradictions": [],
+  "images": [
+    {
+      "id": "img-wt-001",
+      "patient_id": "william-thompson",
+      "study_id": "study-img-wt-001",
+      "source_document_id": null,
+      "image_metadata": {
+        "capture_date": "2025-05-05T10:30:00Z",
+        "capture_device": "Heidelberg Spectralis OCT",
+        "modality": "oct",
+        "laterality": "od",
+        "scan_type": "Macular cube 512x128",
+        "scan_quality": 9
+      },
+      "image_file": "img-wt-001.jpeg",
+      "treatment_context": {
+        "days_since_last_treatment": null,
+        "last_treatment": null,
+        "interval_from_prior_image": null,
+        "treatment_cycle_number": null
+      },
+      "ai_analysis": {
+        "analysis_version": "1.0.0",
+        "analysis_source": "authored_at_seed",
+        "analyzed_at": "2025-05-05T10:30:00Z",
+        "findings": [
+          {
+            "finding_id": "f-img-wt-001-srf",
+            "finding_type": "subretinal_fluid",
+            "location": "foveal",
+            "severity": "moderate",
+            "confidence": 0.92,
+            "description": "Subretinal fluid in foveal region, consistent with active neovascular AMD"
+          },
+          {
+            "finding_id": "f-img-wt-001-drusen",
+            "finding_type": "drusen",
+            "location": "macular",
+            "severity": "moderate",
+            "confidence": 0.93,
+            "description": "Soft drusen throughout macula consistent with AMD"
+          },
+          {
+            "finding_id": "f-img-wt-001-ped",
+            "finding_type": "pigment_epithelial_detachment",
+            "location": "subfoveal",
+            "severity": "mild",
+            "confidence": 0.86,
+            "description": "Fibrovascular PED, stable"
+          }
+        ],
+        "measurements": [
+          {
+            "measurement_type": "central_retinal_thickness",
+            "value": 385,
+            "unit": "microns",
+            "location": "central 1mm",
+            "reference_range": {
+              "normal_min": 240,
+              "normal_max": 280
+            }
+          }
+        ],
+        "comparison_to_prior": null,
+        "summary": {
+          "headline": "Active wet AMD with subretinal fluid",
+          "key_findings": [
+            "CRT 385 microns"
+          ],
+          "alerts": [
+            {
+              "level": "high",
+              "message": "Active CNV requiring treatment initiation"
+            }
+          ],
+          "clinical_impression": "New diagnosis of neovascular AMD with active disease. Anti-VEGF therapy indicated."
+        }
+      },
+      "metadata": {
+        "source_system": "heidelberg_spectralis"
+      }
+    },
+    {
+      "id": "img-wt-002",
+      "patient_id": "william-thompson",
+      "study_id": "study-img-wt-002",
+      "source_document_id": null,
+      "image_metadata": {
+        "capture_date": "2025-06-24T09:15:00Z",
+        "capture_device": "Heidelberg Spectralis OCT",
+        "modality": "oct",
+        "laterality": "od",
+        "scan_type": "Macular cube 512x128",
+        "scan_quality": 9
+      },
+      "image_file": "img-wt-002.jpeg",
+      "treatment_context": {
+        "days_since_last_treatment": 49,
+        "last_treatment": {
+          "medication": "Eylea",
+          "date": "2025-05-06",
+          "dose": "2mg"
+        },
+        "interval_from_prior_image": null,
+        "treatment_cycle_number": 1
+      },
+      "ai_analysis": {
+        "analysis_version": "1.0.0",
+        "analysis_source": "authored_at_seed",
+        "analyzed_at": "2025-06-24T09:15:00Z",
+        "findings": [
+          {
+            "finding_id": "f-img-wt-002-drusen",
+            "finding_type": "drusen",
+            "location": "macular",
+            "severity": "moderate",
+            "confidence": 0.93,
+            "description": "Soft drusen throughout macula consistent with AMD"
+          },
+          {
+            "finding_id": "f-img-wt-002-ped",
+            "finding_type": "pigment_epithelial_detachment",
+            "location": "subfoveal",
+            "severity": "mild",
+            "confidence": 0.86,
+            "description": "Fibrovascular PED, stable"
+          }
+        ],
+        "measurements": [
+          {
+            "measurement_type": "central_retinal_thickness",
+            "value": 266,
+            "unit": "microns",
+            "location": "central 1mm",
+            "reference_range": {
+              "normal_min": 240,
+              "normal_max": 280
+            }
+          }
+        ],
+        "comparison_to_prior": {
+          "prior_image_id": "img-wt-001",
+          "prior_image_date": "2025-05-05",
+          "interval_days": 50,
+          "overall_change": "improved",
+          "changes": [
+            {
+              "finding_type": "subretinal_fluid",
+              "change_type": "resolved",
+              "description": "Subretinal fluid has resolved"
+            },
+            {
+              "finding_type": "central_retinal_thickness",
+              "change_type": "improved",
+              "description": "CRT decreased by 119 microns",
+              "measurement_delta": -119
+            }
+          ],
+          "treatment_response": {
+            "assessment": "good_response",
+            "confidence": 0.9,
+            "rationale": "Complete resolution of SRF with normalization of CRT at 7 weeks post-injection"
+          }
+        },
+        "summary": {
+          "headline": "Excellent response - macula dry at 7 weeks",
+          "key_findings": [
+            "CRT 266 microns"
+          ],
+          "alerts": [],
+          "clinical_impression": "Excellent response to initial Eylea injection. Macula dry at 7 weeks."
+        }
+      },
+      "metadata": {
+        "source_system": "heidelberg_spectralis"
+      }
+    },
+    {
+      "id": "img-wt-003",
+      "patient_id": "william-thompson",
+      "study_id": "study-img-wt-003",
+      "source_document_id": null,
+      "image_metadata": {
+        "capture_date": "2025-08-12T14:00:00Z",
+        "capture_device": "Heidelberg Spectralis OCT",
+        "modality": "oct",
+        "laterality": "od",
+        "scan_type": "Macular cube 512x128",
+        "scan_quality": 9
+      },
+      "image_file": "img-wt-003.jpeg",
+      "treatment_context": {
+        "days_since_last_treatment": 49,
+        "last_treatment": {
+          "medication": "Eylea",
+          "date": "2025-06-24",
+          "dose": "2mg"
+        },
+        "interval_from_prior_image": null,
+        "treatment_cycle_number": 2
+      },
+      "ai_analysis": {
+        "analysis_version": "1.0.0",
+        "analysis_source": "authored_at_seed",
+        "analyzed_at": "2025-08-12T14:00:00Z",
+        "findings": [
+          {
+            "finding_id": "f-img-wt-003-drusen",
+            "finding_type": "drusen",
+            "location": "macular",
+            "severity": "moderate",
+            "confidence": 0.93,
+            "description": "Soft drusen throughout macula consistent with AMD"
+          },
+          {
+            "finding_id": "f-img-wt-003-ped",
+            "finding_type": "pigment_epithelial_detachment",
+            "location": "subfoveal",
+            "severity": "mild",
+            "confidence": 0.86,
+            "description": "Fibrovascular PED, stable"
+          }
+        ],
+        "measurements": [
+          {
+            "measurement_type": "central_retinal_thickness",
+            "value": 270,
+            "unit": "microns",
+            "location": "central 1mm",
+            "reference_range": {
+              "normal_min": 240,
+              "normal_max": 280
+            }
+          }
+        ],
+        "comparison_to_prior": {
+          "prior_image_id": "img-wt-002",
+          "prior_image_date": "2025-06-24",
+          "interval_days": 49,
+          "overall_change": "stable",
+          "changes": [
+            {
+              "finding_type": "central_retinal_thickness",
+              "change_type": "stable",
+              "description": "CRT increased by 4 microns",
+              "measurement_delta": 4
+            }
+          ],
+          "treatment_response": {
+            "assessment": "good_response",
+            "confidence": 0.9,
+            "rationale": "Macula remains dry at 7 weeks post-injection; tolerating 7-week interval"
+          }
+        },
+        "summary": {
+          "headline": "Stable - macula dry at 7 weeks",
+          "key_findings": [
+            "CRT 270 microns"
+          ],
+          "alerts": [],
+          "clinical_impression": "Continued excellent response on 7-week Eylea cycle."
+        }
+      },
+      "metadata": {
+        "source_system": "heidelberg_spectralis"
+      }
+    },
+    {
+      "id": "img-wt-004",
+      "patient_id": "william-thompson",
+      "study_id": "study-img-wt-004",
+      "source_document_id": null,
+      "image_metadata": {
+        "capture_date": "2025-09-30T11:20:00Z",
+        "capture_device": "Heidelberg Spectralis OCT",
+        "modality": "oct",
+        "laterality": "od",
+        "scan_type": "Macular cube 512x128",
+        "scan_quality": 9
+      },
+      "image_file": "img-wt-004.jpeg",
+      "treatment_context": {
+        "days_since_last_treatment": 49,
+        "last_treatment": {
+          "medication": "Eylea",
+          "date": "2025-08-12",
+          "dose": "2mg"
+        },
+        "interval_from_prior_image": null,
+        "treatment_cycle_number": 3
+      },
+      "ai_analysis": {
+        "analysis_version": "1.0.0",
+        "analysis_source": "authored_at_seed",
+        "analyzed_at": "2025-09-30T11:20:00Z",
+        "findings": [
+          {
+            "finding_id": "f-img-wt-004-drusen",
+            "finding_type": "drusen",
+            "location": "macular",
+            "severity": "moderate",
+            "confidence": 0.93,
+            "description": "Soft drusen throughout macula consistent with AMD"
+          },
+          {
+            "finding_id": "f-img-wt-004-ped",
+            "finding_type": "pigment_epithelial_detachment",
+            "location": "subfoveal",
+            "severity": "mild",
+            "confidence": 0.86,
+            "description": "Fibrovascular PED, stable"
+          }
+        ],
+        "measurements": [
+          {
+            "measurement_type": "central_retinal_thickness",
+            "value": 264,
+            "unit": "microns",
+            "location": "central 1mm",
+            "reference_range": {
+              "normal_min": 240,
+              "normal_max": 280
+            }
+          }
+        ],
+        "comparison_to_prior": {
+          "prior_image_id": "img-wt-003",
+          "prior_image_date": "2025-08-12",
+          "interval_days": 49,
+          "overall_change": "stable",
+          "changes": [
+            {
+              "finding_type": "central_retinal_thickness",
+              "change_type": "stable",
+              "description": "CRT decreased by 6 microns",
+              "measurement_delta": -6
+            }
+          ],
+          "treatment_response": {
+            "assessment": "good_response",
+            "confidence": 0.9,
+            "rationale": "Macula dry at 7 weeks for the third consecutive cycle; extension trialed"
+          }
+        },
+        "summary": {
+          "headline": "Macula dry at 7 weeks - extension to 10 weeks trialed",
+          "key_findings": [
+            "CRT 264 microns"
+          ],
+          "alerts": [],
+          "clinical_impression": "Dry at 7 weeks x 3 consecutive cycles. Extension to 10 weeks trialed - no injection today."
+        }
+      },
+      "metadata": {
+        "source_system": "heidelberg_spectralis"
+      }
+    },
+    {
+      "id": "img-wt-005",
+      "patient_id": "william-thompson",
+      "study_id": "study-img-wt-005",
+      "source_document_id": null,
+      "image_metadata": {
+        "capture_date": "2025-10-22T11:30:00Z",
+        "capture_device": "Heidelberg Spectralis OCT",
+        "modality": "oct",
+        "laterality": "od",
+        "scan_type": "Macular cube 512x128",
+        "scan_quality": 9
+      },
+      "image_file": "img-wt-005.jpeg",
+      "treatment_context": {
+        "days_since_last_treatment": 71,
+        "last_treatment": {
+          "medication": "Eylea",
+          "date": "2025-08-12",
+          "dose": "2mg"
+        },
+        "interval_from_prior_image": null,
+        "treatment_cycle_number": 3
+      },
+      "ai_analysis": {
+        "analysis_version": "1.0.0",
+        "analysis_source": "authored_at_seed",
+        "analyzed_at": "2025-10-22T11:30:00Z",
+        "findings": [
+          {
+            "finding_id": "f-img-wt-005-srf",
+            "finding_type": "subretinal_fluid",
+            "location": "foveal",
+            "severity": "mild",
+            "confidence": 0.88,
+            "description": "Recurrent subretinal fluid in foveal region"
+          },
+          {
+            "finding_id": "f-img-wt-005-drusen",
+            "finding_type": "drusen",
+            "location": "macular",
+            "severity": "moderate",
+            "confidence": 0.93,
+            "description": "Soft drusen throughout macula consistent with AMD"
+          }
+        ],
+        "measurements": [
+          {
+            "measurement_type": "central_retinal_thickness",
+            "value": 331,
+            "unit": "microns",
+            "location": "central 1mm",
+            "reference_range": {
+              "normal_min": 240,
+              "normal_max": 280
+            }
+          }
+        ],
+        "comparison_to_prior": {
+          "prior_image_id": "img-wt-004",
+          "prior_image_date": "2025-09-30",
+          "interval_days": 22,
+          "overall_change": "worsened",
+          "changes": [
+            {
+              "finding_type": "subretinal_fluid",
+              "change_type": "new",
+              "description": "New subretinal fluid detected"
+            },
+            {
+              "finding_type": "central_retinal_thickness",
+              "change_type": "worsened",
+              "description": "CRT increased by 67 microns",
+              "measurement_delta": 67
+            }
+          ],
+          "treatment_response": {
+            "assessment": "worsened",
+            "confidence": 0.86,
+            "rationale": "Fluid recurrence at 10 weeks - patient cannot maintain a 10-week interval"
+          }
+        },
+        "summary": {
+          "headline": "Fluid recurrence at extended 10-week interval",
+          "key_findings": [
+            "CRT 331 microns"
+          ],
+          "alerts": [
+            {
+              "level": "medium",
+              "message": "Fluid recurrence at 10 weeks - shorten interval; patient previously stable at 7 weeks"
+            }
+          ],
+          "clinical_impression": "Disease activity recurrence at extended interval. Recommend returning to 7-week dosing."
+        }
+      },
+      "metadata": {
+        "source_system": "heidelberg_spectralis"
+      }
+    },
+    {
+      "id": "img-wt-006",
+      "patient_id": "william-thompson",
+      "study_id": "study-img-wt-006",
+      "source_document_id": null,
+      "image_metadata": {
+        "capture_date": "2025-11-19T10:05:00Z",
+        "capture_device": "Heidelberg Spectralis OCT",
+        "modality": "oct",
+        "laterality": "od",
+        "scan_type": "Macular cube 512x128",
+        "scan_quality": 9
+      },
+      "image_file": "img-wt-006.jpeg",
+      "treatment_context": {
+        "days_since_last_treatment": 28,
+        "last_treatment": {
+          "medication": "Eylea",
+          "date": "2025-10-22",
+          "dose": "2mg"
+        },
+        "interval_from_prior_image": null,
+        "treatment_cycle_number": 4
+      },
+      "ai_analysis": {
+        "analysis_version": "1.0.0",
+        "analysis_source": "authored_at_seed",
+        "analyzed_at": "2025-11-19T10:05:00Z",
+        "findings": [
+          {
+            "finding_id": "f-img-wt-006-drusen",
+            "finding_type": "drusen",
+            "location": "macular",
+            "severity": "moderate",
+            "confidence": 0.93,
+            "description": "Soft drusen throughout macula consistent with AMD"
+          },
+          {
+            "finding_id": "f-img-wt-006-ped",
+            "finding_type": "pigment_epithelial_detachment",
+            "location": "subfoveal",
+            "severity": "mild",
+            "confidence": 0.86,
+            "description": "Fibrovascular PED, stable"
+          }
+        ],
+        "measurements": [
+          {
+            "measurement_type": "central_retinal_thickness",
+            "value": 268,
+            "unit": "microns",
+            "location": "central 1mm",
+            "reference_range": {
+              "normal_min": 240,
+              "normal_max": 280
+            }
+          }
+        ],
+        "comparison_to_prior": {
+          "prior_image_id": "img-wt-005",
+          "prior_image_date": "2025-10-22",
+          "interval_days": 28,
+          "overall_change": "improved",
+          "changes": [
+            {
+              "finding_type": "subretinal_fluid",
+              "change_type": "resolved",
+              "description": "Subretinal fluid has resolved"
+            },
+            {
+              "finding_type": "central_retinal_thickness",
+              "change_type": "improved",
+              "description": "CRT decreased by 63 microns",
+              "measurement_delta": -63
+            }
+          ],
+          "treatment_response": {
+            "assessment": "good_response",
+            "confidence": 0.9,
+            "rationale": "SRF resolved 4 weeks after rescue injection"
+          }
+        },
+        "summary": {
+          "headline": "Rescue injection effective - macula dry at 4 weeks",
+          "key_findings": [
+            "CRT 268 microns"
+          ],
+          "alerts": [],
+          "clinical_impression": "Rescue injection effective. Macula dry."
+        }
+      },
+      "metadata": {
+        "source_system": "heidelberg_spectralis"
+      }
+    },
+    {
+      "id": "img-wt-007",
+      "patient_id": "william-thompson",
+      "study_id": "study-img-wt-007",
+      "source_document_id": null,
+      "image_metadata": {
+        "capture_date": "2025-12-10T09:40:00Z",
+        "capture_device": "Heidelberg Spectralis OCT",
+        "modality": "oct",
+        "laterality": "od",
+        "scan_type": "Macular cube 512x128",
+        "scan_quality": 9
+      },
+      "image_file": "img-wt-007.jpeg",
+      "treatment_context": {
+        "days_since_last_treatment": 49,
+        "last_treatment": {
+          "medication": "Eylea",
+          "date": "2025-10-22",
+          "dose": "2mg"
+        },
+        "interval_from_prior_image": null,
+        "treatment_cycle_number": 4
+      },
+      "ai_analysis": {
+        "analysis_version": "1.0.0",
+        "analysis_source": "authored_at_seed",
+        "analyzed_at": "2025-12-10T09:40:00Z",
+        "findings": [
+          {
+            "finding_id": "f-img-wt-007-drusen",
+            "finding_type": "drusen",
+            "location": "macular",
+            "severity": "moderate",
+            "confidence": 0.93,
+            "description": "Soft drusen throughout macula consistent with AMD"
+          },
+          {
+            "finding_id": "f-img-wt-007-ped",
+            "finding_type": "pigment_epithelial_detachment",
+            "location": "subfoveal",
+            "severity": "mild",
+            "confidence": 0.86,
+            "description": "Fibrovascular PED, stable"
+          }
+        ],
+        "measurements": [
+          {
+            "measurement_type": "central_retinal_thickness",
+            "value": 262,
+            "unit": "microns",
+            "location": "central 1mm",
+            "reference_range": {
+              "normal_min": 240,
+              "normal_max": 280
+            }
+          }
+        ],
+        "comparison_to_prior": {
+          "prior_image_id": "img-wt-006",
+          "prior_image_date": "2025-11-19",
+          "interval_days": 21,
+          "overall_change": "stable",
+          "changes": [
+            {
+              "finding_type": "central_retinal_thickness",
+              "change_type": "stable",
+              "description": "CRT decreased by 6 microns",
+              "measurement_delta": -6
+            }
+          ],
+          "treatment_response": {
+            "assessment": "good_response",
+            "confidence": 0.9,
+            "rationale": "Macula dry at 7 weeks after returning to the established interval"
+          }
+        },
+        "summary": {
+          "headline": "Macula dry at 7 weeks - stable on 7-week cycle",
+          "key_findings": [
+            "CRT 262 microns"
+          ],
+          "alerts": [],
+          "clinical_impression": "Patient stable on 7-week Eylea cycle. Do not extend beyond 7 weeks based on prior recurrence at 10 weeks."
+        }
+      },
+      "metadata": {
+        "source_system": "heidelberg_spectralis"
+      }
+    }
+  ],
+  "treatments": [
+    {
+      "id": "tx-wt-001",
+      "patient_id": "william-thompson",
+      "treatment_type": "anti_vegf_injection",
+      "treatment_date": "2025-05-06",
+      "injection_details": {
+        "medication": "Eylea",
+        "dose": "2mg",
+        "laterality": "od",
+        "injection_number": 1,
+        "interval_from_prior": null
+      },
+      "pre_treatment_assessment": {
+        "indication": "New wet AMD with active CNV",
+        "oct_findings": "SRF, PED, CRT 385",
+        "visual_acuity": "20/50"
+      },
+      "outcome": {
+        "assessed_at": "2025-06-24",
+        "response": "good",
+        "oct_change": "SRF resolved, CRT 266",
+        "notes": "Excellent response"
+      },
+      "performed_by": "Dr. Sarah Morrison"
+    },
+    {
+      "id": "tx-wt-002",
+      "patient_id": "william-thompson",
+      "treatment_type": "anti_vegf_injection",
+      "treatment_date": "2025-06-24",
+      "injection_details": {
+        "medication": "Eylea",
+        "dose": "2mg",
+        "laterality": "od",
+        "injection_number": 2,
+        "interval_from_prior": 49
+      },
+      "pre_treatment_assessment": {
+        "indication": "Maintenance, treat-and-extend",
+        "oct_findings": "Dry macula, CRT 266",
+        "visual_acuity": "20/30"
+      },
+      "outcome": {
+        "assessed_at": "2025-08-12",
+        "response": "good",
+        "oct_change": "Remains dry, CRT 270",
+        "notes": "Stable at 7-week interval"
+      },
+      "performed_by": "Dr. Sarah Morrison"
+    },
+    {
+      "id": "tx-wt-003",
+      "patient_id": "william-thompson",
+      "treatment_type": "anti_vegf_injection",
+      "treatment_date": "2025-08-12",
+      "injection_details": {
+        "medication": "Eylea",
+        "dose": "2mg",
+        "laterality": "od",
+        "injection_number": 3,
+        "interval_from_prior": 49
+      },
+      "pre_treatment_assessment": {
+        "indication": "Maintenance, treat-and-extend",
+        "oct_findings": "Dry macula, CRT 270",
+        "visual_acuity": "20/25"
+      },
+      "outcome": {
+        "assessed_at": "2025-10-22",
+        "response": "worsened",
+        "oct_change": "Recurrent SRF at 10 weeks, CRT 331",
+        "notes": "Extended interval too long - dry at the 7-week check (Sep 30) but leaked by 10 weeks"
+      },
+      "performed_by": "Dr. Sarah Morrison"
+    },
+    {
+      "id": "tx-wt-004",
+      "patient_id": "william-thompson",
+      "treatment_type": "anti_vegf_injection",
+      "treatment_date": "2025-10-22",
+      "injection_details": {
+        "medication": "Eylea",
+        "dose": "2mg",
+        "laterality": "od",
+        "injection_number": 4,
+        "interval_from_prior": 71
+      },
+      "pre_treatment_assessment": {
+        "indication": "Recurrent SRF at extended interval",
+        "oct_findings": "Mild SRF, CRT 331",
+        "visual_acuity": "20/30"
+      },
+      "outcome": {
+        "assessed_at": "2025-12-10",
+        "response": "good",
+        "oct_change": "SRF resolved, CRT 262",
+        "notes": "Back to 7-week intervals; do not extend beyond 7 weeks"
+      },
+      "performed_by": "Dr. Sarah Morrison"
+    }
+  ],
+  "events": []
+}
