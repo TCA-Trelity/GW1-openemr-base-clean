@@ -32,9 +32,9 @@ deploy logs).
 
 | ID | Ticket | Agent | Depends | Verify | Done |
 |---|---|---|---|---|---|
-| P0.1 | Attach Railway volume at `/var/www/localhost/htdocs/openemr/sites` on the OpenEMR service (stops DB reset per push) | user | — | logs: next boot shows setup skipped | ☐ |
-| P0.2 | Set Watch Paths on OpenEMR service to ignore `sidecar/**` and `docs/**` | user | — | push a docs commit → no rebuild | ☐ |
-| P0.3 | Verify demo data + admin login stable across a push; change admin password from demo default | user | P0.1 | screenshot | ☐ |
+| P0.1 | Attach Railway volume at `/var/www/localhost/htdocs/openemr/sites` on the OpenEMR service (stops DB reset per push) | user | — | logs: next boot shows setup skipped | ☑ |
+| P0.2 | Set Watch Paths on OpenEMR service to ignore `sidecar/**` and `docs/**` | user | — | push a docs commit → no rebuild | ☑ |
+| P0.3 | Verify demo data + admin login stable across a push; change admin password from demo default | user | P0.1 | screenshot | ☑ |
 | P0.4 | Commit this plan + update `docs/HANDOFF.md` with locked decisions (imaging metadata authored-at-seed; Kermany-style public OCT imagery; all-four imaging features Thu; embedded panel Thu; F9→`medicationRiskFlags` canonical; scan storage = sidecar volume behind `ImageStore` interface) | main | — | in repo | ☑ |
 
 ## Phase 1 — Walking skeleton (Wednesday; goal: one real prep runs end-to-end on Railway by EOD)
