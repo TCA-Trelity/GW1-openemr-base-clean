@@ -61,7 +61,7 @@ function llmResponse(payload: unknown, stopReason = 'end_turn'): Response {
     const mid = Math.ceil(text.length / 2);
     return new Response(
         sseEvents([
-            { type: 'message_start', message: { model: 'claude-sonnet-5', usage: { input_tokens: 1200, output_tokens: 3 } } },
+            { type: 'message_start', message: { model: 'claude-haiku-4-5', usage: { input_tokens: 1200, output_tokens: 3 } } },
             { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
             { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: text.slice(0, mid) } },
             { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: text.slice(mid) } },
@@ -78,7 +78,30 @@ function extractorWith(...responses: Response[]) {
     for (const response of responses) {
         fetchMock.mockResolvedValueOnce(response);
     }
-    const client = new AnthropicClient({ apiKey: 'test-key', model: 'claude-sonnet-5', fetchImpl: fetchMock });
+    const client = new AnthropicClient({ apiKey: 'test-key', model: 'claude-haiku-4-5', fetchImpl: fetchMock });
+    return { extractor: new FactExtractor(client), fetchMock };
+}
+
+// Corpus-aware LLM fake for per-document extraction: the FIRST document call returns the
+// payload's facts (later document calls return none) and the contradiction pass returns
+// the payload's contradictions. A string payload is returned verbatim on EVERY call
+// (malformed-everywhere mode for failure tests).
+function dispatchingExtractor(payload: unknown) {
+    let factsSent = false;
+    const fetchMock = vi.fn<FetchLike>((_url, init) => {
+        if (typeof payload === 'string') {
+            return Promise.resolve(llmResponse(payload));
+        }
+        const p = payload as { facts?: unknown[]; contradictions?: unknown[] };
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        if (String(body['system']).includes('contradiction detector')) {
+            return Promise.resolve(llmResponse({ contradictions: p.contradictions ?? [] }));
+        }
+        const facts = factsSent ? [] : (p.facts ?? []);
+        factsSent = true;
+        return Promise.resolve(llmResponse({ facts }));
+    });
+    const client = new AnthropicClient({ apiKey: 'test-key', model: 'claude-haiku-4-5', fetchImpl: fetchMock });
     return { extractor: new FactExtractor(client), fetchMock };
 }
 
@@ -202,7 +225,7 @@ const corpusDb: SourceDocumentQuerier = {
 
 function pipelineDeps(payload: unknown) {
     const store = new FakeStore(corpusBundle());
-    const { extractor, fetchMock } = extractorWith(llmResponse(payload));
+    const { extractor, fetchMock } = dispatchingExtractor(payload);
     const deps: PrepDeps = {
         store,
         source: new StoreDocumentSource(store, corpusDb),
@@ -215,33 +238,37 @@ function pipelineDeps(payload: unknown) {
 
 // ---- Extraction ----
 
+// A single synthetic document: per-document extraction makes one call per doc, so most
+// extractor tests drive exactly one document (plus the contradiction pass when facts >= 2).
+const ONE_DOC = [
+    { id: 'doc-x', document_type: 'referral_letter', document_date: '2024-12-15', text: 'UNIQUE-DOC-TEXT' },
+];
+
 describe('FactExtractor', () => {
-    // Guards: the extractor mangling or dropping schema-valid facts on the happy path.
-    it('returns typed facts and contradictions from a schema-valid response', async () => {
+    // Guards: the extractor mangling or dropping schema-valid facts on the happy path —
+    // one call per document, then the contradiction pass over the merged facts.
+    it('returns typed facts from the doc pass and contradictions from the reduce pass', async () => {
         const { extractor, fetchMock } = extractorWith(
-            llmResponse({ facts: corpusFacts(), contradictions: corpusContradictions() }),
+            llmResponse({ facts: corpusFacts() }),
+            llmResponse({ contradictions: corpusContradictions() }),
         );
         const result = await extractor.extract(
-            { patientId: PATIENT_ID, patientName: 'Margaret L. Chen', documents: [] },
+            { patientId: PATIENT_ID, patientName: 'Margaret L. Chen', documents: ONE_DOC },
             'corr-1',
             silentLogger,
         );
         expect(result.facts).toHaveLength(12);
         expect(result.contradictions).toHaveLength(4);
         expect(result.facts.every((fact) => fact.patient_id === PATIENT_ID)).toBe(true);
-        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(fetchMock).toHaveBeenCalledTimes(2); // 1 doc + 1 contradiction pass
     });
 
     // Guards: silent drift off the Messages API contract (endpoint, auth headers, model,
-    // and the sonnet-5 rule that non-default sampling params 400 — no temperature sent).
+    // streaming at the bounded per-call ceiling, no sampling params, single-doc scope).
     it('sends the Messages API contract the live service expects', async () => {
-        const { extractor, fetchMock } = extractorWith(llmResponse({ facts: [], contradictions: [] }));
+        const { extractor, fetchMock } = extractorWith(llmResponse({ facts: [] }));
         await extractor.extract(
-            {
-                patientId: PATIENT_ID,
-                patientName: 'Margaret L. Chen',
-                documents: [{ id: 'doc-x', document_type: 'referral_letter', document_date: '2024-12-15', text: 'UNIQUE-DOC-TEXT' }],
-            },
+            { patientId: PATIENT_ID, patientName: 'Margaret L. Chen', documents: ONE_DOC },
             'corr-contract',
             silentLogger,
         );
@@ -252,13 +279,12 @@ describe('FactExtractor', () => {
         expect(headers['anthropic-version']).toBe('2023-06-01');
         expect(headers['x-correlation-id']).toBe('corr-contract');
         const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
-        expect(body['model']).toBe('claude-sonnet-5');
+        expect(body['model']).toBe('claude-haiku-4-5');
         expect('temperature' in body).toBe(false);
-        // Streaming is REQUIRED at this output budget: >16K tokens without stream risks
-        // HTTP timeouts, and 16K was exactly the cap that truncated the first live prep.
         expect(body['stream']).toBe(true);
-        expect(body['max_tokens']).toBe(64000);
+        expect(body['max_tokens']).toBe(8192); // per-document ceiling, not a corpus mega-call
         expect(body['system']).toContain('VERBATIM');
+        expect(body['system']).toContain('rough estimate is fine'); // no character-counting demand
         const messages = body['messages'] as { role: string; content: string }[];
         expect(messages).toHaveLength(1);
         expect(messages[0]!.content).toContain('UNIQUE-DOC-TEXT');
@@ -270,16 +296,17 @@ describe('FactExtractor', () => {
         const invalid = corpusFacts();
         delete invalid[0].source_document_id; // provenance is required
         const { extractor, fetchMock } = extractorWith(
-            llmResponse({ facts: invalid, contradictions: [] }),
-            llmResponse({ facts: corpusFacts(), contradictions: [] }),
+            llmResponse({ facts: invalid }),
+            llmResponse({ facts: corpusFacts() }),
+            llmResponse({ contradictions: [] }),
         );
         const result = await extractor.extract(
-            { patientId: PATIENT_ID, patientName: null, documents: [] },
+            { patientId: PATIENT_ID, patientName: null, documents: ONE_DOC },
             'corr-retry',
             silentLogger,
         );
         expect(result.facts).toHaveLength(12);
-        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(fetchMock).toHaveBeenCalledTimes(3); // failed doc attempt + retry + contradictions
         const secondBody = JSON.parse(String(fetchMock.mock.calls[1]![1]?.body)) as Record<string, unknown>;
         const messages = secondBody['messages'] as { role: string; content: string }[];
         expect(messages).toHaveLength(3); // original user + failed assistant + error feedback
@@ -295,17 +322,47 @@ describe('FactExtractor', () => {
             llmResponse('still not JSON'),
         );
         await expect(
-            extractor.extract({ patientId: PATIENT_ID, patientName: null, documents: [] }, 'corr-fail', silentLogger),
+            extractor.extract({ patientId: PATIENT_ID, patientName: null, documents: ONE_DOC }, 'corr-fail', silentLogger),
         ).rejects.toThrow(ExtractionError);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    // Guards: truncation being "fixed" by feedback retry — it cannot be; the retry must be
+    // FRESH (truncated garbage never re-enters the conversation) and capped at one.
+    it('retries truncation once fresh, never with feedback', async () => {
+        const { extractor, fetchMock } = extractorWith(
+            llmResponse({ facts: [] }, 'max_tokens'),
+            llmResponse({ facts: [] }),
+        );
+        const result = await extractor.extract(
+            { patientId: PATIENT_ID, patientName: null, documents: ONE_DOC },
+            'corr-trunc',
+            silentLogger,
+        );
+        expect(result.facts).toHaveLength(0);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        const secondBody = JSON.parse(String(fetchMock.mock.calls[1]![1]?.body)) as Record<string, unknown>;
+        expect((secondBody['messages'] as unknown[])).toHaveLength(1); // fresh, no appended failure
+    });
+
+    // Guards: infinite truncation loops — two ceiling hits end the call with a clear error.
+    it('fails with the truncation reason after two ceiling hits', async () => {
+        const { extractor, fetchMock } = extractorWith(
+            llmResponse({ facts: [] }, 'max_tokens'),
+            llmResponse({ facts: [] }, 'max_tokens'),
+        );
+        await expect(
+            extractor.extract({ patientId: PATIENT_ID, patientName: null, documents: ONE_DOC }, 'corr-trunc2', silentLogger),
+        ).rejects.toThrow(/max_tokens/);
         expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 
     // Guards: common model formatting drift — fenced JSON must still parse.
     it('accepts a markdown-fenced JSON response', async () => {
-        const fenced = '```json\n' + JSON.stringify({ facts: [], contradictions: [] }) + '\n```';
+        const fenced = '```json\n' + JSON.stringify({ facts: [] }) + '\n```';
         const { extractor } = extractorWith(llmResponse(fenced));
         const result = await extractor.extract(
-            { patientId: PATIENT_ID, patientName: null, documents: [] },
+            { patientId: PATIENT_ID, patientName: null, documents: ONE_DOC },
             'corr-fence',
             silentLogger,
         );
@@ -316,12 +373,31 @@ describe('FactExtractor', () => {
     it('rejects extraction whose facts claim a different patient', async () => {
         const stray = corpusFacts().map((fact) => ({ ...fact, patient_id: 'someone-else' }));
         const { extractor } = extractorWith(
-            llmResponse({ facts: stray, contradictions: [] }),
-            llmResponse({ facts: stray, contradictions: [] }),
+            llmResponse({ facts: stray }),
+            llmResponse({ facts: stray }),
         );
         await expect(
-            extractor.extract({ patientId: PATIENT_ID, patientName: null, documents: [] }, 'corr-stray', silentLogger),
+            extractor.extract({ patientId: PATIENT_ID, patientName: null, documents: ONE_DOC }, 'corr-stray', silentLogger),
         ).rejects.toThrow(/patient_id/);
+    });
+
+    // Guards: the reduce pass silently skipped — with >= 2 facts the contradiction call
+    // must happen and receive compact fact summaries, not full documents.
+    it('feeds compact fact summaries to the contradiction pass', async () => {
+        const { extractor, fetchMock } = extractorWith(
+            llmResponse({ facts: corpusFacts() }),
+            llmResponse({ contradictions: [] }),
+        );
+        await extractor.extract(
+            { patientId: PATIENT_ID, patientName: null, documents: ONE_DOC },
+            'corr-reduce',
+            silentLogger,
+        );
+        const reduceBody = JSON.parse(String(fetchMock.mock.calls[1]![1]?.body)) as Record<string, unknown>;
+        expect(String(reduceBody['system'])).toContain('contradiction detector');
+        const content = (reduceBody['messages'] as { content: string }[])[0]!.content;
+        expect(content).toContain('type=medication');
+        expect(content).not.toContain('BEGIN TEXT'); // summaries, never full documents
     });
 });
 
@@ -337,14 +413,14 @@ describe('FactExtractor transient retry', () => {
     it('retries once after a transient API failure, then succeeds', async () => {
         const { extractor, fetchMock } = extractorWith(
             apiErrorResponse(529, 'overloaded_error'),
-            llmResponse({ facts: corpusFacts(), contradictions: [] }),
+            llmResponse({ facts: [] }),
         );
         const result = await extractor.extract(
-            { patientId: PATIENT_ID, patientName: null, documents: [] },
+            { patientId: PATIENT_ID, patientName: null, documents: ONE_DOC },
             'corr-transient',
             silentLogger,
         );
-        expect(result.facts).toHaveLength(12);
+        expect(result.facts).toHaveLength(0);
         expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 
@@ -355,7 +431,7 @@ describe('FactExtractor transient retry', () => {
             apiErrorResponse(503, 'api_error'),
         );
         await expect(
-            extractor.extract({ patientId: PATIENT_ID, patientName: null, documents: [] }, 'corr-2x', silentLogger),
+            extractor.extract({ patientId: PATIENT_ID, patientName: null, documents: ONE_DOC }, 'corr-2x', silentLogger),
         ).rejects.toThrow(/503/);
         expect(fetchMock).toHaveBeenCalledTimes(2);
     });
@@ -364,7 +440,7 @@ describe('FactExtractor transient retry', () => {
     it('does not retry a non-transient 400', async () => {
         const { extractor, fetchMock } = extractorWith(apiErrorResponse(400, 'invalid_request_error'));
         await expect(
-            extractor.extract({ patientId: PATIENT_ID, patientName: null, documents: [] }, 'corr-400', silentLogger),
+            extractor.extract({ patientId: PATIENT_ID, patientName: null, documents: ONE_DOC }, 'corr-400', silentLogger),
         ).rejects.toThrow(/400/);
         expect(fetchMock).toHaveBeenCalledTimes(1);
     });
@@ -379,7 +455,7 @@ describe('AnthropicClient streaming', () => {
         const fetchMock = vi.fn<FetchLike>().mockResolvedValueOnce(
             new Response(
                 sseEvents([
-                    { type: 'message_start', message: { model: 'claude-sonnet-5', usage: { input_tokens: 42, output_tokens: 1 } } },
+                    { type: 'message_start', message: { model: 'claude-haiku-4-5', usage: { input_tokens: 42, output_tokens: 1 } } },
                     { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'INTERNAL' } },
                     { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'hello ' } },
                     { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'world' } },
@@ -389,7 +465,7 @@ describe('AnthropicClient streaming', () => {
                 { status: 200 },
             ),
         );
-        const client = new AnthropicClient({ apiKey: 'test-key', model: 'claude-sonnet-5', fetchImpl: fetchMock });
+        const client = new AnthropicClient({ apiKey: 'test-key', model: 'claude-haiku-4-5', fetchImpl: fetchMock });
         const completion = await client.complete('sys', [{ role: 'user', content: 'hi' }], 'corr-sse');
         expect(completion.text).toBe('hello world');
         expect(completion.text).not.toContain('INTERNAL');
@@ -413,7 +489,7 @@ describe('AnthropicClient streaming', () => {
         const fetchMock = vi.fn<FetchLike>().mockResolvedValueOnce(new Response(body, { status: 200 }));
         const client = new AnthropicClient({
             apiKey: 'test-key',
-            model: 'claude-sonnet-5',
+            model: 'claude-haiku-4-5',
             fetchImpl: fetchMock,
             idleTimeoutMs: 25,
         });
@@ -434,7 +510,7 @@ describe('AnthropicClient streaming', () => {
                 { status: 200 },
             ),
         );
-        const client = new AnthropicClient({ apiKey: 'test-key', model: 'claude-sonnet-5', fetchImpl: fetchMock });
+        const client = new AnthropicClient({ apiKey: 'test-key', model: 'claude-haiku-4-5', fetchImpl: fetchMock });
         await expect(client.complete('sys', [{ role: 'user', content: 'hi' }], 'corr-err')).rejects.toThrow(
             /overloaded_error/,
         );
@@ -470,7 +546,7 @@ describe('AnthropicClient streaming', () => {
         const fetchMock = vi.fn<FetchLike>().mockResolvedValueOnce(new Response(body, { status: 200 }));
         const client = new AnthropicClient({
             apiKey: 'test-key',
-            model: 'claude-sonnet-5',
+            model: 'claude-haiku-4-5',
             fetchImpl: fetchMock,
             heartbeatMs: 10,
         });
@@ -597,8 +673,9 @@ describe('prep pipeline tracing', () => {
             'brief_assembly',
             'save_brief',
         ]);
-        expect(tracer.generations).toHaveLength(1);
-        expect(tracer.generations[0]).toMatchObject({ attempt: 1, model: 'claude-sonnet-5', inputTokens: 1200, outputTokens: 800 });
+        // 12 per-document calls + 1 contradiction pass, each traced as a generation.
+        expect(tracer.generations).toHaveLength(13);
+        expect(tracer.generations[0]).toMatchObject({ attempt: 1, model: 'claude-haiku-4-5', inputTokens: 1200, outputTokens: 800 });
         expect(tracer.outcome?.status).toBe('complete');
         expect(tracer.outcome?.gateMetrics).toBeDefined();
     });
@@ -716,7 +793,7 @@ describe('prep pipeline end-to-end', () => {
 
 function routeDeps(payload: unknown = { facts: corpusFacts(), contradictions: corpusContradictions() }) {
     const store = new FakeStore(corpusBundle());
-    const { extractor } = extractorWith(llmResponse(payload));
+    const { extractor } = dispatchingExtractor(payload);
     const deps: PrepRouteDeps = {
         store,
         source: new StoreDocumentSource(store, corpusDb),
@@ -893,9 +970,10 @@ class FakeSpendGuard implements PrepRouteSpendGuard {
 function guardedDeps(options: { spendGuard?: FakeSpendGuard; maxConcurrentPreps?: number } = {}) {
     const store = new FakeStore(corpusBundle());
     const spendGuard = options.spendGuard ?? new FakeSpendGuard();
-    const { extractor, fetchMock } = extractorWith(
-        llmResponse({ facts: corpusFacts(), contradictions: corpusContradictions() }),
-    );
+    const { extractor, fetchMock } = dispatchingExtractor({
+        facts: corpusFacts(),
+        contradictions: corpusContradictions(),
+    });
     const deps: PrepRouteDeps = {
         store,
         source: new StoreDocumentSource(store, corpusDb),
@@ -927,9 +1005,22 @@ function hangingExtractor() {
     const gate = new Promise<Response>((resolve) => {
         release = resolve;
     });
-    const fetchMock = vi.fn<FetchLike>();
-    fetchMock.mockReturnValueOnce(gate);
-    const client = new AnthropicClient({ apiKey: 'test-key', model: 'claude-sonnet-5', fetchImpl: fetchMock });
+    // First call (document 1) hangs on the gate; every later call answers empty so the
+    // run completes once released.
+    let first = true;
+    const fetchMock = vi.fn<FetchLike>((_url, init) => {
+        if (first) {
+            first = false;
+            return gate;
+        }
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        return Promise.resolve(
+            String(body['system']).includes('contradiction detector')
+                ? llmResponse({ contradictions: [] })
+                : llmResponse({ facts: [] }),
+        );
+    });
+    const client = new AnthropicClient({ apiKey: 'test-key', model: 'claude-haiku-4-5', fetchImpl: fetchMock });
     return { extractor: new FactExtractor(client), release };
 }
 
@@ -940,10 +1031,23 @@ describe('spend guardrails: prep pipeline', () => {
         const store = new FakeStore(corpusBundle());
         const spendGuard = new FakeSpendGuard();
         const invalid = corpusFacts();
-        delete invalid[0].source_document_id; // first attempt fails validation -> retry
-        const { extractor, fetchMock } = extractorWith(
-            llmResponse({ facts: invalid, contradictions: [] }),
-            llmResponse({ facts: corpusFacts(), contradictions: [] }),
+        delete invalid[0].source_document_id; // doc 1's first attempt fails validation -> retry
+        // Dispatcher with one planted validation failure: doc call 1 invalid, doc call 2
+        // valid (all facts), later docs empty, contradiction pass empty.
+        let docCalls = 0;
+        const fetchMock = vi.fn<FetchLike>((_url, init) => {
+            const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+            if (String(body['system']).includes('contradiction detector')) {
+                return Promise.resolve(llmResponse({ contradictions: [] }));
+            }
+            docCalls += 1;
+            if (docCalls === 1) {
+                return Promise.resolve(llmResponse({ facts: invalid }));
+            }
+            return Promise.resolve(llmResponse({ facts: docCalls === 2 ? corpusFacts() : [] }));
+        });
+        const extractor = new FactExtractor(
+            new AnthropicClient({ apiKey: 'test-key', model: 'claude-haiku-4-5', fetchImpl: fetchMock }),
         );
         const deps: PrepDeps = {
             store,
@@ -954,13 +1058,14 @@ describe('spend guardrails: prep pipeline', () => {
             clock: () => NOW,
         };
         await runPrep(deps, PATIENT_ID, 'corr-usage');
-        expect(fetchMock).toHaveBeenCalledTimes(2);
-        expect(spendGuard.recorded).toHaveLength(2);
+        // 12 documents + 1 validation retry + 1 contradiction pass — every call ledgered.
+        expect(fetchMock).toHaveBeenCalledTimes(14);
+        expect(spendGuard.recorded).toHaveLength(14);
         for (const call of spendGuard.recorded) {
             expect(call).toEqual({
                 correlationId: 'corr-usage',
                 purpose: 'prep_extraction',
-                model: 'claude-sonnet-5',
+                model: 'claude-haiku-4-5',
                 inputTokens: 1200,
                 outputTokens: 800,
             });

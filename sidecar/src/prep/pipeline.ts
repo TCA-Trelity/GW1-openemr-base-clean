@@ -106,6 +106,7 @@ export async function executePrep(deps: PrepDeps, ctx: PrepRunContext): Promise<
                 // Ledger + trace every Anthropic call (all attempts) under this run's ID.
                 async (usage) => {
                     trace?.generation({
+                        label: usage.label,
                         attempt: usage.attempt,
                         model: usage.model,
                         inputTokens: usage.inputTokens,
@@ -121,6 +122,10 @@ export async function executePrep(deps: PrepDeps, ctx: PrepRunContext): Promise<
                         purpose: 'prep_extraction',
                     });
                 },
+                // Per-document progress lands on the prep_run row: /api/prep-runs shows
+                // llm_extraction:7/12 instead of one opaque multi-minute stage.
+                (progress) =>
+                    deps.store.setPrepRunStage?.(prepRunId, `llm_extraction:${progress.done}/${progress.total}`),
             ),
         );
 

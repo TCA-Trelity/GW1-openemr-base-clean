@@ -1,6 +1,12 @@
-// LLM fact extraction (S1.7): Sonnet-class deep read of the source documents into
-// schema-validated PatientFacts + RuntimeContradictions, with ONE retry that feeds the
-// validation errors back to the model. Second failure throws — the prep run records it.
+// LLM fact extraction (S1.7, reworked after the live 64K-thinking spiral): map-reduce.
+// One bounded call PER DOCUMENT (output is structurally limited by one document's
+// content), then one contradiction pass over compact fact summaries — never the full
+// corpus in a single mega-call. Offsets are best-effort by contract: the citation gate
+// verifies excerpt_text verbatim and corrects ranges, so the model never needs to count
+// characters (the counting demand is what sent the reasoning budget into a death spiral).
+// Each call gets ONE validation retry (errors fed back) and ONE fresh retry for
+// transient failures or truncation; truncation never retries with feedback because the
+// failure is structural, not correctable.
 import { z } from 'zod';
 import {
     FACT_TYPES,
@@ -42,46 +48,65 @@ export type OnUsage = (usage: {
     inputTokens: number;
     outputTokens: number;
     attempt: number;
+    label: string;
     startedAt: Date;
     endedAt: Date;
 }) => Promise<void> | void;
 
+/** Per-document progress hook — the pipeline stamps it onto the prep_run row. */
+export type OnDocProgress = (progress: { done: number; total: number; docId: string }) => Promise<void> | void;
+
 export class ExtractionError extends Error {
     constructor(
+        public readonly label: string,
         public readonly attempts: number,
         public readonly issues: string[],
     ) {
-        super(`extraction failed after ${attempts} attempt(s): ${issues.join('; ')}`);
+        super(`extraction failed after ${attempts} attempt(s) [${label}]: ${issues.join('; ')}`);
         this.name = 'ExtractionError';
     }
 }
 
-const ExtractionResponseSchema = z.object({
+const DocResponseSchema = z.object({
     facts: z.array(PatientFactSchema),
+});
+
+const ContradictionResponseSchema = z.object({
     contradictions: z.array(RuntimeContradictionSchema).default([]),
 });
 
-// The deep-reader system prompt. The hard rules are the verification contract
-// (ARCHITECTURE.md §4): assertion only with support, verbatim cited excerpts with
-// character offsets, contradictions surfaced never resolved.
-export const EXTRACTION_SYSTEM_PROMPT = `You are the preparation deep-reader for a clinical co-pilot. Before a physician \
-walks into the room, you read the patient's full source record and extract typed clinical facts the physician can trust.
+// Shared contract fragments (verification rules per ARCHITECTURE.md §4).
+const CITATION_CONTRACT = `Each citation object:
+{"id": "<unique id>", "fact_id": "<owning fact id>", "source_label": "<human label>",
+ "source_type": "intake_transcript"|"provider_note"|"pharmacy_record"|"imaging_report"|"lab_report"|"prior_visit_note"|"referral_letter"|"patient_self_report"|"clinical_observation"|"external_ehr_import"|"scribe_transcript",
+ "excerpt_text": "<VERBATIM excerpt — character-for-character exact, including punctuation and casing>",
+ "excerpt_location": {"type": "character_range", "start_char": <int>, "end_char": <int>, "context_before": null, "context_after": null},
+ "attribution": {"speaker_role": "patient"|"family_member"|"physician"|"nurse"|"technician"|"pharmacist"|"external_provider"|"system", "speaker_name"?, "confidence"?},
+ "source_document_id": "<document id>", "document_date": "<document date>"}
+
+start_char/end_char: a rough estimate is fine — verification matches excerpt_text verbatim \
+against the document and corrects the range. Do NOT spend effort counting characters; the \
+excerpt text itself must be exact, the offsets need not be. Always set context_before and \
+context_after to null.`;
+
+// The per-document deep-reader prompt: facts ONLY, from ONE document.
+export const EXTRACTION_SYSTEM_PROMPT = `You are the preparation deep-reader for a clinical co-pilot. You are given ONE source \
+document from a patient's record. Extract the typed clinical facts this document supports.
 
 Hard rules — these are non-negotiable:
-1. Only assert what the documents support. Never infer from outside medical knowledge, never guess, never fill gaps. \
+1. Only assert what THIS document supports. Never infer from outside medical knowledge, never guess, never fill gaps. \
 Missing information is absence, not an estimate.
-2. Every fact must carry at least one citation whose excerpt_text quotes the source document VERBATIM \
-(character-for-character, including punctuation and casing), with excerpt_location.start_char/end_char giving the exact \
-character offsets of that excerpt within the document text exactly as provided to you.
-3. Contradictions between documents are surfaced, never resolved. When two sources disagree, report both claims as a \
-contradiction with a suggested question for the patient — do not pick a winner and do not average.
+2. Every fact must carry at least one citation whose excerpt_text quotes this document VERBATIM \
+(character-for-character, including punctuation and casing).
+3. Be economical: extract the clinically meaningful facts, do not restate the same fact multiple ways, and reply with \
+MINIFIED single-line JSON (no pretty-printing, no prose, no markdown fences).
 
-Output contract — reply with a single JSON object and nothing else (no prose, no markdown fences):
-{"facts": [...], "contradictions": [...]}
+Output contract — a single JSON object and nothing else:
+{"facts": [...]}
 
 Each fact object:
 {"id": "<unique id>", "patient_id": "<the patient id given>", "fact_type": <one of ${JSON.stringify([...FACT_TYPES])}>,
- "content": <shape depends on fact_type>, "is_current": true|false, "source_document_id": "<id of the primary document>",
+ "content": <shape depends on fact_type>, "is_current": true|false, "source_document_id": "<this document's id>",
  "sources": [<citation>...], "verification": {"status": "unverified"}, "laterality": "OD"|"OS"|"OU"|null}
 
 Content shapes by fact_type:
@@ -97,12 +122,21 @@ Content shapes by fact_type:
 - patient_goal: {"goal", "specific_concerns"?: [], "verbatim_quotes"?: [], "emotional_state"?}
 - chief_complaint: {"statement", "onset"?, "onset_context"?, "laterality"?, "progression"?, "pertinent_negatives"?: []}
 
-Each citation object:
-{"id": "<unique id>", "fact_id": "<owning fact id>", "source_label": "<human label>",
- "source_type": "intake_transcript"|"provider_note"|"pharmacy_record"|"imaging_report"|"lab_report"|"prior_visit_note"|"referral_letter"|"patient_self_report"|"clinical_observation"|"external_ehr_import"|"scribe_transcript",
- "excerpt_text": "<VERBATIM excerpt>", "excerpt_location": {"type": "character_range", "start_char": <int>, "end_char": <int>, "context_before": "<up to 60 chars before>", "context_after": "<up to 60 chars after>"},
- "attribution": {"speaker_role": "patient"|"family_member"|"physician"|"nurse"|"technician"|"pharmacist"|"external_provider"|"system", "speaker_name"?, "confidence"?},
- "source_document_id": "<document id>", "document_date": "<document date>"}
+${CITATION_CONTRACT}`;
+
+// The contradiction detector: runs ONCE over compact summaries of every extracted fact.
+export const CONTRADICTION_SYSTEM_PROMPT = `You are the contradiction detector for a clinical co-pilot. You are given compact \
+summaries of typed facts extracted from a patient's source documents (fact type, content, source document, date, and the \
+cited verbatim excerpt). Find the places where sources DISAGREE.
+
+Hard rules:
+1. Contradictions are surfaced, never resolved. Report both claims — do not pick a winner and do not average.
+2. Only report disagreements the given facts actually support (dosage discrepancies, conflicting dates, conflicting \
+laterality, patient-report vs record, temporal impossibilities). No outside knowledge.
+3. Reply with MINIFIED single-line JSON (no prose, no markdown fences).
+
+Output contract — a single JSON object and nothing else:
+{"contradictions": [...]}
 
 Each contradiction object:
 {"id": "<unique id>", "patient_id": "<the patient id given>", "status": "active",
@@ -111,13 +145,17 @@ Each contradiction object:
  "source_a": {"type": "<source kind>", "value": "<claim>", "document_id": "<doc id>", "excerpt": "<verbatim text>"}|null,
  "source_b": {...same shape...}|null}`;
 
-function buildUserContent(input: ExtractionInput): string {
-    const header = `Patient id: ${input.patientId}\nPatient name: ${input.patientName ?? 'unknown'}\n\nSource documents follow. Character offsets in your citations must index into each document's text exactly as it appears between the BEGIN/END markers.`;
-    const docs = input.documents.map(
-        (doc) =>
-            `--- document id: ${doc.id} | type: ${doc.document_type} | date: ${doc.document_date} ---\nBEGIN TEXT\n${doc.text}\nEND TEXT`,
-    );
-    return [header, ...docs].join('\n\n');
+function buildDocContent(input: ExtractionInput, doc: ExtractionDocument): string {
+    return `Patient id: ${input.patientId}\nPatient name: ${input.patientName ?? 'unknown'}\n\n--- document id: ${doc.id} | type: ${doc.document_type} | date: ${doc.document_date} ---\nBEGIN TEXT\n${doc.text}\nEND TEXT`;
+}
+
+// Compact one-line-per-fact summary — the contradiction pass never re-reads full documents.
+function buildContradictionContent(input: ExtractionInput, facts: PatientFact[]): string {
+    const lines = facts.map((fact) => {
+        const excerpt = fact.sources[0]?.excerpt_text ?? '';
+        return `- id=${fact.id} type=${fact.fact_type} doc=${fact.source_document_id} content=${JSON.stringify(fact.content)} excerpt=${JSON.stringify(excerpt)}`;
+    });
+    return `Patient id: ${input.patientId}\nPatient name: ${input.patientName ?? 'unknown'}\n\nExtracted facts follow, one per line.\n\n${lines.join('\n')}`;
 }
 
 // Models occasionally fence JSON despite instructions; recover the object body.
@@ -127,36 +165,30 @@ function stripFences(text: string): string {
     return fenced?.[1] ?? trimmed;
 }
 
-type Validation = { ok: true; result: ExtractionResult } | { ok: false; issues: string[] };
+type Validation<T> = { ok: true; result: T } | { ok: false; issues: string[] };
 
-function validateResponse(text: string, patientId: string, stopReason: string | null): Validation {
-    if (stopReason !== null && stopReason !== 'end_turn') {
-        return { ok: false, issues: [`response ended with stop_reason '${stopReason}' instead of end_turn`] };
-    }
+function parseAndCheck<T>(text: string, schema: z.ZodType<T, z.ZodTypeDef, unknown>): Validation<T> {
     let parsed: unknown;
     try {
         parsed = JSON.parse(stripFences(text));
     } catch (error) {
         return { ok: false, issues: [`response is not valid JSON: ${error instanceof Error ? error.message : 'parse error'}`] };
     }
-    const checked = ExtractionResponseSchema.safeParse(parsed);
+    const checked = schema.safeParse(parsed);
     if (!checked.success) {
         return {
             ok: false,
             issues: checked.error.issues.map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`),
         };
     }
-    // Cross-patient guard: an extracted item may never claim a different patient.
-    const strays = [
-        ...checked.data.facts.filter((fact) => fact.patient_id !== patientId).map((fact) => `facts id=${fact.id}`),
-        ...checked.data.contradictions
-            .filter((item) => item.patient_id !== patientId)
-            .map((item) => `contradictions id=${item.id}`),
-    ];
-    if (strays.length > 0) {
-        return { ok: false, issues: strays.map((s) => `${s}: patient_id must be '${patientId}'`) };
-    }
     return { ok: true, result: checked.data };
+}
+
+// Cross-patient guard: an extracted item may never claim a different patient.
+function strayPatients(items: { id: string; patient_id: string }[], patientId: string, kind: string): string[] {
+    return items
+        .filter((item) => item.patient_id !== patientId)
+        .map((item) => `${kind} id=${item.id}: patient_id must be '${patientId}'`);
 }
 
 export class FactExtractor {
@@ -167,38 +199,97 @@ export class FactExtractor {
         correlationId: string,
         logger: PrepLogger,
         onUsage?: OnUsage,
+        onDocProgress?: OnDocProgress,
     ): Promise<ExtractionResult> {
-        const messages: AnthropicMessage[] = [{ role: 'user', content: buildUserContent(input) }];
+        const facts: PatientFact[] = [];
+        const total = input.documents.length;
+        let done = 0;
+        for (const doc of input.documents) {
+            const response = await this.jsonCall(
+                EXTRACTION_SYSTEM_PROMPT,
+                buildDocContent(input, doc),
+                doc.id,
+                (text) => {
+                    const parsed = parseAndCheck(text, DocResponseSchema);
+                    if (!parsed.ok) {
+                        return parsed;
+                    }
+                    const strays = strayPatients(parsed.result.facts, input.patientId, 'facts');
+                    return strays.length > 0 ? { ok: false, issues: strays } : parsed;
+                },
+                correlationId,
+                logger,
+                onUsage,
+            );
+            facts.push(...response.facts);
+            done += 1;
+            await onDocProgress?.({ done, total, docId: doc.id });
+        }
+
+        // Contradictions need at least two claims to disagree.
+        if (facts.length < 2) {
+            return { facts, contradictions: [] };
+        }
+        const contradictionResponse = await this.jsonCall(
+            CONTRADICTION_SYSTEM_PROMPT,
+            buildContradictionContent(input, facts),
+            'contradictions',
+            (text) => {
+                const parsed = parseAndCheck(text, ContradictionResponseSchema);
+                if (!parsed.ok) {
+                    return parsed;
+                }
+                const strays = strayPatients(parsed.result.contradictions, input.patientId, 'contradictions');
+                return strays.length > 0 ? { ok: false, issues: strays } : parsed;
+            },
+            correlationId,
+            logger,
+            onUsage,
+        );
+        return { facts, contradictions: contradictionResponse.contradictions };
+    }
+
+    // One schema-validated JSON call: 1 feedback retry for validation failures, 1 fresh
+    // retry for transient failures OR truncation (feedback cannot fix a structural cap hit).
+    private async jsonCall<T>(
+        system: string,
+        userContent: string,
+        label: string,
+        validate: (text: string) => Validation<T>,
+        correlationId: string,
+        logger: PrepLogger,
+        onUsage?: OnUsage,
+    ): Promise<T> {
+        const messages: AnthropicMessage[] = [{ role: 'user', content: userContent }];
         let lastIssues: string[] = [];
-        let transientRetries = 0;
+        let freshRetries = 0;
         let attempt = 1;
 
         while (attempt <= 2) {
             const startedAt = new Date();
             let completion;
             try {
-                // Streaming heartbeat: a long extraction logs progress every ~15s, so a silent
+                // Streaming heartbeat: a long call logs progress every ~15s, so a silent
                 // Railway log means hung (and the client's idle timeout will kill it), not slow.
-                completion = await this.client.complete(EXTRACTION_SYSTEM_PROMPT, messages, correlationId, (progress) =>
+                completion = await this.client.complete(system, messages, correlationId, (progress) =>
                     logger.info(
-                        { correlationId, attempt, text_chars: progress.textChars, elapsed_ms: progress.elapsedMs },
+                        { correlationId, label, attempt, text_chars: progress.textChars, elapsed_ms: progress.elapsedMs },
                         'extraction stream in progress',
                     ),
                 );
             } catch (error) {
-                // ONE fresh retry across the whole extraction for transient failures
-                // (timeout/overloaded/5xx) — a blip must not kill the prep run outright.
-                if (isTransientAnthropicError(error) && transientRetries < 1) {
-                    transientRetries += 1;
-                    logger.warn({ correlationId, attempt, err: String(error) }, 'transient llm failure, retrying');
+                if (isTransientAnthropicError(error) && freshRetries < 1) {
+                    freshRetries += 1;
+                    logger.warn({ correlationId, label, attempt, err: String(error) }, 'transient llm failure, retrying');
                     continue;
                 }
                 throw error;
             }
-            // Token usage feeds the cost-tracking requirement — always logged with the correlation ID.
+            // Token usage feeds the cost ledger + trace — always logged with the correlation ID.
             logger.info(
                 {
                     correlationId,
+                    label,
                     attempt,
                     model: completion.model,
                     input_tokens: completion.usage.input_tokens,
@@ -206,36 +297,48 @@ export class FactExtractor {
                 },
                 'extraction llm call complete',
             );
-            // Spend guardrails + tracing: every attempt cost tokens, so report it before validation.
             await onUsage?.({
                 model: completion.model,
                 inputTokens: completion.usage.input_tokens,
                 outputTokens: completion.usage.output_tokens,
                 attempt,
+                label,
                 startedAt,
                 endedAt: new Date(),
             });
-            const validation = validateResponse(completion.text, input.patientId, completion.stop_reason);
+            // Truncation is structural — feeding a cut-off response back cannot fix it.
+            // One FRESH retry, then give up on this call.
+            if (completion.stop_reason === 'max_tokens') {
+                lastIssues = ["response ended with stop_reason 'max_tokens' instead of end_turn"];
+                logger.warn({ correlationId, label, attempt }, 'extraction response truncated at output ceiling');
+                if (freshRetries < 1) {
+                    freshRetries += 1;
+                    continue;
+                }
+                break;
+            }
+            if (completion.stop_reason !== null && completion.stop_reason !== 'end_turn') {
+                lastIssues = [`response ended with stop_reason '${completion.stop_reason}' instead of end_turn`];
+                break;
+            }
+            const validation = validate(completion.text);
             if (validation.ok) {
                 return validation.result;
             }
             lastIssues = validation.issues;
-            logger.warn(
-                { correlationId, attempt, issues: validation.issues },
-                'extraction response failed validation',
-            );
+            logger.warn({ correlationId, label, attempt, issues: validation.issues }, 'extraction response failed validation');
             // Retry ONCE with the validation errors appended to the conversation.
             messages.push(
                 { role: 'assistant', content: completion.text },
                 {
                     role: 'user',
-                    content: `Your JSON response failed validation with these errors:\n${validation.issues
+                    content: `Your JSON response failed validation with these errors:\n${lastIssues
                         .map((issue) => `- ${issue}`)
                         .join('\n')}\nReply again with a single corrected JSON object only.`,
                 },
             );
             attempt += 1;
         }
-        throw new ExtractionError(2, lastIssues);
+        throw new ExtractionError(label, 2, lastIssues);
     }
 }

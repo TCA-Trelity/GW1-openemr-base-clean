@@ -36,8 +36,9 @@ describe('LangfuseTracer', () => {
         const startedAt = new Date('2026-07-08T12:00:00Z');
         handle.stage({ name: 'llm_extraction', startedAt, durationMs: 1500 });
         handle.generation({
+            label: 'doc-mc-001',
             attempt: 1,
-            model: 'claude-sonnet-5',
+            model: 'claude-haiku-4-5',
             inputTokens: 14000,
             outputTokens: 22000,
             startedAt,
@@ -56,7 +57,8 @@ describe('LangfuseTracer', () => {
         expect(span['name']).toBe('llm_extraction');
         expect(span['endTime']).toEqual(new Date(startedAt.getTime() + 1500));
         const generation = calls.find((c) => c.method === 'generation')!.body as Record<string, unknown>;
-        expect(generation['model']).toBe('claude-sonnet-5');
+        expect(generation['name']).toBe('doc-mc-001:attempt_1');
+        expect(generation['model']).toBe('claude-haiku-4-5');
         expect(generation['usage']).toEqual({ input: 14000, output: 22000 });
         const scores = calls.filter((c) => c.method === 'score').map((c) => c.body);
         expect(scores).toContainEqual({ name: 'run_success', value: 1 });
@@ -90,7 +92,7 @@ describe('LangfuseTracer', () => {
         const warn = vi.fn();
         const handle = new LangfuseTracer(explosive, { ...silentLogger, warn }).startTrace(CTX);
         handle.stage({ name: 's', startedAt: new Date(), durationMs: 1 });
-        handle.generation({ attempt: 1, model: 'm', inputTokens: 1, outputTokens: 1, startedAt: new Date(), endedAt: new Date() });
+        handle.generation({ label: 'doc-x', attempt: 1, model: 'm', inputTokens: 1, outputTokens: 1, startedAt: new Date(), endedAt: new Date() });
         await expect(handle.end({ status: 'complete' })).resolves.toBeUndefined();
         expect(warn).toHaveBeenCalled(); // failures are logged, not raised
     });

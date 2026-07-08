@@ -48,6 +48,8 @@ export interface StageRecord {
 }
 
 export interface GenerationRecord {
+    /** Which call this was: a document id or 'contradictions'. */
+    label: string;
     attempt: number;
     model: string;
     inputTokens: number;
@@ -113,12 +115,12 @@ export class LangfuseTracer implements PrepTracer {
             generation: (record) =>
                 guarded('generation', () =>
                     trace?.generation({
-                        name: `extraction_attempt_${record.attempt}`,
+                        name: `${record.label}:attempt_${record.attempt}`,
                         model: record.model,
                         startTime: record.startedAt,
                         endTime: record.endedAt,
                         usage: { input: record.inputTokens, output: record.outputTokens },
-                        metadata: { attempt: record.attempt },
+                        metadata: { label: record.label, attempt: record.attempt },
                     }),
                 ),
             end: async (outcome) => {

@@ -72,9 +72,9 @@ export interface AnthropicClientOptions {
 }
 
 const DEFAULT_BASE_URL = 'https://api.anthropic.com';
-// Streaming output budget: sonnet-5 allows up to 128K; extraction re-quotes source text
-// per citation so its output scales with input. Unused budget costs nothing.
-const DEFAULT_MAX_TOKENS = 64000;
+// Per-call output budget: extraction is per-document, so 8K is generous headroom for
+// one document's facts. Config LLM_MAX_OUTPUT_TOKENS overrides.
+const DEFAULT_MAX_TOKENS = 8192;
 const DEFAULT_IDLE_TIMEOUT_MS = 90_000;
 const DEFAULT_TOTAL_TIMEOUT_MS = 900_000;
 const DEFAULT_HEARTBEAT_MS = 15_000;

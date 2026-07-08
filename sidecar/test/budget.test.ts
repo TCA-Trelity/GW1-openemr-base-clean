@@ -18,9 +18,9 @@ function fakeQuerier(rows: Record<string, unknown>[]) {
 }
 
 describe('priceCall', () => {
-    // Guards: the cost formula drifting off the pinned Sonnet tier arithmetic —
+    // Guards: the cost formula arithmetic (fixed at the Sonnet-tier rates this test pins) —
     // 30K in at $3/MTok ($0.09) + 8K out at $15/MTok ($0.12) = $0.21.
-    it('prices 30000 input + 8000 output tokens at $0.21 on the default rates', () => {
+    it('prices 30000 input + 8000 output tokens at $0.21 on the pinned test rates', () => {
         expect(
             priceCall({ model: 'claude-sonnet-5', inputTokens: 30_000, outputTokens: 8_000 }, RATES),
         ).toBeCloseTo(0.21, 10);
