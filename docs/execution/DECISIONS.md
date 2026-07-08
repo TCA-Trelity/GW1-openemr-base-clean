@@ -35,3 +35,4 @@ architecture docs:
 - DECISION: Keep BullMQ/Redis and the two-tier model split (Sonnet 5 prep / Haiku 4.5 chat) exactly as submitted — doc/build consistency is an interview asset.
 - DECISION: Live verification runs in GitHub Actions (public runners reach the Railway URL; the dev session cannot) — CI smoke is the arbiter of "works in the live environment."
 - DECISION: OAuth registration + corpus seeding execute as scripts on the Railway sidecar service, not from the dev session (same egress constraint).
+- DECISION: Corpus keeps HCQ at 200mg daily since 2019-01-15 (per every cited document excerpt) over the ticket's 400mg/2021-12-01 — the corpus-as-eval-truth invariant outranks ticket text; risk flag still fires via the ≥5-year AAO branch (~5.9 years). The 2021-12-01 anchor survives as the medication_start event for the imaging series.

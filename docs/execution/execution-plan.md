@@ -35,7 +35,7 @@ deploy logs).
 | P0.1 | Attach Railway volume at `/var/www/localhost/htdocs/openemr/sites` on the OpenEMR service (stops DB reset per push) | user | — | logs: next boot shows setup skipped | ☐ |
 | P0.2 | Set Watch Paths on OpenEMR service to ignore `sidecar/**` and `docs/**` | user | — | push a docs commit → no rebuild | ☐ |
 | P0.3 | Verify demo data + admin login stable across a push; change admin password from demo default | user | P0.1 | screenshot | ☐ |
-| P0.4 | Commit this plan + update `docs/HANDOFF.md` with locked decisions (imaging metadata authored-at-seed; Kermany-style public OCT imagery; all-four imaging features Thu; embedded panel Thu; F9→`medicationRiskFlags` canonical; scan storage = sidecar volume behind `ImageStore` interface) | main | — | in repo | ☐ |
+| P0.4 | Commit this plan + update `docs/HANDOFF.md` with locked decisions (imaging metadata authored-at-seed; Kermany-style public OCT imagery; all-four imaging features Thu; embedded panel Thu; F9→`medicationRiskFlags` canonical; scan storage = sidecar volume behind `ImageStore` interface) | main | — | in repo | ☑ |
 
 ## Phase 1 — Walking skeleton (Wednesday; goal: one real prep runs end-to-end on Railway by EOD)
 
@@ -43,10 +43,10 @@ deploy logs).
 
 | ID | Ticket | Agent | Depends | Verify | Done |
 |---|---|---|---|---|---|
-| S1.1 | `sidecar/` scaffold: Fastify + TS strict + pino logging with correlation-ID middleware (ID on every log line, propagated to tool + LLM calls), config loader, error envelope, Dockerfile, `railway.json`, `/health` + `/ready` (ready = real checks: OpenEMR reachable, Anthropic key valid, Langfuse reachable, Postgres/Redis up) | main | P0.4 | unit + logs | ☐ |
-| S1.2 | Port Zod schemas verbatim from port manifest §2: `PatientFact` (11 fact types, content shapes), `CitationRef` (character-range excerpt), rich `Contradiction`, `SourceDocument`, `ProviderProfile` thresholds, image/treatment shapes. Contracts = source of truth; exported for panel reuse | sub/wt | — | unit (schema fixtures) | ☐ |
-| S1.3 | Port pure engines + unit tests w/ golden numbers: `medicationRiskFlags` (canonical per F9; AAO thresholds), `computeTreatmentContext`, `computeComparison`, `analyzeIntervalPatterns`, `analyzeHCQProgression`; inject clock (manifest §3); document the failure mode each test guards | sub/wt | S1.2 | unit | ☐ |
-| S1.4 | Author seed corpus: Margaret Chen (12 source docs, 4 contradictions w/ ground truth, HCQ series w/ authored GC-thinning trend) + William Thompson (7 OCT + 4 injections, 49→71d over-extension) as OpenEMR-ready payloads; source public OCT B-scans (CNV-class for fluid visits, normal post-tx; normal for HCQ) + `docs/data-sources.md` attribution (CC BY) | sub/wt | S1.2 | unit (corpus validates against schemas) | ☐ |
+| S1.1 | `sidecar/` scaffold: Fastify + TS strict + pino logging with correlation-ID middleware (ID on every log line, propagated to tool + LLM calls), config loader, error envelope, Dockerfile, `railway.json`, `/health` + `/ready` (ready = real checks: OpenEMR reachable, Anthropic key valid, Langfuse reachable, Postgres/Redis up) | main | P0.4 | unit + logs | ☑ |
+| S1.2 | Port Zod schemas verbatim from port manifest §2: `PatientFact` (11 fact types, content shapes), `CitationRef` (character-range excerpt), rich `Contradiction`, `SourceDocument`, `ProviderProfile` thresholds, image/treatment shapes. Contracts = source of truth; exported for panel reuse | sub/wt | — | unit (schema fixtures) | ☑ |
+| S1.3 | Port pure engines + unit tests w/ golden numbers: `medicationRiskFlags` (canonical per F9; AAO thresholds), `computeTreatmentContext`, `computeComparison`, `analyzeIntervalPatterns`, `analyzeHCQProgression`; inject clock (manifest §3); document the failure mode each test guards | sub/wt | S1.2 | unit | ☑ |
+| S1.4 | Author seed corpus: Margaret Chen (12 source docs, 4 contradictions w/ ground truth, HCQ series w/ authored GC-thinning trend) + William Thompson (7 OCT + 4 injections, 49→71d over-extension) as OpenEMR-ready payloads; source public OCT B-scans (CNV-class for fluid visits, normal post-tx; normal for HCQ) + `docs/data-sources.md` attribution (CC BY) | sub/wt | S1.2 | unit (corpus validates against schemas) | ☑ |
 
 **Wave B — serial on main (integration spine):**
 
