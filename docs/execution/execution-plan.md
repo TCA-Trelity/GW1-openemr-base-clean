@@ -82,8 +82,8 @@ LLM output is an async enhancement card, never a gate. Priority stack confirmed:
 | S2.4 | **Embed (committed for Thu):** `oe-module-clinical-copilot` — brief card into patient chart via `SectionEvent`/`CardRenderEvent`, iframe → SMART-launched panel, patient-bound token. Timeboxed to Thu AM; fallback = chart link to standalone panel (decision point 1 PM CT) | main | S2.1, S1.5 | screenshot | ☐ |
 | S2.5 | Eval suite as deliverable: fixtures from corpus ground truth (planted contradictions found; citation validity 100%; calculator goldens; empty/missing-record boundaries; cross-patient denial; injection corpus in a seeded referral letter); runs in CI; results exported to `docs/execution/eval-results.md` | sub/wt | S1.7, S1.8 | unit + ci-live | ☐ |
 | S2.6 | Observability deliverable: Langfuse dashboard (requests, error rate, p50/p95 per surface, tool calls, retries, verification pass/fail, token spend) + 3 alerts documented w/ on-call response in `docs/execution/observability.md` | main | S1.9, S2.3 | screenshot | ☐ |
-| S2.7 | Bruno collection (`sidecar/api-collection/`): health/ready, register, trigger prep, get brief, chat turn, verify fact — runnable by graders without source | main | S2.3 | ci-live | ☐ |
-| S2.8 | `COSTS.md`: actual dev spend (Anthropic console + Langfuse tokens) + 100/1K/10K/100K projections w/ architecture inflections (from ARCHITECTURE §11) | main | S2.6 | review | ☐ |
+| S2.7 | Bruno collection (`sidecar/api-collection/`): health/ready, register, trigger prep, get brief, chat turn, verify fact — runnable by graders without source | main | S2.3 | ci-live | ☑ |
+| S2.8 | `COSTS.md`: actual dev spend (Anthropic console + Langfuse tokens) + 100/1K/10K/100K projections w/ architecture inflections (from ARCHITECTURE §11) | main | S2.6 | review | ☑ |
 | S2.9 | Demo video #2: script update (brief → drill-down chat → imaging story → contradiction verify → dashboards), user records | main + user | all above | — | ☐ |
 
 **Phase 2 exit criteria:** agent works in the live environment (embedded), eval results committed, dashboard live, video submitted.
