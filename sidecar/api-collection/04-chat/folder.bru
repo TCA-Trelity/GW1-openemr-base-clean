@@ -1,0 +1,11 @@
+meta {
+  name: 04 Chat (SSE, LLM, guarded)
+  seq: 4
+}
+
+docs {
+  Streaming chat over the stored fact bundle. The POST spends real
+  (budget-guarded) LLM money and answers as a Server-Sent-Events stream;
+  the GET replays a stored conversation for free. Run the POST first — its
+  post-response script captures the `conversation_id` for the replay.
+}

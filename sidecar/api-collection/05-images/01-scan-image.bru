@@ -1,0 +1,47 @@
+meta {
+  name: GET /api/images/:storageKey — scan bytes
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/images/oct-normal-macula-1.jpg
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("serves JPEG bytes", function() {
+    expect(String(res.getHeader('content-type'))).to.contain('image/jpeg');
+  });
+}
+
+docs {
+  # Scan image bytes
+
+  **What it proves:** the imaging pipeline is end-to-end real — the OCT
+  scans referenced by the fact store are actually retrievable as bytes,
+  not just metadata rows. Bruno renders the JPEG inline in the response
+  pane.
+
+  **Where the key comes from:** each entry in `overview.images[]` (see
+  `GET /api/overview/margaret-chen`) carries a `storage_key` — e.g.
+  `oct-normal-macula-1.jpg`, the one requested here. The panel's imaging
+  timeline loads `/api/images/<storage_key>` for every scan it shows, so
+  the provenance chain is: stored `image_records` row -> `storage_key` ->
+  this endpoint. Keys are server-assigned (seeded or ingested), never
+  user input.
+
+  **Serving details:** files come from the configured scan-image
+  directory (`SCAN_IMAGES_DIR`, defaulting to the seeded images shipped
+  in the deploy image) via `@fastify/static`, which owns path-traversal
+  safety; responses carry a 7-day `Cache-Control` max-age. Unknown keys
+  return `404`.
+
+  **Try also:** the other seeded keys visible in the overview payload,
+  e.g. `oct-cnv-fluid-1.jpg`, `oct-post-treatment-dry-1.jpg`.
+}

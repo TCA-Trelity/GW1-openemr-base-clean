@@ -1,0 +1,83 @@
+meta {
+  name: POST /api/chat/:patientId — streaming chat turn (SSE)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/chat/margaret-chen
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "message": "What medication risks does this patient have?"
+  }
+}
+
+script:post-response {
+  // The done event carries the conversation_id; capture it so the replay
+  // request (next in this folder) can reference the same conversation.
+  const raw = typeof res.getBody() === 'string' ? res.getBody() : JSON.stringify(res.getBody());
+  const match = raw.match(/"conversation_id"\s*:\s*"([^"]+)"/);
+  if (match) {
+    bru.setVar('conversationId', match[1]);
+  }
+}
+
+tests {
+  test("stream opens with 200 and SSE content type", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(String(res.getHeader('content-type'))).to.contain('text/event-stream');
+  });
+
+  test("stream ends with a done event carrying cited_fact_ids", function() {
+    const raw = typeof res.getBody() === 'string' ? res.getBody() : JSON.stringify(res.getBody());
+    expect(raw).to.contain('"type":"done"');
+    expect(raw).to.contain('"cited_fact_ids"');
+  });
+}
+
+docs {
+  # Streaming chat turn (spends guarded LLM budget)
+
+  **What it proves:** grounded, citation-gated chat over the patient's
+  stored facts, streamed as **Server-Sent Events**. Bruno is not an SSE
+  client — it shows the **raw stream** as the response body once the
+  turn completes, which is exactly what you want for grading: every
+  event is visible verbatim.
+
+  **The raw stream looks like:**
+
+  ```
+  data: {"type":"delta","text":"Margaret Chen is on"}
+
+  data: {"type":"delta","text":" hydroxychloroquine ..."}
+
+  data: {"type":"done","conversation_id":"...","cited_fact_ids":["fact-mc-med-001", ...],"invalid_citation_ids":[]}
+  ```
+
+  - `delta` events carry incremental answer text (what the panel renders
+    token-by-token).
+  - The single terminal `done` event carries the `conversation_id` and
+    the **validated** citations: `cited_fact_ids` are ids that resolve
+    against real stored facts (check them via `/api/facts/margaret-chen`);
+    any model-invented ids are quarantined into `invalid_citation_ids`
+    rather than presented as citations.
+  - On a mid-stream failure you get `data: {"type":"error","error":"chat_failed"}`
+    instead — internals are never leaked into the stream.
+
+  **Guards answer as plain JSON before the stream opens**, so clients can
+  branch on status codes: `400 {"error":"invalid_message","max_chars":2000}`
+  (missing/empty/oversized message), `404 {"error":"patient_not_found"}`,
+  `429 {"error":"llm_budget_exceeded","spent_usd":...,"budget_usd":...}`.
+
+  **Request body:** `{"message": "...", "conversation_id": "..."}` —
+  `conversation_id` is optional; omit it (as here) to start a new
+  conversation, or pass a previous `done` event's id to continue one.
+
+  **Post-response script:** captures `conversation_id` from the `done`
+  event into the `conversationId` variable, so the replay request that
+  follows targets this very conversation.
+}
