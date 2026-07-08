@@ -1556,7 +1556,8 @@
       "metadata": {
         "source_system": "external_import",
         "note": "Imported external HCQ-monitoring archive scan (authored series for imaging-trends demo/eval)"
-      }
+      },
+      "storage_key": "oct-normal-macula-1.jpg"
     },
     {
       "id": "img-mc-002",
@@ -1641,7 +1642,8 @@
       "metadata": {
         "source_system": "external_import",
         "note": "Imported external HCQ-monitoring archive scan (authored series for imaging-trends demo/eval)"
-      }
+      },
+      "storage_key": "oct-normal-macula-2.jpg"
     },
     {
       "id": "img-mc-003",
@@ -1726,7 +1728,8 @@
       "metadata": {
         "source_system": "external_import",
         "note": "Imported external HCQ-monitoring archive scan (authored series for imaging-trends demo/eval)"
-      }
+      },
+      "storage_key": "oct-normal-macula-1.jpg"
     },
     {
       "id": "img-mc-004",
@@ -1811,7 +1814,8 @@
       "metadata": {
         "source_system": "external_import",
         "note": "Imported external HCQ-monitoring archive scan (authored series for imaging-trends demo/eval)"
-      }
+      },
+      "storage_key": "oct-normal-macula-2.jpg"
     },
     {
       "id": "img-mc-005",
@@ -1914,7 +1918,8 @@
       "metadata": {
         "source_system": "external_import",
         "note": "Imported external HCQ-monitoring archive scan (authored series for imaging-trends demo/eval)"
-      }
+      },
+      "storage_key": "oct-normal-macula-1.jpg"
     },
     {
       "id": "img-mc-006",
@@ -2021,7 +2026,8 @@
       "metadata": {
         "source_system": "heidelberg_spectralis",
         "note": "Captured at 2024-12-26 visit; also filed as source document doc-mc-008"
-      }
+      },
+      "storage_key": "oct-normal-macula-2.jpg"
     }
   ],
   "treatments": [],

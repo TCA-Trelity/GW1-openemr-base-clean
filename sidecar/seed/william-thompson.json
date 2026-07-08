@@ -383,7 +383,8 @@
       },
       "metadata": {
         "source_system": "heidelberg_spectralis"
-      }
+      },
+      "storage_key": "oct-cnv-fluid-1.jpg"
     },
     {
       "id": "img-wt-002",
@@ -478,7 +479,8 @@
       },
       "metadata": {
         "source_system": "heidelberg_spectralis"
-      }
+      },
+      "storage_key": "oct-post-treatment-dry-1.jpg"
     },
     {
       "id": "img-wt-003",
@@ -568,7 +570,8 @@
       },
       "metadata": {
         "source_system": "heidelberg_spectralis"
-      }
+      },
+      "storage_key": "oct-post-treatment-macula-1.jpg"
     },
     {
       "id": "img-wt-004",
@@ -658,7 +661,8 @@
       },
       "metadata": {
         "source_system": "heidelberg_spectralis"
-      }
+      },
+      "storage_key": "oct-post-treatment-dry-1.jpg"
     },
     {
       "id": "img-wt-005",
@@ -758,7 +762,8 @@
       },
       "metadata": {
         "source_system": "heidelberg_spectralis"
-      }
+      },
+      "storage_key": "oct-cnv-fluid-2.jpg"
     },
     {
       "id": "img-wt-006",
@@ -853,7 +858,8 @@
       },
       "metadata": {
         "source_system": "heidelberg_spectralis"
-      }
+      },
+      "storage_key": "oct-post-treatment-macula-1.jpg"
     },
     {
       "id": "img-wt-007",
@@ -943,7 +949,8 @@
       },
       "metadata": {
         "source_system": "heidelberg_spectralis"
-      }
+      },
+      "storage_key": "oct-post-treatment-dry-1.jpg"
     }
   ],
   "treatments": [
