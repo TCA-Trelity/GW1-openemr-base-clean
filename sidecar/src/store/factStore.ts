@@ -505,6 +505,19 @@ export class FactStore {
         }
     }
 
+    /** Day-list read behind GET /api/patients — the panel's schedule sidebar. */
+    public async listPatients(): Promise<StoredPatient[]> {
+        const result = await this.pool.query<PatientRow>(
+            'SELECT id, openemr_patient_id, name, demographics FROM patients ORDER BY name',
+        );
+        return result.rows.map((row) => ({
+            id: row.id,
+            openemr_patient_id: row.openemr_patient_id,
+            name: row.name,
+            demographics: JsonObjectSchema.parse(row.demographics),
+        }));
+    }
+
     /** Stamps the stage a run is entering — a failed run's row then shows where it died. */
     public async setPrepRunStage(runId: string, stageName: string): Promise<void> {
         const result = await this.pool.query('UPDATE prep_runs SET stage = $2 WHERE id = $1', [runId, stageName]);

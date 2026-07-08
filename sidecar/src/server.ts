@@ -16,6 +16,7 @@ import { SpendGuard } from './prep/budget.js';
 import { FactExtractor } from './prep/extraction.js';
 import { StoreDocumentSource } from './prep/sources.js';
 import { registerHealthRoutes } from './routes/health.js';
+import { registerOverviewRoutes, type OverviewRouteDeps } from './routes/overview.js';
 import { registerPrepRoutes, type PrepRouteDeps } from './routes/prep.js';
 import { createPool, FactStore } from './store/index.js';
 import { migrate } from './store/migrate.js';
@@ -26,6 +27,8 @@ export interface AppDeps {
     /** Applies pending fact-store migrations (idempotent, advisory-locked). */
     runMigrations: () => Promise<string[]>;
     prep: PrepRouteDeps;
+    /** Deterministic landing-page reads (no LLM in the load path). */
+    overview: OverviewRouteDeps;
 }
 
 // Store-backed dependencies exist only when DATABASE_URL is configured; without it the
@@ -81,6 +84,7 @@ export function buildDeps(config: Config): AppDeps | undefined {
             reuseWindowMinutes: config.PREP_REUSE_WINDOW_MINUTES,
             maxConcurrentPreps: config.LLM_MAX_CONCURRENT_PREPS,
         },
+        overview: { store },
     };
 }
 
@@ -98,6 +102,7 @@ export function buildServer(config: Config, deps?: AppDeps): FastifyInstance {
 
     registerHealthRoutes(app, config, deps === undefined ? undefined : { checkPostgres: deps.checkPostgres });
     registerPrepRoutes(app, deps?.prep);
+    registerOverviewRoutes(app, deps?.overview);
 
     // Serve the built panel when present (panel/dist ships in the image); SPA
     // fallback for non-API GETs so ?patient= URLs deep-link correctly.

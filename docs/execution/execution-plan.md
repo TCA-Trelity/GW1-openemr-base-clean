@@ -63,8 +63,19 @@ deploy logs).
 
 ## Phase 2 — Surface + hard-gate deliverables
 
+**Realignment (2026-07-08, user review):** the panel gated every visual behind a
+successful LLM prep — wrong product shape. New invariant: **the landing page is
+deterministic** (stored EHR facts + pure engines, <1s, no LLM in any load path);
+LLM output is an async enhancement card, never a gate. Priority stack confirmed:
+(a) instant landing page → (b) source rail/viewer → (c) real OCT images →
+(d) chat → (e) chart embed → (f) LLM ingest polish.
+
 | ID | Ticket | Agent | Depends | Verify | Done |
 |---|---|---|---|---|---|
+| S2.10 | Deterministic overview API: `GET /api/patients` (day-schedule sidebar) + `GET /api/overview/:patientId` (patient header, facts by type, engine-computed med-risk flags + imaging analytics, contradictions, document metadata, latest-brief ref) — pure store reads, zero LLM | main | S1.6 | unit | ☑ |
+| S2.11 | Panel realignment: left day-schedule sidebar (second-opinion pattern) to toggle patients; Overview renders instantly from `/api/overview` incl. most-recent-scan toggle; AI-insights card async + non-blocking (no more blocking Prepare) | sub | S2.10 | screenshot | ☐ |
+| S2.12 | Source rail elevated: all documents listed with type/date/received-method/OCR-quality badges; click → full text with cited-excerpt highlights (provenance display IS the feature) | sub | S2.10 | screenshot | ☐ |
+| S2.13 | Real OCT imagery: CC-licensed public B-scans (attributed in `docs/data-sources.md`) wired through ImageStore — `/api/images/:key` route + `storage_key` on seeded image records; Imaging tab shows actual scans | main + sub | S2.2 | screenshot | ☐ |
 | S2.1 | React panel shell: Vite + Tailwind/shadcn (ported design system), brief tabs per manifest §4 (Overview / Medical Background / Diagnosis & Care / Sources), citation chips → source cards (verbatim excerpt highlight, attribution, deep link) | sub/wt | S1.2 | screenshot | ☑ |
 | S2.2 | Imaging spine + all four features: ImagingTimeline (+days-post-injection badges), TrendAnalysis (CRT/GC w/ thresholds), IntervalAnalysis (treat-and-extend recommendation), ImageComparison (≤4 side-by-side); images served from sidecar `ImageStore` | sub/wt | S1.4, S2.1 | screenshot | ☑ |
 | S2.3 | Chat loop: Haiku 4.5 over prepared fact bundle, strict inline citation token contract + parse-back to chips (manifest §5), streaming, conversation persistence, quick prompts | main | S1.7, S1.8 | ci-live + screenshot | ☐ |

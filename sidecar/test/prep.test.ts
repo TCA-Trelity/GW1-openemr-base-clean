@@ -166,6 +166,10 @@ class FakeStore implements PrepRouteStore {
         return this.bundle !== null && this.bundle.patient.id === patientId ? this.bundle : null;
     }
 
+    async listPatients() {
+        return this.bundle === null ? [] : [this.bundle.patient];
+    }
+
     async setPrepRunStage(runId: string, stageName: string): Promise<void> {
         const run = this.runs.find((candidate) => candidate.id === runId);
         if (run === undefined) {
@@ -192,8 +196,9 @@ class FakeStore implements PrepRouteStore {
 }
 
 function corpusBundle(): FactBundle {
+    const { patient_id: _pid, name: _name, ...demographics } = corpus['patient'];
     return {
-        patient: { id: PATIENT_ID, openemr_patient_id: null, name: corpus['patient'].name, demographics: {} },
+        patient: { id: PATIENT_ID, openemr_patient_id: null, name: corpus['patient'].name, demographics },
         facts: [],
         contradictions: [],
         images: structuredClone(corpus['images']),
@@ -205,7 +210,17 @@ function corpusBundle(): FactBundle {
             treatment_date: treatment.treatment_date,
             payload: structuredClone(treatment),
         })),
+        documents: (corpus['source_documents'] as any[]).map((doc) => {
+            const { document_id, document_type, document_date, content, metadata, ...extras } = doc;
+            return { id: document_id, document_type, document_date, content, metadata: metadata ?? {}, extras };
+        }),
     };
+}
+
+// The seeded-store view of the corpus: authored facts land as StoredFact rows, so the
+// deterministic overview renders the full landing page with ZERO LLM involvement.
+function seededBundle(): FactBundle {
+    return { ...corpusBundle(), facts: corpusFacts() };
 }
 
 // Fake source_documents query: serves the corpus documents keyed the way the store does.
@@ -805,7 +820,14 @@ function routeDeps(payload: unknown = { facts: corpusFacts(), contradictions: co
 
 function testServer(prep?: PrepRouteDeps, checkPostgres?: () => Promise<void>) {
     const appDeps: AppDeps | undefined =
-        prep === undefined ? undefined : { checkPostgres: checkPostgres ?? (async () => {}), prep };
+        prep === undefined
+            ? undefined
+            : {
+                  checkPostgres: checkPostgres ?? (async () => {}),
+                  runMigrations: async () => [],
+                  prep,
+                  overview: { store: prep.store as unknown as FakeStore, clock: () => NOW },
+              };
     return buildServer(loadConfig({ NODE_ENV: 'test' }), appDeps);
 }
 
@@ -1220,6 +1242,74 @@ describe('spend guardrails: prep route', () => {
         const res = await app.inject({ method: 'GET', url: '/api/usage' });
         expect(res.statusCode).toBe(503);
         expect(res.json()).toEqual({ error: 'store_not_configured' });
+    });
+});
+
+describe('overview routes (deterministic landing page)', () => {
+    function overviewDeps() {
+        const store = new FakeStore(seededBundle());
+        const { extractor } = dispatchingExtractor({ facts: [], contradictions: [] });
+        const deps: PrepRouteDeps = {
+            store,
+            source: new StoreDocumentSource(store, corpusDb),
+            extractor,
+            clock: () => NOW,
+        };
+        return { deps, store };
+    }
+
+    // Guards: the day-schedule sidebar contract — patients with their demographics
+    // (appointment date/time live there) straight from the store.
+    it('GET /api/patients lists patients with demographics', async () => {
+        const { deps } = overviewDeps();
+        const res = await testServer(deps).inject({ method: 'GET', url: '/api/patients' });
+        expect(res.statusCode).toBe(200);
+        const { patients } = res.json() as { patients: { id: string; demographics: Record<string, unknown> }[] };
+        expect(patients[0]!.id).toBe(PATIENT_ID);
+        expect(patients[0]!.demographics['appointment_time']).toBe('10:30');
+    });
+
+    // Guards: THE realignment invariant — the landing page renders complete clinical
+    // content (meds + deterministic risk flags, imaging analytics, contradictions,
+    // document metadata) from the seeded store with zero LLM calls.
+    it('GET /api/overview serves the full landing page with no LLM in the path', async () => {
+        const { deps } = overviewDeps();
+        const res = await testServer(deps).inject({ method: 'GET', url: `/api/overview/${PATIENT_ID}` });
+        expect(res.statusCode).toBe(200);
+        const overview = res.json() as Record<string, any>;
+        expect(overview.patient.name).toBe(corpus['patient'].name);
+        expect(overview.facts_by_type.medication.length).toBeGreaterThan(0);
+        expect(overview.facts_by_type.chief_complaint).toHaveLength(1);
+        // The HCQ >= 5 years AAO branch must fire deterministically at the corpus NOW.
+        const flagText = JSON.stringify(overview.medication_risk_flags);
+        expect(overview.medication_risk_flags.length).toBeGreaterThan(0);
+        expect(flagText.toLowerCase()).toContain('hydroxychloroquine');
+        expect(overview.imaging.hcq_progression.alert_level).not.toBeNull();
+        expect(overview.imaging.timeline_summary.length).toBe(corpus['images'].length);
+        expect(overview.documents).toHaveLength(12);
+        // Metadata only — full text loads via /api/facts when the viewer opens.
+        expect(overview.documents[0].content).toBeUndefined();
+        expect(overview.latest_brief).toBeNull();
+        expect(overview.generated_at).toBe(NOW.toISOString());
+    });
+
+    // Guards: the AI-insights card contract — once a brief exists it is referenced,
+    // never inlined (the landing page stays deterministic either way).
+    it('GET /api/overview references the latest brief when one exists', async () => {
+        const { deps, store } = overviewDeps();
+        await store.saveBrief({ patient_id: PATIENT_ID, correlation_id: 'corr-b', content: {} });
+        const overview = (
+            await testServer(deps).inject({ method: 'GET', url: `/api/overview/${PATIENT_ID}` })
+        ).json() as Record<string, any>;
+        expect(overview.latest_brief.id).toBe('brief-1');
+    });
+
+    // Guards: the scaffold contract — 404 for unknown patients, 503 without a store.
+    it('answers 404 for an unknown patient and 503 without deps', async () => {
+        const { deps } = overviewDeps();
+        expect((await testServer(deps).inject({ method: 'GET', url: '/api/overview/nobody' })).statusCode).toBe(404);
+        expect((await testServer().inject({ method: 'GET', url: '/api/overview/x' })).statusCode).toBe(503);
+        expect((await testServer().inject({ method: 'GET', url: '/api/patients' })).statusCode).toBe(503);
     });
 });
 
