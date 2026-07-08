@@ -28,7 +28,7 @@ deploy logs).
 
 ---
 
-## Phase 0 — Platform stabilization (tonight, serial, blocks everything)
+## Phase 0 — Platform stabilization (serial, blocks everything)
 
 | ID | Ticket | Agent | Depends | Verify | Done |
 |---|---|---|---|---|---|
@@ -37,7 +37,7 @@ deploy logs).
 | P0.3 | Verify demo data + admin login stable across a push; change admin password from demo default | user | P0.1 | screenshot | ☑ |
 | P0.4 | Commit this plan + update `docs/HANDOFF.md` with locked decisions (imaging metadata authored-at-seed; Kermany-style public OCT imagery; all-four imaging features Thu; embedded panel Thu; F9→`medicationRiskFlags` canonical; scan storage = sidecar volume behind `ImageStore` interface) | main | — | in repo | ☑ |
 
-## Phase 1 — Walking skeleton (Wednesday; goal: one real prep runs end-to-end on Railway by EOD)
+## Phase 1 — Walking skeleton (goal: one real prep runs end-to-end on Railway)
 
 **Wave A — parallel (subagents in worktrees, no shared files):**
 
@@ -59,9 +59,9 @@ deploy logs).
 | S1.9 | Railway topology: sidecar + Postgres + Redis + Langfuse services in existing project; sidecar volume for scans; user adds `ANTHROPIC_API_KEY` in Variables; seed job (`sidecar/scripts/seed.ts`) runs on Railway against live EHR | main + user + railway | S1.1, S1.4 | logs + ci-live | ☐ |
 | S1.10 | CI: sidecar unit tests on PR; live smoke workflow (hits `/ready`, triggers prep for seed patient, asserts brief exists + citations valid) — this is the session's eyes on prod | main | S1.9 | ci-live | ☐ |
 
-**Exit criteria Wed:** smoke workflow green — a prepared brief for Margaret Chen exists on the live deployment, every fact cited, gate passing.
+**Phase 1 exit criteria:** smoke workflow green — a prepared brief for Margaret Chen exists on the live deployment, every fact cited, gate passing.
 
-## Phase 2 — Surface + hard-gate deliverables (Thursday)
+## Phase 2 — Surface + hard-gate deliverables
 
 | ID | Ticket | Agent | Depends | Verify | Done |
 |---|---|---|---|---|---|
@@ -75,9 +75,9 @@ deploy logs).
 | S2.8 | `COSTS.md`: actual dev spend (Anthropic console + Langfuse tokens) + 100/1K/10K/100K projections w/ architecture inflections (from ARCHITECTURE §11) | main | S2.6 | review | ☐ |
 | S2.9 | Demo video #2: script update (brief → drill-down chat → imaging story → contradiction verify → dashboards), user records | main + user | all above | — | ☐ |
 
-**Exit criteria Thu:** agent works in the live environment (embedded), eval results committed, dashboard live, video submitted.
+**Phase 2 exit criteria:** agent works in the live environment (embedded), eval results committed, dashboard live, video submitted.
 
-## Phase 3 — Tier 2 / Final (Fri–Sun)
+## Phase 3 — Tier 2 / Final
 
 | ID | Ticket | Agent | Depends | Verify | Done |
 |---|---|---|---|---|---|
@@ -90,7 +90,7 @@ deploy logs).
 
 ## Standing rules
 
-- **Sequencing invariant:** platform (P0) before code; skeleton deployed before surface; the embed decision point is Thu 1 PM CT.
+- **Sequencing invariant:** platform (P0) before code; skeleton deployed before surface; the embed timebox decision falls at Phase-2 midpoint.
 - **Subagent protocol:** worktree isolation for parallel tickets; every subagent diff gets a code-review pass before merge; no subagent touches `sidecar/src/schemas/` after S1.2 lands except via main.
 - **Session continuity:** each new session starts by reading this file + `docs/HANDOFF.md` + `docs/execution/DECISIONS.md`. Status updates are commits, not memory.
 - **Live verification:** the dev session never assumes live behavior — CI smoke (S1.10) is the arbiter.

@@ -1,9 +1,16 @@
-# Live smoke probe (S1.10 seed): GitHub runners can reach the public app URL
-# (the dev session cannot), so this workflow is the session's eyes on prod.
+# Live smoke probe (S1.10): GitHub runners can reach the public URLs (the dev
+# session cannot), so this workflow is the session's eyes on prod. With a
+# sidecar_url input it also runs the full end-to-end: trigger a real prep for
+# the seeded patient and assert the gate-checked brief exists.
 name: Live smoke
 
 on:
   workflow_dispatch:
+    inputs:
+      sidecar_url:
+        description: 'Sidecar base URL (e.g. https://sidecar-production-xxxx.up.railway.app); empty = EHR-only probe'
+        required: false
+        default: ''
 
 jobs:
   probe:
@@ -35,3 +42,41 @@ jobs:
           fi
 
           exit $fail
+
+      - name: Sidecar readiness and end-to-end prep
+        if: ${{ inputs.sidecar_url != '' }}
+        env:
+          SIDECAR_URL: ${{ inputs.sidecar_url }}
+        run: |
+          set -uo pipefail
+
+          echo "== GET /ready =="
+          code=$(curl -s -o /tmp/ready.json -w '%{http_code}' --max-time 30 "$SIDECAR_URL/ready")
+          echo "HTTP $code"; cat /tmp/ready.json | head -c 600; echo
+          [ "$code" = "200" ] || { echo "sidecar not ready"; exit 1; }
+
+          echo "== POST /api/prep/margaret-chen =="
+          code=$(curl -s -X POST -o /tmp/prep.json -w '%{http_code}' --max-time 30 "$SIDECAR_URL/api/prep/margaret-chen")
+          echo "HTTP $code"; cat /tmp/prep.json; echo
+          [ "$code" = "202" ] || { echo "prep trigger failed"; exit 1; }
+
+          echo "== Poll GET /api/brief/margaret-chen (up to 5 min) =="
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /tmp/brief.json -w '%{http_code}' --max-time 30 "$SIDECAR_URL/api/brief/margaret-chen")
+            if [ "$code" = "200" ]; then break; fi
+            echo "attempt $i: HTTP $code — waiting 10s (LLM extraction in flight)"; sleep 10
+          done
+          [ "$code" = "200" ] || { echo "brief never appeared"; exit 1; }
+
+          echo "== Brief assertions =="
+          jq -e '.content.gate_metrics.citationsFailed == 0' /tmp/brief.json >/dev/null \
+            && echo "gate: 0 failed citations OK" || { echo "gate metrics FAILED"; jq '.content.gate_metrics' /tmp/brief.json; exit 1; }
+          jq -e '.content.medication_risk_flags | length > 0' /tmp/brief.json >/dev/null \
+            && echo "med-risk flags present OK" || { echo "med-risk flags MISSING"; exit 1; }
+          jq -e '.content.imaging.hcq_progression.alert_level != null' /tmp/brief.json >/dev/null \
+            && echo "imaging analytics present OK" || { echo "imaging block MISSING"; exit 1; }
+          jq -e '.content.contradiction_alerts | length > 0' /tmp/brief.json >/dev/null \
+            && echo "contradiction alerts present OK" || echo "note: no contradiction alerts (extraction may not have surfaced them)"
+
+          echo "== Brief summary =="
+          jq '{prepared_at: .prepared_at, urgency: .content.urgency, discussion_points: (.content.key_discussion_points | length), facts: (.content.facts_by_type | to_entries | map({(.key): (.value | length)}) | add), gate: .content.gate_metrics}' /tmp/brief.json
