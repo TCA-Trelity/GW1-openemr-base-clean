@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Railway deploy entrypoint wrapper.
+# Railway deploy entrypoint wrapper. (rev 2: context-size fix rollout)
 #
 # Railway's private network (mariadb.railway.internal) can take several seconds
 # to become resolvable when a container starts. OpenEMR's setup tries the DB
