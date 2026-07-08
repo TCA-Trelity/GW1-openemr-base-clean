@@ -2,7 +2,7 @@
 // parse through the landed Zod schemas. This is the contract S1.7's extraction
 // and the fact store rely on; if it breaks, fix the source (schema or corpus),
 // never the sink. Added after S1.6 found five silent drift points.
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
     ContradictionSchema,
@@ -16,10 +16,12 @@ function load(name: string) {
     return JSON.parse(readFileSync(new URL(`../seed/${name}`, import.meta.url), 'utf8'));
 }
 
-const corpora = [
-    ['margaret-chen.json', load('margaret-chen.json')],
-    ['william-thompson.json', load('william-thompson.json')],
-] as const;
+// Sweep every *.json directly in seed/ (same glob seed.ts loads), so a newly added
+// patient corpus is conformance-locked without editing this list.
+const corpora = readdirSync(new URL('../seed/', import.meta.url))
+    .filter((name) => name.endsWith('.json'))
+    .sort()
+    .map((name) => [name, load(name)] as const);
 
 describe.each(corpora)('corpus conformance: %s', (_name, corpus) => {
     // Guards: facts the prep pipeline would emit/consume failing strict parse.

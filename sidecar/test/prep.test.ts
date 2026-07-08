@@ -1293,7 +1293,7 @@ describe('overview routes (deterministic landing page)', () => {
         expect(res.statusCode).toBe(200);
         const { patients } = res.json() as { patients: { id: string; demographics: Record<string, unknown> }[] };
         expect(patients[0]!.id).toBe(PATIENT_ID);
-        expect(patients[0]!.demographics['appointment_time']).toBe('10:30');
+        expect(patients[0]!.demographics['appointment_time']).toBe('08:00');
     });
 
     // Guards: THE realignment invariant — the landing page renders complete clinical

@@ -1,0 +1,570 @@
+{
+  "patient": {
+    "patient_id": "robert-alvarez",
+    "name": "Robert M. Alvarez",
+    "dob": "1962-09-05",
+    "sex": "M",
+    "mrn": "MEC-2023-0642",
+    "address": "1187 Cypress Bend Drive, Orlando, FL 32812",
+    "phone": "(407) 555-8142",
+    "appointment_date": "2024-12-26",
+    "appointment_time": "10:15",
+    "visit_type": "established_patient"
+  },
+  "medications": [
+    {
+      "id": "fact-ra-med-001",
+      "patient_id": "robert-alvarez",
+      "fact_type": "medication",
+      "content": {
+        "name": "Metformin",
+        "generic_name": "metformin hydrochloride",
+        "dose": "1000mg",
+        "frequency": "twice daily",
+        "route": "PO",
+        "start_date": null,
+        "end_date": null,
+        "prescriber": "Daniel Reyes, MD (PCP)",
+        "indication": "Type 2 diabetes mellitus",
+        "risk_flags": []
+      },
+      "is_current": true,
+      "source_document_id": "doc-ra-001",
+      "sources": [
+        {
+          "id": "cit-ra-001",
+          "fact_id": "fact-ra-med-001",
+          "source_label": "Referral letter - Dr. Daniel Reyes (PCP)",
+          "source_type": "referral_letter",
+          "excerpt_text": "Metformin 1000mg PO twice daily",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 1040,
+            "end_char": 1071,
+            "context_before": "ashes, or other visual complaints.\n\nCURRENT MEDICATIONS:\n1. ",
+            "context_after": "\n2. Lisinopril 20mg PO daily\n\nALLERGIES: Penicillin - hives "
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Daniel Reyes, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-ra-001",
+          "document_date": "2024-12-12"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": null,
+      "created_date": "2024-12-26T09:00:00Z",
+      "updated_date": "2024-12-26T09:00:00Z"
+    },
+    {
+      "id": "fact-ra-med-002",
+      "patient_id": "robert-alvarez",
+      "fact_type": "medication",
+      "content": {
+        "name": "Lisinopril",
+        "generic_name": "lisinopril",
+        "dose": "20mg",
+        "frequency": "daily",
+        "route": "PO",
+        "start_date": null,
+        "end_date": null,
+        "prescriber": "Daniel Reyes, MD (PCP)",
+        "indication": "Hypertension",
+        "risk_flags": []
+      },
+      "is_current": true,
+      "source_document_id": "doc-ra-001",
+      "sources": [
+        {
+          "id": "cit-ra-002",
+          "fact_id": "fact-ra-med-002",
+          "source_label": "Referral letter - Dr. Daniel Reyes (PCP)",
+          "source_type": "referral_letter",
+          "excerpt_text": "Lisinopril 20mg PO daily",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 1075,
+            "end_char": 1099,
+            "context_before": "\nCURRENT MEDICATIONS:\n1. Metformin 1000mg PO twice daily\n2. ",
+            "context_after": "\n\nALLERGIES: Penicillin - hives with amoxicillin as a child."
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Daniel Reyes, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-ra-001",
+          "document_date": "2024-12-12"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": null,
+      "created_date": "2024-12-26T09:00:00Z",
+      "updated_date": "2024-12-26T09:00:00Z"
+    }
+  ],
+  "allergies": [
+    {
+      "id": "fact-ra-alg-001",
+      "patient_id": "robert-alvarez",
+      "fact_type": "allergy",
+      "content": {
+        "substance": "Penicillin",
+        "reaction": "hives",
+        "severity": "moderate",
+        "verified": false,
+        "source": "documented in PCP referral letter"
+      },
+      "is_current": true,
+      "source_document_id": "doc-ra-001",
+      "sources": [
+        {
+          "id": "cit-ra-003",
+          "fact_id": "fact-ra-alg-001",
+          "source_label": "Referral letter - Dr. Daniel Reyes (PCP)",
+          "source_type": "referral_letter",
+          "excerpt_text": "ALLERGIES: Penicillin - hives with amoxicillin as a child.",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 1101,
+            "end_char": 1159,
+            "context_before": "etformin 1000mg PO twice daily\n2. Lisinopril 20mg PO daily\n\n",
+            "context_after": "\n\nRECENT VITALS (from 12/09/2024 visit):\nBP: 126/78 | HR: 70"
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Daniel Reyes, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-ra-001",
+          "document_date": "2024-12-12"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": null,
+      "created_date": "2024-12-26T09:00:00Z",
+      "updated_date": "2024-12-26T09:00:00Z"
+    }
+  ],
+  "conditions": [
+    {
+      "id": "fact-ra-con-001",
+      "patient_id": "robert-alvarez",
+      "fact_type": "condition",
+      "content": {
+        "name": "Type 2 diabetes mellitus",
+        "icd10": "E11.9",
+        "status": "active",
+        "since": "2016",
+        "severity": "A1c 7.2% (November 2024)"
+      },
+      "is_current": true,
+      "source_document_id": "doc-ra-001",
+      "sources": [
+        {
+          "id": "cit-ra-004",
+          "fact_id": "fact-ra-con-001",
+          "source_label": "Referral letter - Dr. Daniel Reyes (PCP)",
+          "source_type": "referral_letter",
+          "excerpt_text": "type 2 diabetes mellitus, diagnosed 2016. Most recent hemoglobin A1c 7.2% (November 2024)",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 627,
+            "end_char": 716,
+            "context_before": "c eye examination.\n\nCLINICAL CONTEXT:\n62-year-old male with ",
+            "context_after": ". Blood pressure well controlled on lisinopril. Your office "
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Daniel Reyes, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-ra-001",
+          "document_date": "2024-12-12"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": null,
+      "created_date": "2024-12-26T09:00:00Z",
+      "updated_date": "2024-12-26T09:00:00Z"
+    },
+    {
+      "id": "fact-ra-con-002",
+      "patient_id": "robert-alvarez",
+      "fact_type": "condition",
+      "content": {
+        "name": "Mild nonproliferative diabetic retinopathy",
+        "icd10": "E11.3293",
+        "status": "active",
+        "since": "2023-12",
+        "severity": "mild, no macular edema"
+      },
+      "is_current": true,
+      "source_document_id": "doc-ra-002",
+      "sources": [
+        {
+          "id": "cit-ra-005",
+          "fact_id": "fact-ra-con-002",
+          "source_label": "Prior diabetic eye exam note - Dr. Elena Montzka",
+          "source_type": "prior_visit_note",
+          "excerpt_text": "Mild nonproliferative diabetic retinopathy, both eyes (E11.3293) - scattered microaneurysms, no macular edema.",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 1074,
+            "end_char": 1184,
+            "context_before": "al subfield thickness within normal limits.\n\nASSESSMENT:\n1. ",
+            "context_after": "\n2. Type 2 diabetes mellitus - continue medical management w"
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Elena Montzka, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-ra-002",
+          "document_date": "2023-12-05"
+        },
+        {
+          "id": "cit-ra-006",
+          "fact_id": "fact-ra-con-002",
+          "source_label": "Referral letter - Dr. Daniel Reyes (PCP)",
+          "source_type": "referral_letter",
+          "excerpt_text": "found mild nonproliferative diabetic retinopathy in both eyes",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 833,
+            "end_char": 894,
+            "context_before": "ce performed his diabetic eye examination last December and ",
+            "context_after": "; he was asked to return in twelve months.\n\nHe reports no bl"
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Daniel Reyes, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-ra-001",
+          "document_date": "2024-12-12"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": "OU",
+      "created_date": "2024-12-26T09:00:00Z",
+      "updated_date": "2024-12-26T09:00:00Z"
+    }
+  ],
+  "family_history": [],
+  "patient_goals": [],
+  "chief_complaint": {
+    "id": "fact-ra-cc-001",
+    "patient_id": "robert-alvarez",
+    "fact_type": "chief_complaint",
+    "content": {
+      "statement": "Annual diabetic retinopathy surveillance; no new visual complaints",
+      "onset": "routine annual follow-up (last exam December 2023)",
+      "laterality": "OU",
+      "progression": "asymptomatic",
+      "pertinent_negatives": [
+        "No blurred vision",
+        "No floaters",
+        "No flashes"
+      ]
+    },
+    "is_current": true,
+    "source_document_id": "doc-ra-001",
+    "sources": [
+      {
+        "id": "cit-ra-007",
+        "fact_id": "fact-ra-cc-001",
+        "source_label": "Referral letter - Dr. Daniel Reyes (PCP)",
+        "source_type": "referral_letter",
+        "excerpt_text": "He reports no blurred vision, floaters, flashes, or other visual complaints.",
+        "excerpt_location": {
+          "type": "character_range",
+          "start_char": 938,
+          "end_char": 1014,
+          "context_before": "thy in both eyes; he was asked to return in twelve months.\n\n",
+          "context_after": "\n\nCURRENT MEDICATIONS:\n1. Metformin 1000mg PO twice daily\n2."
+        },
+        "attribution": {
+          "speaker_role": "physician",
+          "speaker_name": "Daniel Reyes, MD",
+          "confidence": 0.95
+        },
+        "source_document_id": "doc-ra-001",
+        "document_date": "2024-12-12"
+      }
+    ],
+    "verification": {
+      "status": "unverified",
+      "verified_by_user_id": null,
+      "verified_at": null,
+      "verifier_role": null
+    },
+    "laterality": "OU",
+    "created_date": "2024-12-26T09:00:00Z",
+    "updated_date": "2024-12-26T09:00:00Z"
+  },
+  "source_documents": [
+    {
+      "document_id": "doc-ra-001",
+      "filename": "referral-pcp-2024-12-12.txt",
+      "document_type": "referral_letter",
+      "document_date": "2024-12-12",
+      "received_date": "2024-12-12",
+      "received_method": "fax",
+      "content": {
+        "format": "text",
+        "text_content": "FAX TRANSMISSION\nFROM: LAKESIDE PRIMARY CARE\nTO: MONTZKA EYE CLINIC\nPAGES: 1 of 1\nDATE: 12/12/2024 11:47\n\nLAKESIDE PRIMARY CARE\nDaniel Reyes, MD - Internal Medicine\n740 Lakeside Commons Blvd, Suite 110\nOrlando, FL 32812\nPhone: (407) 555-9010 | Fax: (407) 555-9011 | NPI: 1435792860\n\nDate: December 12, 2024\n\nRE: REFERRAL FOR ANNUAL DIABETIC EYE EXAMINATION\n\nPatient Name: Robert M. Alvarez\nDate of Birth: 09/05/1962 (62 years old)\nMedical Record #: LPC-2016-3308\nPhone: (407) 555-8142\n\nDear Colleague,\n\nI am referring Mr. Robert Alvarez for his annual dilated diabetic eye examination.\n\nCLINICAL CONTEXT:\n62-year-old male with type 2 diabetes mellitus, diagnosed 2016. Most recent hemoglobin A1c 7.2% (November 2024). Blood pressure well controlled on lisinopril. Your office performed his diabetic eye examination last December and found mild nonproliferative diabetic retinopathy in both eyes; he was asked to return in twelve months.\n\nHe reports no blurred vision, floaters, flashes, or other visual complaints.\n\nCURRENT MEDICATIONS:\n1. Metformin 1000mg PO twice daily\n2. Lisinopril 20mg PO daily\n\nALLERGIES: Penicillin - hives with amoxicillin as a child.\n\nRECENT VITALS (from 12/09/2024 visit):\nBP: 126/78 | HR: 70 | BMI: 29.4\n\nREQUEST:\nAnnual dilated fundus examination and OCT for diabetic retinopathy surveillance. Please forward your report to my attention.\n\nSincerely,\n\nDaniel Reyes, MD\nLakeside Primary Care\nFL Medical License: ME778901\n\n[End of fax transmission]",
+        "ocr_quality": 0.93,
+        "ocr_artifacts": [
+          "slight blur on fax header"
+        ]
+      },
+      "extracted_data": {
+        "referring_provider": {
+          "name": "Daniel Reyes, MD",
+          "specialty": "Internal Medicine",
+          "practice": "Lakeside Primary Care",
+          "npi": "1435792860"
+        },
+        "chief_complaint": "Annual diabetic eye examination; no visual complaints",
+        "medications_mentioned": [
+          {
+            "name": "Metformin",
+            "dose": "1000mg twice daily",
+            "indication": "T2DM"
+          },
+          {
+            "name": "Lisinopril",
+            "dose": "20mg daily",
+            "indication": "HTN"
+          }
+        ],
+        "allergies_mentioned": {
+          "stated": "Penicillin - hives"
+        },
+        "recent_vitals": {
+          "bp": "126/78",
+          "hr": 70,
+          "bmi": 29.4,
+          "date": "2024-12-09"
+        }
+      },
+      "metadata": {
+        "source_system": "fax_intake",
+        "imported_at": "2024-12-12T14:05:00Z",
+        "imported_by": "front_desk",
+        "pages": 1,
+        "original_filename": "referral_alvarez_robert_20241212.pdf"
+      }
+    },
+    {
+      "document_id": "doc-ra-002",
+      "filename": "eye-exam-note-2023-12-05.txt",
+      "document_type": "prior_visit_note",
+      "document_date": "2023-12-05",
+      "content": {
+        "format": "text",
+        "text_content": "MONTZKA EYE CLINIC - OFFICE VISIT NOTE\n\nPatient: Robert M. Alvarez\nDOB: 09/05/1962\nMRN: MEC-2023-0642\nDate of Service: December 5, 2023\nVisit Type: Established Patient - Diabetic Eye Examination\nProvider: Elena Montzka, MD\n\nCHIEF COMPLAINT:\nAnnual diabetic eye examination. No visual complaints.\n\nHISTORY OF PRESENT ILLNESS:\nMr. Alvarez is a 61-year-old man with type 2 diabetes mellitus diagnosed in 2016, referred by his primary care physician for annual diabetic retinopathy surveillance. He denies blurred vision, floaters, flashes, or eye pain.\n\nEXAMINATION:\nVisual acuity (corrected): OD 20/20, OS 20/20\nIntraocular pressure (applanation): OD 15 mmHg, OS 16 mmHg\nDilated fundus examination: Scattered microaneurysms and rare dot hemorrhages in the posterior pole of each eye. No hard exudates, cotton wool spots, venous beading, or neovascularization. Maculae flat with normal foveal reflex.\n\nIMAGING:\nMacular OCT both eyes: normal foveal contour, no intraretinal or subretinal fluid, no macular edema. Central subfield thickness within normal limits.\n\nASSESSMENT:\n1. Mild nonproliferative diabetic retinopathy, both eyes (E11.3293) - scattered microaneurysms, no macular edema.\n2. Type 2 diabetes mellitus - continue medical management with primary care.\n\nPLAN:\n1. Continue current medical management; encouraged glycemic and blood pressure control.\n2. Return in twelve months for repeat dilated examination and macular OCT, sooner for any new floaters, vision change, or distortion.\n\n[ELECTRONIC SIGNATURE APPLIED]\nElena Montzka, MD\nDictated: 12/05/2023 15:20 | Signed: 12/05/2023 15:41"
+      },
+      "extracted_data": {
+        "provider": {
+          "name": "Elena Montzka, MD",
+          "practice": "Montzka Eye Clinic"
+        },
+        "diagnoses": [
+          {
+            "condition": "Mild nonproliferative diabetic retinopathy",
+            "icd10": "E11.3293",
+            "laterality": "OU",
+            "status": "mild, no macular edema"
+          }
+        ],
+        "visual_acuity": {
+          "od_corrected": "20/20",
+          "os_corrected": "20/20"
+        },
+        "iop": {
+          "od": 15,
+          "os": 16,
+          "unit": "mmHg",
+          "method": "applanation"
+        },
+        "plan": "Annual surveillance; return in twelve months"
+      },
+      "metadata": {
+        "source_system": "ehr_archive",
+        "imported_at": "2024-12-12T14:20:00Z",
+        "imported_by": "front_desk",
+        "pages": 1
+      }
+    }
+  ],
+  "contradictions": [],
+  "images": [
+    {
+      "id": "img-ra-001",
+      "patient_id": "robert-alvarez",
+      "study_id": "study-img-ra-001",
+      "source_document_id": null,
+      "image_metadata": {
+        "capture_date": "2023-12-05T10:20:00Z",
+        "capture_device": "Heidelberg Spectralis OCT",
+        "modality": "oct",
+        "laterality": "od",
+        "scan_type": "Macular cube 512x128",
+        "scan_quality": 9
+      },
+      "image_file": "img-ra-001.jpeg",
+      "treatment_context": {
+        "days_since_last_treatment": null,
+        "last_treatment": null,
+        "interval_from_prior_image": null,
+        "treatment_cycle_number": null
+      },
+      "ai_analysis": {
+        "analysis_version": "1.0.0",
+        "analysis_source": "authored_at_seed",
+        "analyzed_at": "2023-12-05T10:20:00Z",
+        "findings": [
+          {
+            "finding_id": "f-img-ra-001-1",
+            "finding_type": "normal",
+            "location": "macula",
+            "confidence": 0.95,
+            "description": "Normal foveal contour; no intraretinal or subretinal fluid"
+          }
+        ],
+        "measurements": [
+          {
+            "measurement_type": "central_retinal_thickness",
+            "value": 257,
+            "unit": "microns",
+            "location": "central 1mm",
+            "reference_range": {
+              "normal_min": 240,
+              "normal_max": 280
+            }
+          }
+        ],
+        "comparison_to_prior": null,
+        "summary": {
+          "headline": "Normal macular OCT - no diabetic macular edema",
+          "key_findings": [
+            "CRT 257 microns - within normal limits"
+          ],
+          "alerts": [],
+          "clinical_impression": "Normal macular OCT - no diabetic macular edema"
+        }
+      },
+      "metadata": {
+        "source_system": "heidelberg_spectralis",
+        "note": "Captured at 2023-12-05 diabetic eye examination (doc-ra-002)"
+      },
+      "storage_key": "oct-normal-macula-1.jpg"
+    },
+    {
+      "id": "img-ra-002",
+      "patient_id": "robert-alvarez",
+      "study_id": "study-img-ra-002",
+      "source_document_id": null,
+      "image_metadata": {
+        "capture_date": "2024-12-26T10:05:00Z",
+        "capture_device": "Heidelberg Spectralis OCT",
+        "modality": "oct",
+        "laterality": "od",
+        "scan_type": "Macular cube 512x128",
+        "scan_quality": 9
+      },
+      "image_file": "img-ra-002.jpeg",
+      "treatment_context": {
+        "days_since_last_treatment": null,
+        "last_treatment": null,
+        "interval_from_prior_image": null,
+        "treatment_cycle_number": null
+      },
+      "ai_analysis": {
+        "analysis_version": "1.0.0",
+        "analysis_source": "authored_at_seed",
+        "analyzed_at": "2024-12-26T10:05:00Z",
+        "findings": [
+          {
+            "finding_id": "f-img-ra-002-1",
+            "finding_type": "normal",
+            "location": "macula",
+            "confidence": 0.95,
+            "description": "Normal foveal contour; no diabetic macular edema"
+          }
+        ],
+        "measurements": [
+          {
+            "measurement_type": "central_retinal_thickness",
+            "value": 259,
+            "unit": "microns",
+            "location": "central 1mm",
+            "reference_range": {
+              "normal_min": 240,
+              "normal_max": 280
+            }
+          }
+        ],
+        "comparison_to_prior": {
+          "prior_image_id": "img-ra-001",
+          "prior_image_date": "2023-12-05",
+          "interval_days": 387,
+          "overall_change": "stable",
+          "changes": [
+            {
+              "finding_type": "central_retinal_thickness",
+              "change_type": "stable",
+              "description": "CRT increased by 2 microns - within measurement variability",
+              "measurement_delta": 2
+            }
+          ],
+          "treatment_response": null
+        },
+        "summary": {
+          "headline": "Stable normal macula - no diabetic macular edema",
+          "key_findings": [
+            "CRT 259 microns - within normal limits"
+          ],
+          "alerts": [],
+          "clinical_impression": "Stable normal macula - no diabetic macular edema"
+        }
+      },
+      "metadata": {
+        "source_system": "heidelberg_spectralis",
+        "note": "Captured at 2024-12-26 annual diabetic eye examination"
+      },
+      "storage_key": "oct-normal-macula-2.jpg"
+    }
+  ],
+  "treatments": [],
+  "events": []
+}

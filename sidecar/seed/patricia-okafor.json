@@ -1,0 +1,425 @@
+{
+  "patient": {
+    "patient_id": "patricia-okafor",
+    "name": "Patricia N. Okafor",
+    "dob": "1971-02-18",
+    "sex": "F",
+    "mrn": "MEC-2024-0917",
+    "address": "3320 Rosamond Circle, Orlando, FL 32806",
+    "phone": "(407) 555-6203",
+    "appointment_date": "2024-12-26",
+    "appointment_time": "11:00",
+    "visit_type": "established_patient"
+  },
+  "medications": [
+    {
+      "id": "fact-po-med-001",
+      "patient_id": "patricia-okafor",
+      "fact_type": "medication",
+      "content": {
+        "name": "Latanoprost 0.005% ophthalmic solution",
+        "generic_name": "latanoprost",
+        "dose": "1 drop OU",
+        "frequency": "nightly at bedtime",
+        "route": "topical",
+        "start_date": "2024-11-21",
+        "end_date": null,
+        "prescriber": "Elena Montzka, MD",
+        "indication": "Ocular hypertension",
+        "risk_flags": []
+      },
+      "is_current": true,
+      "source_document_id": "doc-po-002",
+      "sources": [
+        {
+          "id": "cit-po-001",
+          "fact_id": "fact-po-med-001",
+          "source_label": "Glaucoma evaluation note - Dr. Elena Montzka",
+          "source_type": "prior_visit_note",
+          "excerpt_text": "Started latanoprost 0.005% one drop in both eyes at bedtime.",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 1353,
+            "end_char": 1413,
+            "context_before": "s, full visual fields, and normal RNFL thickness.\n\nPLAN:\n1. ",
+            "context_after": "\n2. Return in four to five weeks for repeat intraocular pres"
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Elena Montzka, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-po-002",
+          "document_date": "2024-11-21"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": "OU",
+      "created_date": "2024-12-26T09:00:00Z",
+      "updated_date": "2024-12-26T09:00:00Z"
+    }
+  ],
+  "allergies": [],
+  "conditions": [
+    {
+      "id": "fact-po-con-001",
+      "patient_id": "patricia-okafor",
+      "fact_type": "condition",
+      "content": {
+        "name": "Ocular hypertension",
+        "icd10": "H40.053",
+        "status": "active",
+        "since": "2024-11",
+        "severity": "IOP mid-20s OU; open angles, normal discs, full fields"
+      },
+      "is_current": true,
+      "source_document_id": "doc-po-002",
+      "sources": [
+        {
+          "id": "cit-po-002",
+          "fact_id": "fact-po-con-001",
+          "source_label": "Glaucoma evaluation note - Dr. Elena Montzka",
+          "source_type": "prior_visit_note",
+          "excerpt_text": "Ocular hypertension, both eyes (H40.053) - intraocular pressure in the mid-20s with open angles, normal optic discs, full visual fields, and normal RNFL thickness.",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 1179,
+            "end_char": 1342,
+            "context_before": "2: full fields both eyes, reliable indices.\n\nASSESSMENT:\n1. ",
+            "context_after": "\n\nPLAN:\n1. Started latanoprost 0.005% one drop in both eyes "
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Elena Montzka, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-po-002",
+          "document_date": "2024-11-21"
+        },
+        {
+          "id": "cit-po-003",
+          "fact_id": "fact-po-con-001",
+          "source_label": "Optometry referral letter - Dr. James Liu",
+          "source_type": "referral_letter",
+          "excerpt_text": "Elevated intraocular pressure both eyes with symmetric cupping. Glaucoma suspect - please evaluate.",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 914,
+            "end_char": 1013,
+            "context_before": "c ratio 0.55 both eyes, symmetric, rims intact\n\nIMPRESSION:\n",
+            "context_after": "\n\nThank you for seeing her. Please send your consultation re"
+          },
+          "attribution": {
+            "speaker_role": "external_provider",
+            "speaker_name": "James Liu, OD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-po-001",
+          "document_date": "2024-11-08"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": "OU",
+      "created_date": "2024-12-26T09:00:00Z",
+      "updated_date": "2024-12-26T09:00:00Z"
+    },
+    {
+      "id": "fact-po-vs-001",
+      "patient_id": "patricia-okafor",
+      "fact_type": "vital_sign",
+      "content": {
+        "name": "IOP",
+        "value": 24,
+        "units": "mmHg",
+        "laterality": "OD",
+        "captured_at": "2024-11-21"
+      },
+      "is_current": true,
+      "source_document_id": "doc-po-002",
+      "sources": [
+        {
+          "id": "cit-po-004",
+          "fact_id": "fact-po-vs-001",
+          "source_label": "Glaucoma evaluation note - Dr. Elena Montzka",
+          "source_type": "prior_visit_note",
+          "excerpt_text": "Applanation tonometry (9:20 AM): OD 24 mmHg, OS 25 mmHg",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 654,
+            "end_char": 709,
+            "context_before": "\nEXAMINATION:\nVisual acuity (corrected): OD 20/20, OS 20/20\n",
+            "context_after": "\nCentral corneal thickness (pachymetry): OD 545 um, OS 548 u"
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Elena Montzka, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-po-002",
+          "document_date": "2024-11-21"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": "OD",
+      "created_date": "2024-12-26T09:00:00Z",
+      "updated_date": "2024-12-26T09:00:00Z"
+    },
+    {
+      "id": "fact-po-vs-002",
+      "patient_id": "patricia-okafor",
+      "fact_type": "vital_sign",
+      "content": {
+        "name": "IOP",
+        "value": 25,
+        "units": "mmHg",
+        "laterality": "OS",
+        "captured_at": "2024-11-21"
+      },
+      "is_current": true,
+      "source_document_id": "doc-po-002",
+      "sources": [
+        {
+          "id": "cit-po-005",
+          "fact_id": "fact-po-vs-002",
+          "source_label": "Glaucoma evaluation note - Dr. Elena Montzka",
+          "source_type": "prior_visit_note",
+          "excerpt_text": "Applanation tonometry (9:20 AM): OD 24 mmHg, OS 25 mmHg",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 654,
+            "end_char": 709,
+            "context_before": "\nEXAMINATION:\nVisual acuity (corrected): OD 20/20, OS 20/20\n",
+            "context_after": "\nCentral corneal thickness (pachymetry): OD 545 um, OS 548 u"
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Elena Montzka, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-po-002",
+          "document_date": "2024-11-21"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": "OS",
+      "created_date": "2024-12-26T09:00:00Z",
+      "updated_date": "2024-12-26T09:00:00Z"
+    }
+  ],
+  "family_history": [],
+  "patient_goals": [],
+  "chief_complaint": {
+    "id": "fact-po-cc-001",
+    "patient_id": "patricia-okafor",
+    "fact_type": "chief_complaint",
+    "content": {
+      "statement": "Follow-up IOP check on latanoprost; asymptomatic",
+      "onset": "latanoprost started 2024-11-21",
+      "laterality": "OU",
+      "progression": "asymptomatic on treatment",
+      "pertinent_negatives": [
+        "No eye pain",
+        "No halos",
+        "No subjective vision change"
+      ]
+    },
+    "is_current": true,
+    "source_document_id": "doc-po-002",
+    "sources": [
+      {
+        "id": "cit-po-006",
+        "fact_id": "fact-po-cc-001",
+        "source_label": "Glaucoma evaluation note - Dr. Elena Montzka",
+        "source_type": "prior_visit_note",
+        "excerpt_text": "Return in four to five weeks for repeat intraocular pressure check on treatment.",
+        "excerpt_location": {
+          "type": "character_range",
+          "start_char": 1417,
+          "end_char": 1497,
+          "context_before": "ted latanoprost 0.005% one drop in both eyes at bedtime.\n2. ",
+          "context_after": "\n3. Repeat visual fields and OCT RNFL in six months to estab"
+        },
+        "attribution": {
+          "speaker_role": "physician",
+          "speaker_name": "Elena Montzka, MD",
+          "confidence": 0.95
+        },
+        "source_document_id": "doc-po-002",
+        "document_date": "2024-11-21"
+      }
+    ],
+    "verification": {
+      "status": "unverified",
+      "verified_by_user_id": null,
+      "verified_at": null,
+      "verifier_role": null
+    },
+    "laterality": "OU",
+    "created_date": "2024-12-26T09:00:00Z",
+    "updated_date": "2024-12-26T09:00:00Z"
+  },
+  "source_documents": [
+    {
+      "document_id": "doc-po-001",
+      "filename": "referral-optometry-2024-11-08.txt",
+      "document_type": "referral_letter",
+      "document_date": "2024-11-08",
+      "received_date": "2024-11-08",
+      "received_method": "fax",
+      "content": {
+        "format": "text",
+        "text_content": "CENTRAL FLORIDA OPTOMETRY GROUP\n880 Lake Baldwin Lane, Orlando, FL 32814\nPhone: (407) 555-4410 | Fax: (407) 555-4411\n\nDate: November 8, 2024\n\nRE: GLAUCOMA EVALUATION REFERRAL\n\nPatient Name: Patricia N. Okafor\nDate of Birth: 02/18/1971 (53 years old)\nPhone: (407) 555-6203\n\nDear Dr. Montzka,\n\nI am referring Ms. Patricia Okafor for glaucoma evaluation after elevated intraocular pressure was found on routine examination.\n\nHISTORY:\nMs. Okafor presented for a routine eye examination and updated glasses. She denies eye pain, halos, headaches, or subjective vision change. She has no prior ocular history and takes no eye medications.\n\nEXAMINATION:\nVisual acuity (corrected): OD 20/20, OS 20/20\nIntraocular pressure (non-contact tonometry, 2:40 PM): OD 26 mmHg, OS 27 mmHg\nAnterior segment: unremarkable; angles appear open by van Herick\nFundus: cup-to-disc ratio 0.55 both eyes, symmetric, rims intact\n\nIMPRESSION:\nElevated intraocular pressure both eyes with symmetric cupping. Glaucoma suspect - please evaluate.\n\nThank you for seeing her. Please send your consultation report to our office.\n\nSincerely,\n\nJames Liu, OD\nCentral Florida Optometry Group",
+        "ocr_quality": 0.94
+      },
+      "extracted_data": {
+        "referring_provider": {
+          "name": "James Liu, OD",
+          "practice": "Central Florida Optometry Group"
+        },
+        "chief_complaint": "Elevated IOP found on routine examination",
+        "iop_screening": {
+          "od": 26,
+          "os": 27,
+          "unit": "mmHg",
+          "method": "non-contact tonometry"
+        },
+        "impression": [
+          "Glaucoma suspect - elevated IOP OU, symmetric cupping"
+        ]
+      },
+      "metadata": {
+        "source_system": "fax_intake",
+        "imported_at": "2024-11-08T16:30:00Z",
+        "imported_by": "front_desk",
+        "pages": 1
+      }
+    },
+    {
+      "document_id": "doc-po-002",
+      "filename": "glaucoma-eval-note-2024-11-21.txt",
+      "document_type": "prior_visit_note",
+      "document_date": "2024-11-21",
+      "content": {
+        "format": "text",
+        "text_content": "MONTZKA EYE CLINIC - OFFICE VISIT NOTE\n\nPatient: Patricia N. Okafor\nDOB: 02/18/1971\nMRN: MEC-2024-0917\nDate of Service: November 21, 2024\nVisit Type: New Patient - Glaucoma Evaluation\nProvider: Elena Montzka, MD\n\nCHIEF COMPLAINT:\nReferred by optometry for elevated intraocular pressure found on routine examination.\n\nHISTORY OF PRESENT ILLNESS:\nMs. Okafor is a 53-year-old woman referred after screening intraocular pressures of 26 and 27 mmHg. She is asymptomatic - no eye pain, halos, or subjective vision change. No prior ocular surgery or trauma. No systemic or topical corticosteroid use.\n\nEXAMINATION:\nVisual acuity (corrected): OD 20/20, OS 20/20\nApplanation tonometry (9:20 AM): OD 24 mmHg, OS 25 mmHg\nCentral corneal thickness (pachymetry): OD 545 um, OS 548 um\nGonioscopy: angles open to ciliary body band 360 degrees both eyes, no synechiae\nOptic discs: cup-to-disc ratio 0.55 both eyes, symmetric, neuroretinal rims intact, no notching or disc hemorrhage\n\nIMAGING AND TESTING:\nOCT retinal nerve fiber layer: average RNFL thickness within normal limits both eyes, no focal thinning.\nHumphrey visual field 24-2: full fields both eyes, reliable indices.\n\nASSESSMENT:\n1. Ocular hypertension, both eyes (H40.053) - intraocular pressure in the mid-20s with open angles, normal optic discs, full visual fields, and normal RNFL thickness.\n\nPLAN:\n1. Started latanoprost 0.005% one drop in both eyes at bedtime.\n2. Return in four to five weeks for repeat intraocular pressure check on treatment.\n3. Repeat visual fields and OCT RNFL in six months to establish baseline trend.\n\n[ELECTRONIC SIGNATURE APPLIED]\nElena Montzka, MD\nDictated: 11/21/2024 16:05 | Signed: 11/21/2024 16:30"
+      },
+      "extracted_data": {
+        "provider": {
+          "name": "Elena Montzka, MD",
+          "practice": "Montzka Eye Clinic"
+        },
+        "diagnoses": [
+          {
+            "condition": "Ocular hypertension",
+            "icd10": "H40.053",
+            "laterality": "OU",
+            "status": "treated with latanoprost from 2024-11-21"
+          }
+        ],
+        "iop": {
+          "od": 24,
+          "os": 25,
+          "unit": "mmHg",
+          "method": "applanation"
+        },
+        "pachymetry": {
+          "od_um": 545,
+          "os_um": 548
+        },
+        "plan": "Latanoprost OU nightly; IOP check in four to five weeks"
+      },
+      "metadata": {
+        "source_system": "ehr_archive",
+        "imported_at": "2024-11-21T17:00:00Z",
+        "imported_by": "system",
+        "pages": 1
+      }
+    }
+  ],
+  "contradictions": [],
+  "images": [
+    {
+      "id": "img-po-001",
+      "patient_id": "patricia-okafor",
+      "study_id": "study-img-po-001",
+      "source_document_id": null,
+      "image_metadata": {
+        "capture_date": "2024-11-21T09:35:00Z",
+        "capture_device": "Heidelberg Spectralis OCT",
+        "modality": "oct",
+        "laterality": "od",
+        "scan_type": "RNFL circle scan",
+        "scan_quality": 9
+      },
+      "image_file": "img-po-001.jpeg",
+      "treatment_context": {
+        "days_since_last_treatment": null,
+        "last_treatment": null,
+        "interval_from_prior_image": null,
+        "treatment_cycle_number": null
+      },
+      "ai_analysis": {
+        "analysis_version": "1.0.0",
+        "analysis_source": "authored_at_seed",
+        "analyzed_at": "2024-11-21T09:35:00Z",
+        "findings": [
+          {
+            "finding_id": "f-img-po-001-1",
+            "finding_type": "normal",
+            "location": "peripapillary",
+            "confidence": 0.95,
+            "description": "Retinal nerve fiber layer within normal limits; no focal thinning"
+          }
+        ],
+        "measurements": [
+          {
+            "measurement_type": "rnfl_thickness",
+            "value": 96,
+            "unit": "microns",
+            "location": "global average",
+            "reference_range": {
+              "normal_min": 80,
+              "normal_max": 110
+            }
+          }
+        ],
+        "comparison_to_prior": null,
+        "summary": {
+          "headline": "Normal RNFL - no glaucomatous structural damage",
+          "key_findings": [
+            "Average RNFL 96 microns - within normal limits"
+          ],
+          "alerts": [],
+          "clinical_impression": "Normal baseline scan for ocular hypertension monitoring"
+        }
+      },
+      "metadata": {
+        "source_system": "heidelberg_spectralis",
+        "note": "Baseline scan captured at 2024-11-21 glaucoma evaluation (doc-po-002)"
+      },
+      "storage_key": "oct-normal-macula-1.jpg"
+    }
+  ],
+  "treatments": [],
+  "events": []
+}

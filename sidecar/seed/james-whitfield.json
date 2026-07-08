@@ -1,0 +1,342 @@
+{
+  "patient": {
+    "patient_id": "james-whitfield",
+    "name": "James E. Whitfield",
+    "dob": "1953-06-30",
+    "sex": "M",
+    "mrn": "MEC-2022-0388",
+    "address": "915 Delaney Park Drive, Orlando, FL 32806",
+    "phone": "(407) 555-7734",
+    "appointment_date": "2024-12-26",
+    "appointment_time": "13:30",
+    "visit_type": "established_patient"
+  },
+  "medications": [
+    {
+      "id": "fact-jw-med-001",
+      "patient_id": "james-whitfield",
+      "fact_type": "medication",
+      "content": {
+        "name": "Prednisolone acetate 1% ophthalmic suspension",
+        "generic_name": "prednisolone acetate",
+        "dose": "1 drop OD",
+        "frequency": "tapering: three times daily, then twice daily, then once daily, then stop",
+        "route": "topical",
+        "start_date": "2024-12-05",
+        "end_date": null,
+        "prescriber": "Elena Montzka, MD",
+        "indication": "Post-operative inflammation, right eye",
+        "risk_flags": []
+      },
+      "is_current": true,
+      "source_document_id": "doc-jw-002",
+      "sources": [
+        {
+          "id": "cit-jw-001",
+          "fact_id": "fact-jw-med-001",
+          "source_label": "Post-operative week 1 note - Dr. Elena Montzka",
+          "source_type": "prior_visit_note",
+          "excerpt_text": "Continue prednisolone acetate 1% right eye: three times daily this week, then twice daily for one week, then once daily for one week, then stop.",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 1110,
+            "end_char": 1254,
+            "context_before": "AN:\n1. Discontinue moxifloxacin at the end of this week.\n2. ",
+            "context_after": "\n3. Return in two weeks for the three-week post-operative ch"
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Elena Montzka, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-jw-002",
+          "document_date": "2024-12-12"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": "OD",
+      "created_date": "2024-12-26T09:00:00Z",
+      "updated_date": "2024-12-26T09:00:00Z"
+    }
+  ],
+  "allergies": [],
+  "conditions": [
+    {
+      "id": "fact-jw-proc-001",
+      "patient_id": "james-whitfield",
+      "fact_type": "procedure_history",
+      "content": {
+        "procedure": "Phacoemulsification with posterior chamber intraocular lens implantation",
+        "cpt": "66984",
+        "laterality": "OD",
+        "date": "2024-12-05",
+        "performed_by": "Elena Montzka, MD",
+        "notes": "Uncomplicated; Alcon AcrySof SN60WF 21.0 D placed in the capsular bag"
+      },
+      "is_current": true,
+      "source_document_id": "doc-jw-001",
+      "sources": [
+        {
+          "id": "cit-jw-002",
+          "fact_id": "fact-jw-proc-001",
+          "source_label": "Operative note - Dr. Elena Montzka",
+          "source_type": "provider_note",
+          "excerpt_text": "Phacoemulsification with posterior chamber intraocular lens implantation, right eye (CPT 66984)",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 367,
+            "end_char": 462,
+            "context_before": "right eye (H25.11)\nPOSTOPERATIVE DIAGNOSIS: Same\nPROCEDURE: ",
+            "context_after": "\nIMPLANT: Alcon AcrySof SN60WF, 21.0 diopters, placed in the"
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Elena Montzka, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-jw-001",
+          "document_date": "2024-12-05"
+        },
+        {
+          "id": "cit-jw-003",
+          "fact_id": "fact-jw-proc-001",
+          "source_label": "Post-operative week 1 note - Dr. Elena Montzka",
+          "source_type": "prior_visit_note",
+          "excerpt_text": "seven days out from uncomplicated phacoemulsification with intraocular lens implantation of the right eye",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 345,
+            "end_char": 450,
+            "context_before": "ract surgery.\n\nHISTORY OF PRESENT ILLNESS:\nMr. Whitfield is ",
+            "context_after": ". He is very pleased with his vision and reports no pain, re"
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Elena Montzka, MD",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-jw-002",
+          "document_date": "2024-12-12"
+        }
+      ],
+      "verification": {
+        "status": "unverified",
+        "verified_by_user_id": null,
+        "verified_at": null,
+        "verifier_role": null
+      },
+      "laterality": "OD",
+      "created_date": "2024-12-26T09:00:00Z",
+      "updated_date": "2024-12-26T09:00:00Z"
+    }
+  ],
+  "family_history": [],
+  "patient_goals": [],
+  "chief_complaint": {
+    "id": "fact-jw-cc-001",
+    "patient_id": "james-whitfield",
+    "fact_type": "chief_complaint",
+    "content": {
+      "statement": "Three-week post-operative check, right eye cataract surgery; vision much improved",
+      "onset": "surgery 2024-12-05",
+      "laterality": "OD",
+      "progression": "improving; excellent early result at week 1",
+      "pertinent_negatives": [
+        "No pain",
+        "No redness",
+        "No new floaters"
+      ]
+    },
+    "is_current": true,
+    "source_document_id": "doc-jw-002",
+    "sources": [
+      {
+        "id": "cit-jw-004",
+        "fact_id": "fact-jw-cc-001",
+        "source_label": "Post-operative week 1 note - Dr. Elena Montzka",
+        "source_type": "prior_visit_note",
+        "excerpt_text": "He is very pleased with his vision and reports no pain, redness, or new floaters.",
+        "excerpt_location": {
+          "type": "character_range",
+          "start_char": 452,
+          "end_char": 533,
+          "context_before": "cation with intraocular lens implantation of the right eye. ",
+          "context_after": " He is using his drops as directed.\n\nEXAMINATION:\nVisual acu"
+        },
+        "attribution": {
+          "speaker_role": "physician",
+          "speaker_name": "Elena Montzka, MD",
+          "confidence": 0.95
+        },
+        "source_document_id": "doc-jw-002",
+        "document_date": "2024-12-12"
+      }
+    ],
+    "verification": {
+      "status": "unverified",
+      "verified_by_user_id": null,
+      "verified_at": null,
+      "verifier_role": null
+    },
+    "laterality": "OD",
+    "created_date": "2024-12-26T09:00:00Z",
+    "updated_date": "2024-12-26T09:00:00Z"
+  },
+  "source_documents": [
+    {
+      "document_id": "doc-jw-001",
+      "filename": "op-note-cataract-od-2024-12-05.txt",
+      "document_type": "clinical_note",
+      "document_date": "2024-12-05",
+      "content": {
+        "format": "text",
+        "text_content": "MONTZKA EYE CLINIC - AMBULATORY SURGERY CENTER\nOPERATIVE NOTE\n\nPatient: James E. Whitfield\nDOB: 06/30/1953\nMRN: MEC-2022-0388\nDate of Surgery: December 5, 2024\nSurgeon: Elena Montzka, MD\nAnesthesia: Topical with intravenous sedation\n\nPREOPERATIVE DIAGNOSIS: Visually significant nuclear sclerotic cataract, right eye (H25.11)\nPOSTOPERATIVE DIAGNOSIS: Same\nPROCEDURE: Phacoemulsification with posterior chamber intraocular lens implantation, right eye (CPT 66984)\nIMPLANT: Alcon AcrySof SN60WF, 21.0 diopters, placed in the capsular bag\n\nDESCRIPTION OF PROCEDURE:\nAfter informed consent, the patient was brought to the operating suite and the right eye was prepped and draped in the usual sterile fashion. A temporal clear corneal incision was created, the anterior chamber was filled with viscoelastic, and a continuous curvilinear capsulorhexis was performed. The nucleus was disassembled and removed by phacoemulsification, and cortical material was aspirated. The intraocular lens was injected into the capsular bag and centered. Viscoelastic was removed, the incision was hydrated and confirmed watertight, and intracameral antibiotic was given. The procedure was uncomplicated and the patient tolerated it well.\n\nPOSTOPERATIVE INSTRUCTIONS:\n1. Moxifloxacin 0.5% one drop right eye three times daily for one week.\n2. Prednisolone acetate 1% one drop right eye four times daily, taper per follow-up schedule.\n3. Eye shield at night for one week. No heavy lifting or eye rubbing.\n4. Follow-up in clinic tomorrow, at one week, and at three weeks.\n\n[ELECTRONIC SIGNATURE APPLIED]\nElena Montzka, MD\nDictated: 12/05/2024 12:10 | Signed: 12/05/2024 12:25"
+      },
+      "extracted_data": {
+        "provider": {
+          "name": "Elena Montzka, MD",
+          "practice": "Montzka Eye Clinic"
+        },
+        "procedure": {
+          "name": "Phacoemulsification with posterior chamber IOL implantation",
+          "cpt": "66984",
+          "laterality": "OD",
+          "date": "2024-12-05",
+          "implant": "Alcon AcrySof SN60WF 21.0 D",
+          "complications": "none"
+        }
+      },
+      "metadata": {
+        "source_system": "ehr_archive",
+        "imported_at": "2024-12-05T18:00:00Z",
+        "imported_by": "system",
+        "pages": 1
+      }
+    },
+    {
+      "document_id": "doc-jw-002",
+      "filename": "postop-week1-note-2024-12-12.txt",
+      "document_type": "prior_visit_note",
+      "document_date": "2024-12-12",
+      "content": {
+        "format": "text",
+        "text_content": "MONTZKA EYE CLINIC - OFFICE VISIT NOTE\n\nPatient: James E. Whitfield\nDOB: 06/30/1953\nMRN: MEC-2022-0388\nDate of Service: December 12, 2024\nVisit Type: Established Patient - Post-operative Week 1\nProvider: Elena Montzka, MD\n\nCHIEF COMPLAINT:\nOne-week post-operative check, right eye cataract surgery.\n\nHISTORY OF PRESENT ILLNESS:\nMr. Whitfield is seven days out from uncomplicated phacoemulsification with intraocular lens implantation of the right eye. He is very pleased with his vision and reports no pain, redness, or new floaters. He is using his drops as directed.\n\nEXAMINATION:\nVisual acuity (uncorrected): OD 20/25, OS 20/40\nIntraocular pressure (applanation): OD 14 mmHg, OS 15 mmHg\nRight eye: cornea clear, anterior chamber deep and quiet with rare cell, incisions sealed, intraocular lens well centered in the capsular bag\nDilated fundus examination OD: macula flat, no cystoid edema, periphery attached\n\nASSESSMENT:\n1. Status post uncomplicated phacoemulsification with intraocular lens, right eye (12/05/2024) - excellent early result.\n\nPLAN:\n1. Discontinue moxifloxacin at the end of this week.\n2. Continue prednisolone acetate 1% right eye: three times daily this week, then twice daily for one week, then once daily for one week, then stop.\n3. Return in two weeks for the three-week post-operative check with macular OCT; refraction for updated glasses at that visit.\n\n[ELECTRONIC SIGNATURE APPLIED]\nElena Montzka, MD\nDictated: 12/12/2024 11:40 | Signed: 12/12/2024 11:55"
+      },
+      "extracted_data": {
+        "provider": {
+          "name": "Elena Montzka, MD",
+          "practice": "Montzka Eye Clinic"
+        },
+        "visual_acuity": {
+          "od_uncorrected": "20/25",
+          "os_uncorrected": "20/40"
+        },
+        "iop": {
+          "od": 14,
+          "os": 15,
+          "unit": "mmHg",
+          "method": "applanation"
+        },
+        "assessment": "Excellent early post-operative result, right eye",
+        "plan": "Prednisolone taper; return in two weeks with macular OCT"
+      },
+      "metadata": {
+        "source_system": "ehr_archive",
+        "imported_at": "2024-12-12T12:10:00Z",
+        "imported_by": "system",
+        "pages": 1
+      }
+    }
+  ],
+  "contradictions": [],
+  "images": [
+    {
+      "id": "img-jw-001",
+      "patient_id": "james-whitfield",
+      "study_id": "study-img-jw-001",
+      "source_document_id": null,
+      "image_metadata": {
+        "capture_date": "2024-12-26T13:10:00Z",
+        "capture_device": "Heidelberg Spectralis OCT",
+        "modality": "oct",
+        "laterality": "od",
+        "scan_type": "Macular cube 512x128",
+        "scan_quality": 9
+      },
+      "image_file": "img-jw-001.jpeg",
+      "treatment_context": {
+        "days_since_last_treatment": null,
+        "last_treatment": null,
+        "interval_from_prior_image": null,
+        "treatment_cycle_number": null
+      },
+      "ai_analysis": {
+        "analysis_version": "1.0.0",
+        "analysis_source": "authored_at_seed",
+        "analyzed_at": "2024-12-26T13:10:00Z",
+        "findings": [
+          {
+            "finding_id": "f-img-jw-001-1",
+            "finding_type": "normal",
+            "location": "macula",
+            "confidence": 0.94,
+            "description": "Restored foveal contour; no cystoid macular edema"
+          }
+        ],
+        "measurements": [
+          {
+            "measurement_type": "central_retinal_thickness",
+            "value": 255,
+            "unit": "microns",
+            "location": "central 1mm",
+            "reference_range": {
+              "normal_min": 240,
+              "normal_max": 280
+            }
+          }
+        ],
+        "comparison_to_prior": null,
+        "summary": {
+          "headline": "Normal post-operative macula - no cystoid macular edema",
+          "key_findings": [
+            "CRT 255 microns - within normal limits"
+          ],
+          "alerts": [],
+          "clinical_impression": "No pseudophakic cystoid macular edema at the three-week post-operative visit"
+        }
+      },
+      "metadata": {
+        "source_system": "heidelberg_spectralis",
+        "note": "Captured at 2024-12-26 three-week post-operative visit"
+      },
+      "storage_key": "oct-post-treatment-macula-1.jpg"
+    }
+  ],
+  "treatments": [],
+  "events": [
+    {
+      "id": "evt-jw-001",
+      "patient_id": "james-whitfield",
+      "event_type": "cataract_surgery",
+      "treatment_type": "cataract_surgery",
+      "treatment_date": "2024-12-05",
+      "injection_details": null,
+      "pre_treatment_assessment": {
+        "indication": "Visually significant nuclear sclerotic cataract, right eye",
+        "visual_acuity": "20/60"
+      },
+      "outcome": {
+        "assessed_at": "2024-12-12",
+        "response": "good",
+        "notes": "Uncorrected VA 20/25 OD at post-operative week 1; quiet eye"
+      },
+      "performed_by": "Elena Montzka, MD",
+      "note": "Uncomplicated phacoemulsification with posterior chamber IOL (CPT 66984), Alcon AcrySof SN60WF 21.0 D"
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 // Seed CLI (node dist/scripts/seed.js on Railway, or npx tsx src/scripts/seed.ts locally):
 // migrates the fact store, then loads the ground-truthed corpus (seed/*.json) into it.
 // Idempotent: each patient is wiped and re-inserted, so re-runs converge (prep_runs survive).
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../config.js';
 import { createPool, FactStore } from '../store/index.js';
@@ -9,7 +9,12 @@ import { migrate } from '../store/migrate.js';
 
 // Resolves to sidecar/seed/ from both src/scripts/ (tsx) and dist/scripts/ (built).
 const SEED_DIR = fileURLToPath(new URL('../../seed/', import.meta.url));
-const CORPUS_FILES = ['margaret-chen.json', 'william-thompson.json'];
+
+// Every *.json directly in seed/ is a patient corpus (images/manifest.json lives in a
+// subdirectory and is not swept). Sorted for a deterministic load/log order.
+async function listCorpusFiles(): Promise<string[]> {
+    return (await readdir(SEED_DIR)).filter((name) => name.endsWith('.json')).sort();
+}
 
 async function main(): Promise<void> {
     const config = loadConfig();
@@ -22,7 +27,7 @@ async function main(): Promise<void> {
     console.log(`migrations applied: ${applied.length === 0 ? '(none pending)' : applied.join(', ')}`);
 
     const store = new FactStore(pool);
-    for (const file of CORPUS_FILES) {
+    for (const file of await listCorpusFiles()) {
         const corpus = JSON.parse(await readFile(new URL(file, `file://${SEED_DIR}`), 'utf8'));
         // Corpus uses patient_id as the identity key; everything else is demographics.
         const { patient_id: patientId, name, ...demographics } = corpus.patient;
