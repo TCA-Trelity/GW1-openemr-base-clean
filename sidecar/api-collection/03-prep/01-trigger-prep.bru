@@ -1,0 +1,62 @@
+meta {
+  name: POST /api/prep/:patientId — trigger LLM prep
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/prep/margaret-chen
+  body: none
+  auth: none
+}
+
+params:query {
+  ~force: true
+}
+
+tests {
+  test("returns 202 (started / already running) or 200 (fresh brief reused)", function() {
+    expect([200, 202]).to.include(res.getStatus());
+  });
+
+  test("body carries a run/brief identifier", function() {
+    const body = res.getBody();
+    expect(Boolean(body.prep_run_id) || Boolean(body.brief_id)).to.equal(true);
+  });
+}
+
+docs {
+  # Trigger a prep run (spends guarded LLM budget)
+
+  **What it proves:** the async LLM pipeline starts on demand and every
+  dollar of spend sits behind four cost guards, checked in order:
+
+  1. **Reuse window** — a complete brief newer than
+     `PREP_REUSE_WINDOW_MINUTES` (default 10) answers `200` with **no LLM
+     spend**: `{"status":"reused","brief_id":"...","prepared_at":"..."}`.
+     Append `?force=true` (a disabled query param on this request — toggle
+     it on) to bypass this guard for an explicit re-prep.
+  2. **In-flight dedupe** — one running prep per patient:
+     `202 {"status":"already_running","prep_run_id":"..."}`.
+  3. **Concurrency cap** — `LLM_MAX_CONCURRENT_PREPS` (default 2) across
+     all patients in the process: `429 {"error":"too_many_preps"}`.
+  4. **Budget precheck** — rolling 24h spend vs `LLM_DAILY_BUDGET_USD`:
+     `429 {"error":"llm_budget_exceeded","spent_usd":...,"budget_usd":...}`.
+     (The pipeline re-checks right before the LLM call too, so runs
+     already in flight cannot blow past the cap.)
+
+  **Fresh start** — `202`:
+
+  ```json
+  { "prep_run_id": "...", "correlation_id": "..." }
+  ```
+
+  The run executes async in-process; poll `/api/prep-runs/margaret-chen`
+  (next request) for stage/status, then `/api/brief/margaret-chen` for the
+  result. `correlation_id` ties the run to logs and Langfuse traces.
+
+  **Test note:** the tests accept `200` or `202` so the collection passes
+  whether or not a fresh brief exists. A `429` is not a failure of the
+  system — it is the guardrails working — but it will fail this request's
+  test; wait for the window/budget or another day's budget.
+}

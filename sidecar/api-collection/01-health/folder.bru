@@ -1,0 +1,11 @@
+meta {
+  name: 01 Health
+  seq: 1
+}
+
+docs {
+  Liveness and readiness probes. `/health` proves the process answers;
+  `/ready` proves the dependencies behind it (OpenEMR, Anthropic, Langfuse,
+  Postgres) actually respond. Run these first — everything else assumes a
+  ready deployment.
+}

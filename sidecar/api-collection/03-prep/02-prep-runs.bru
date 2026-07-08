@@ -1,0 +1,64 @@
+meta {
+  name: GET /api/prep-runs/:patientId — run status
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/prep-runs/margaret-chen
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body.runs: isDefined
+}
+
+tests {
+  test("runs is an array (newest first, max 20)", function() {
+    expect(res.getBody().runs).to.be.an('array');
+  });
+}
+
+docs {
+  # Prep-run observability
+
+  **What it proves:** "is my prep stuck / why did it fail" answers over
+  HTTP instead of platform-log archaeology. Newest-first history (up to
+  20 runs) with the **stage** the run last entered and the **error** it
+  died with, if any.
+
+  **Response shape** — `200`:
+
+  ```json
+  {
+    "runs": [
+      {
+        "id": "...",
+        "patient_id": "margaret-chen",
+        "status": "complete",
+        "stage": "persist_brief",
+        "error": null,
+        "correlation_id": "...",
+        "started_at": "2026-07-08T...",
+        "finished_at": "2026-07-08T..."
+      },
+      {
+        "status": "failed",
+        "stage": "extract_facts",
+        "error": "…what broke…",
+        ...
+      }
+    ]
+  }
+  ```
+
+  A `failed` run's `stage` pinpoints where in the pipeline it died and
+  `error` says why; `correlation_id` matches the value returned by the
+  POST and joins to structured logs / Langfuse traces. An empty `runs`
+  array simply means no prep has ever been triggered for this patient.
+
+  **Usage:** after POSTing a prep, poll this until the newest run shows
+  `status: "complete"`, then fetch `/api/brief/margaret-chen`.
+}

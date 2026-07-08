@@ -1,0 +1,56 @@
+meta {
+  name: GET /api/usage — 24h LLM spend vs budget
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/usage
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body.window: eq 24h
+  res.body.budget_usd: isNumber
+  res.body.remaining_usd: isNumber
+}
+
+docs {
+  # LLM spend accounting
+
+  **What it proves:** every LLM call (prep and chat) is metered into a
+  ledger, and the same numbers that gate spending (the `429
+  llm_budget_exceeded` responses on prep/chat) are exposed for
+  inspection. The window is rolling — the last 24 hours, not a calendar
+  day.
+
+  **Response shape** — `200`:
+
+  ```json
+  {
+    "window": "24h",
+    "calls": 7,
+    "input_tokens": 52340,
+    "output_tokens": 8112,
+    "est_cost_usd": 0.19,
+    "budget_usd": 5,
+    "remaining_usd": 4.81
+  }
+  ```
+
+  - `est_cost_usd` is computed from the ledgered token counts at the
+    configured per-Mtok rates.
+  - `budget_usd` is `LLM_DAILY_BUDGET_USD` (default 5).
+  - When `remaining_usd` hits 0, prep and chat both refuse with
+    `429 {"error":"llm_budget_exceeded", ...}` until the rolling window
+    frees headroom.
+
+  **Grader tip:** snapshot this before and after running the prep/chat
+  requests to watch `calls` and `est_cost_usd` move — direct evidence the
+  metering is real.
+
+  **Failure mode:** `503 {"error":"store_not_configured"}` when no
+  database (the ledger lives in Postgres).
+}

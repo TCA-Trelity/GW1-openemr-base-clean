@@ -1,0 +1,64 @@
+meta {
+  name: GET /api/overview/:patientId — deterministic landing payload
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/overview/margaret-chen
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body.patient.id: eq margaret-chen
+  res.body.medication_risk_flags.length: gte 1
+  res.body.contradictions.length: gte 1
+}
+
+docs {
+  # Overview — everything above the fold, zero LLM
+
+  **What it proves:** the landing page's clinical-safety content is
+  **deterministic**. This payload derives entirely from stored EHR facts
+  plus pure analysis engines — one store round-trip, no model call, so it
+  is fast, reproducible, and immune to hallucination. Re-running this
+  request yields the same clinical content every time (only
+  `generated_at` moves).
+
+  **Asserted:**
+  - `medication_risk_flags` is non-empty — the medication-risk engine
+    fires on the seeded regimen (e.g. hydroxychloroquine duration/dosing
+    risk for Margaret Chen).
+  - `contradictions` is non-empty — cross-source contradiction detection
+    found conflicting statements in the record.
+
+  **Response shape** — `200`:
+
+  ```json
+  {
+    "patient": { "id": "margaret-chen", "name": "Margaret Chen", ... },
+    "facts_by_type": { "medication": [...], "diagnosis": [...], ... },
+    "medication_risk_flags": [ ... ],
+    "contradictions": [ ... ],
+    "documents": [ { "id", "document_type", "document_date", "metadata", "extras" } ],
+    "images": [ { "id", "storage_key", "image_metadata", ... } ],
+    "imaging": {
+      "timeline_summary": [ { "image_id", "capture_date", "modality", "laterality", "treatment_context" } ],
+      "interval_analysis": { ... },
+      "hcq_progression": { ... }
+    },
+    "latest_brief": { "id", "prepared_at", "correlation_id" },
+    "generated_at": "2026-07-08T..."
+  }
+  ```
+
+  Notes: `documents` here is metadata only (full text lives on
+  `/api/facts`); `images[].storage_key` feeds the `/api/images/<key>`
+  request later in this collection; `latest_brief` is `null` until a prep
+  run has completed.
+
+  **Failure modes:** `404 {"error":"patient_not_found"}` for an unknown
+  id; `503 {"error":"store_not_configured"}` without a database.
+}

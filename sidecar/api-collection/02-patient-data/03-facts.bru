@@ -1,0 +1,62 @@
+meta {
+  name: GET /api/facts/:patientId — full fact bundle
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/facts/margaret-chen
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body.patient.id: eq margaret-chen
+  res.body.facts.length: gte 1
+  res.body.documents.length: gte 1
+}
+
+docs {
+  # Full fact bundle — the citation substrate
+
+  **What it proves:** the complete stored record the LLM features are
+  grounded in. Every fact carries provenance (`source_document_id`,
+  `sources`), and `documents` contains the **full source documents** —
+  this is what the panel's Sources tab and citation deep-links render
+  from, and what chat/brief citations (`cited_fact_ids`) resolve against.
+
+  **Response shape** — `200`, the raw `FactBundle`:
+
+  ```json
+  {
+    "patient": { "id", "openemr_patient_id", "name", "demographics" },
+    "facts": [
+      {
+        "id": "fact-mc-med-001",
+        "fact_type": "medication",
+        "content": { ... },
+        "is_current": true,
+        "laterality": null,
+        "verification": "...",
+        "source_document_id": "...",
+        "sources": [ ... ],
+        "created_date": "...",
+        "updated_date": "..."
+      }
+    ],
+    "contradictions": [ ... ],
+    "images": [ ... ],
+    "treatments": [ ... ],
+    "documents": [ ...full text, not just metadata... ]
+  }
+  ```
+
+  **Why it matters for grading:** take any `cited_fact_ids` value from a
+  chat `done` event or a brief and find it under `facts[].id` here — the
+  citation chain from LLM output back to a verifiable EHR source document
+  closes on this endpoint.
+
+  **Failure modes:** `404 {"error":"patient_not_found"}`;
+  `503 {"error":"store_not_configured"}`.
+}

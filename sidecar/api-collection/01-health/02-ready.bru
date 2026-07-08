@@ -1,0 +1,57 @@
+meta {
+  name: GET /ready — dependency readiness
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/ready
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body.ready: eq true
+}
+
+docs {
+  # Readiness (real dependency checks)
+
+  **What it proves:** the sidecar's dependencies are actually reachable
+  right now — not just that the process booted. Each configured dependency
+  is probed live, in parallel, with a 5s timeout per check:
+
+  | Dependency  | Probe                                                        |
+  |-------------|--------------------------------------------------------------|
+  | `openemr`   | FHIR capability statement (`/apis/default/fhir/metadata`)     |
+  | `anthropic` | Model list — cheapest authenticated call, proves the key is live |
+  | `langfuse`  | `/api/public/health` on the configured Langfuse host          |
+  | `postgres`  | `SELECT 1` through the live connection pool                   |
+  | `redis`     | Placeholder — reports `not_configured` until a queue is adopted |
+
+  **Expected response** — `200`:
+
+  ```json
+  {
+    "ready": true,
+    "dependencies": {
+      "openemr":   { "status": "ok" },
+      "anthropic": { "status": "ok" },
+      "langfuse":  { "status": "ok" },
+      "postgres":  { "status": "ok" },
+      "redis":     { "status": "not_configured" }
+    }
+  }
+  ```
+
+  **Per-dependency statuses:** `ok` (probe passed), `failed` (configured
+  but the live check errored — an `error` string says why), or
+  `not_configured` (no credentials/URL set for it).
+
+  **When it 503s:** any configured dependency reporting `failed` flips
+  `ready` to `false`, as does running in production with a required
+  dependency (`openemr`, `anthropic`) unconfigured. On a 503, the
+  `dependencies` map pinpoints exactly which check failed and with what
+  error — no log archaeology needed.
+}

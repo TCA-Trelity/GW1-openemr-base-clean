@@ -1,0 +1,48 @@
+meta {
+  name: GET /api/patients — day list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/patients
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body.patients.length: gte 2
+}
+
+docs {
+  # Day list (schedule sidebar)
+
+  **What it proves:** the Postgres fact store is wired and seeded — this
+  is the panel's day-schedule sidebar source. The deployment ships with at
+  least two seeded patients (`margaret-chen`, `william-thompson`), which
+  the assertion checks.
+
+  **Expected response** — `200`:
+
+  ```json
+  {
+    "patients": [
+      {
+        "id": "margaret-chen",
+        "openemr_patient_id": null,
+        "name": "Margaret Chen",
+        "demographics": { ... }
+      },
+      ...
+    ]
+  }
+  ```
+
+  Each `patients[].id` is the `:patientId` path parameter used by every
+  other request in this collection.
+
+  **Failure mode:** `503 {"error":"store_not_configured"}` means the
+  deployment has no `DATABASE_URL` — the scaffold boots without a store,
+  but none of the patient endpoints can answer.
+}

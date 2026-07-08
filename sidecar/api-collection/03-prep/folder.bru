@@ -1,0 +1,11 @@
+meta {
+  name: 03 Prep pipeline (LLM, guarded)
+  seq: 3
+}
+
+docs {
+  The LLM prep pipeline and its observability/cost surfaces. The POST
+  spends real (budget-guarded) LLM money; the three GETs are free reads.
+  Four cost guards sit in front of every prep: reuse window, in-flight
+  dedupe, concurrency cap, and a rolling 24h budget precheck.
+}

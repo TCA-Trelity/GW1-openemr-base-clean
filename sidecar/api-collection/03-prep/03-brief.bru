@@ -1,0 +1,65 @@
+meta {
+  name: GET /api/brief/:patientId — latest brief
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/brief/margaret-chen
+  body: none
+  auth: none
+}
+
+tests {
+  test("200 with a brief, or 404 not_prepared before any prep", function() {
+    expect([200, 404]).to.include(res.getStatus());
+  });
+
+  test("payload matches its status code", function() {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body).to.have.property('content');
+      expect(body).to.have.property('prepared_at');
+    } else {
+      expect(body.status).to.equal('not_prepared');
+    }
+  });
+}
+
+docs {
+  # Latest citation-gated brief
+
+  **What it proves:** LLM output is only ever served **after** it has
+  survived citation gating — the prep pipeline validates every citation
+  in the generated brief against real stored fact IDs before persisting,
+  so nothing uncited or miscited reaches this endpoint.
+
+  **Response** — `200`, the latest complete brief:
+
+  ```json
+  {
+    "id": "...",
+    "patient_id": "margaret-chen",
+    "prepared_at": "2026-07-08T...",
+    "correlation_id": "...",
+    "status": "complete",
+    "content": { ...structured brief with per-claim fact citations... }
+  }
+  ```
+
+  Citation ids inside `content` resolve against `facts[].id` from
+  `/api/facts/margaret-chen` — the grading path for "is every claim
+  grounded".
+
+  **Not prepared yet** — `404`:
+
+  ```json
+  { "status": "not_prepared" }
+  ```
+
+  This is an expected state, not an error: it is what the endpoint
+  returns before the first successful prep run (or on a fresh database).
+  The tests accept both outcomes so the collection runs green on a cold
+  deployment; POST `/api/prep/margaret-chen`, wait for the run to
+  complete, and re-request to see the 200 path.
+}

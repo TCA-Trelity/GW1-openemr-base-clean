@@ -1,0 +1,37 @@
+meta {
+  name: GET /health — liveness
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/health
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq ok
+  res.headers['x-correlation-id']: isDefined
+}
+
+docs {
+  # Liveness
+
+  **What it proves:** the sidecar process is up and Fastify is serving
+  requests. No dependency is touched — this is the cheap "is it alive"
+  probe (Railway healthcheck target). Dependency health is `/ready`.
+
+  **Expected response** — `200`:
+
+  ```json
+  { "status": "ok" }
+  ```
+
+  **Also asserted:** the `x-correlation-id` response header. Every request
+  to the sidecar gets a correlation ID (an incoming `x-correlation-id`
+  header is honored, otherwise one is generated) that appears on every log
+  line, tool call, and LLM interaction — a full trace reconstructs from
+  logs alone. The header proves that plumbing is active.
+}
