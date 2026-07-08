@@ -1,17 +1,108 @@
-// Overview tab — manifest §4 order: contradiction alerts -> Why They're Here ->
-// What They're Hoping For -> Key Discussion Points -> Questions to Confirm ->
-// Medication Risk Flags -> compact imaging block (full workstation lands in S2.2).
-import { AlertTriangle, GitMerge, HelpCircle, Info, Pill, ExternalLink, Activity } from 'lucide-react';
+// Overview landing (S2.11) — rendered instantly from GET /api/overview, no LLM in the
+// path: patient band, contradiction alerts, chief complaint, meds + deterministic risk
+// flags, allergies, conditions, recent-scans strip; the AI insights card slots in async.
+import { useState, type ComponentType, type ReactNode } from 'react';
+import {
+    AlertTriangle,
+    Clock,
+    ExternalLink,
+    GitMerge,
+    Info,
+    MessageSquare,
+    Pill,
+    Scan,
+    Stethoscope,
+} from 'lucide-react';
 import type {
-    BriefContent,
     CitationRef,
     ContradictionSeverity,
+    ImageRecord,
     MedicationRiskFlag,
+    OverviewPayload,
+    PatientFact,
+    PatientRecord,
     RuntimeContradiction,
     RuntimeContradictionSource,
+    StoredContradictionRow,
 } from './types';
-import { Card, SectionLabel, asSourceType, titleCase } from './ui';
+import { Card, SectionLabel, VisitTypeChip, asSourceType, computeAge, formatAppointmentTime, formatDate, titleCase } from './ui';
 import { CitationChips } from './CitationChip';
+import { FactRow } from './MedicalBackground';
+import ScanImage, { modalityLabel } from './imaging/ScanImage';
+
+// ---- Stored contradiction rows -> the runtime shape the alert banner renders ----
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+    return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+function asString(value: unknown): string | null {
+    return typeof value === 'string' && value !== '' ? value : null;
+}
+
+function runtimeSource(value: unknown): RuntimeContradictionSource | null {
+    const record = asRecord(value);
+    if (record === null) {
+        return null;
+    }
+    return {
+        type: asString(record.type) ?? 'source_document',
+        value: asString(record.value) ?? '',
+        timestamp: asString(record.timestamp),
+        document_id: asString(record.document_id),
+        excerpt: asString(record.excerpt),
+    };
+}
+
+/**
+ * Stored contradiction payloads arrive in the runtime detector shape OR the rich seed
+ * shape — project either into the RuntimeContradiction the alert banner renders
+ * (mirror of sidecar schemas/contradictions.ts projectContradiction).
+ */
+export function projectContradictionRow(row: StoredContradictionRow): RuntimeContradiction {
+    const payload = row.payload;
+    const status: 'active' | 'resolved' = row.status === 'resolved' ? 'resolved' : 'active';
+    const richDescription = asString(payload.clinical_significance);
+    if (richDescription !== null) {
+        const docs = Array.isArray(payload.source_documents) ? payload.source_documents : [];
+        const toSource = (doc: unknown): RuntimeContradictionSource | null => {
+            const record = asRecord(doc);
+            if (record === null) {
+                return null;
+            }
+            return {
+                type: 'source_document',
+                value: asString(record.claim) ?? '',
+                document_id: asString(record.source_document_id) ?? asString(record.filename),
+                excerpt: asString(record.exact_text),
+                timestamp: null,
+            };
+        };
+        const workflow = asRecord(payload.physician_workflow);
+        return {
+            id: row.id,
+            patient_id: row.patient_id,
+            status,
+            severity: row.severity,
+            type: asString(payload.type) ?? 'contradiction',
+            description: richDescription,
+            suggested_question: workflow !== null ? asString(workflow.auto_generate_question) : null,
+            source_a: toSource(docs[0]),
+            source_b: toSource(docs[1]),
+        };
+    }
+    return {
+        id: row.id,
+        patient_id: row.patient_id,
+        status,
+        severity: row.severity,
+        type: asString(payload.type) ?? 'contradiction',
+        description: asString(payload.description) ?? 'Contradiction on record',
+        suggested_question: asString(payload.suggested_question),
+        source_a: runtimeSource(payload.source_a),
+        source_b: runtimeSource(payload.source_b),
+    };
+}
 
 // ---- Contradiction alerts banner (port of ContradictionAlert.jsx severityConfig) ----
 
@@ -42,7 +133,7 @@ function contradictionCitation(alertId: string, side: 'a' | 'b', source: Runtime
     };
 }
 
-function ContradictionAlerts({ alerts }: { alerts: RuntimeContradiction[] }) {
+export function ContradictionAlerts({ alerts }: { alerts: RuntimeContradiction[] }) {
     if (alerts.length === 0) {
         return null;
     }
@@ -100,6 +191,30 @@ const FLAG_STYLES: Record<MedicationRiskFlag['severity'], { container: string; i
     low: { container: 'bg-blue-50 border-blue-200', icon: 'text-blue-600', title: 'text-blue-800', badge: 'bg-blue-100 text-blue-700 border-blue-200' },
 };
 
+/** Compact severity-styled badge shown inline on the medication row. */
+function RiskFlagBadge({ flag }: { flag: MedicationRiskFlag }) {
+    const styles = FLAG_STYLES[flag.severity];
+    return (
+        <span
+            data-testid="med-risk-badge"
+            title={flag.message}
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-xs font-semibold ${styles.badge}`}
+        >
+            <AlertTriangle className="w-3 h-3" />
+            {titleCase(flag.flag_type)} · {flag.severity.toUpperCase()}
+        </span>
+    );
+}
+
+/** Flags matched to a medication row by name (flag.medication mirrors the fact's name). */
+function flagsForMedication(name: string, flags: MedicationRiskFlag[]): MedicationRiskFlag[] {
+    const lower = name.toLowerCase();
+    return flags.filter((flag) => {
+        const flagName = flag.medication.toLowerCase();
+        return flagName === lower || lower.includes(flagName) || flagName.includes(lower);
+    });
+}
+
 function MedicationRiskFlags({ flags }: { flags: MedicationRiskFlag[] }) {
     if (flags.length === 0) {
         return null;
@@ -156,62 +271,159 @@ function MedicationRiskFlags({ flags }: { flags: MedicationRiskFlag[] }) {
     );
 }
 
-// ---- Compact imaging block (data from S1 engines; the four full features are S2.2) ----
+// ---- Patient header band ----
 
-const HCQ_ALERT_STYLES: Record<'high' | 'medium' | 'low', string> = {
-    high: 'bg-red-50 border-red-200 text-red-800',
-    medium: 'bg-amber-50 border-amber-200 text-amber-800',
-    low: 'bg-slate-50 border-slate-200 text-slate-700',
-};
+const SEX_LABELS: Record<string, string> = { F: 'Female', M: 'Male' };
 
-function ImagingSummary({ imaging }: { imaging: BriefContent['imaging'] }) {
-    const { timeline_summary, interval_analysis, hcq_progression } = imaging;
-    const modalityCounts = new Map<string, number>();
-    for (const entry of timeline_summary) {
-        const key = `${entry.modality.toUpperCase()} ${entry.laterality.toUpperCase()}`;
-        modalityCounts.set(key, (modalityCounts.get(key) ?? 0) + 1);
+function PatientHeaderBand({ patient, generatedAt }: { patient: PatientRecord; generatedAt: string }) {
+    const demo = patient.demographics;
+    const age = computeAge(demo.dob, generatedAt);
+    const identity = [
+        age !== null ? `${age} yrs` : '',
+        demo.sex !== undefined && demo.sex !== '' ? (SEX_LABELS[demo.sex] ?? demo.sex) : '',
+        demo.mrn !== undefined && demo.mrn !== '' ? `MRN ${demo.mrn}` : '',
+    ].filter((part) => part !== '');
+    return (
+        <Card className="p-5 flex flex-wrap items-center justify-between gap-4">
+            <div>
+                <h2 className="text-xl font-semibold text-slate-800">{patient.name}</h2>
+                {identity.length > 0 && <p className="text-sm text-slate-500 mt-0.5">{identity.join(' · ')}</p>}
+            </div>
+            <div className="flex items-center gap-2 text-sm text-slate-600">
+                {demo.appointment_time !== undefined && demo.appointment_time !== '' && (
+                    <span className="inline-flex items-center gap-1.5">
+                        <Clock className="w-4 h-4 text-slate-400" />
+                        {formatAppointmentTime(demo.appointment_time)}
+                    </span>
+                )}
+                <VisitTypeChip visitType={demo.visit_type} />
+            </div>
+        </Card>
+    );
+}
+
+// ---- Chief complaint card ----
+
+function ChiefComplaintCard({ fact }: { fact: PatientFact | undefined }) {
+    if (fact === undefined || fact.fact_type !== 'chief_complaint') {
+        return null;
+    }
+    const content = fact.content;
+    return (
+        <section>
+            <SectionLabel>
+                <MessageSquare className="w-4 h-4" />
+                Chief Complaint
+            </SectionLabel>
+            <Card className="p-5">
+                {/* div, not p: the chip popover nests block elements */}
+                <div className="text-lg text-slate-700 leading-relaxed">
+                    {content.statement}
+                    <CitationChips citations={fact.sources} />
+                </div>
+                <div className="mt-2 text-sm text-slate-500 space-y-0.5">
+                    {content.onset !== undefined && <p>Onset: {content.onset}</p>}
+                    {content.progression !== undefined && <p>Progression: {content.progression}</p>}
+                    {content.pertinent_negatives !== undefined && content.pertinent_negatives.length > 0 && (
+                        <p>Pertinent negatives: {content.pertinent_negatives.join('; ')}</p>
+                    )}
+                </div>
+            </Card>
+        </section>
+    );
+}
+
+// ---- Fact group cards (meds / allergies / conditions) ----
+
+function FactGroupCard({
+    title,
+    icon: Icon,
+    facts,
+    badgesFor,
+}: {
+    title: string;
+    icon: ComponentType<{ className?: string }>;
+    facts: PatientFact[];
+    badgesFor?: (fact: PatientFact) => ReactNode;
+}) {
+    if (facts.length === 0) {
+        return null;
     }
     return (
         <section>
             <SectionLabel>
-                <Activity className="w-4 h-4" />
-                Imaging
+                <Icon className="w-4 h-4" />
+                {title} ({facts.length})
             </SectionLabel>
-            <Card className="p-5 space-y-4">
-                <p className="text-sm text-slate-600">
-                    <span className="font-medium text-slate-700">{timeline_summary.length} studies on file</span>
-                    {modalityCounts.size > 0 && (
-                        <span className="text-slate-500">
-                            {' · '}
-                            {[...modalityCounts.entries()].map(([key, count]) => `${key} ×${count}`).join(' · ')}
-                        </span>
-                    )}
-                </p>
-                {interval_analysis.recommendation !== '' && (
-                    <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
-                        <p className="text-sm text-blue-800">
-                            <span className="font-medium">Treatment intervals:</span> {interval_analysis.recommendation}
-                        </p>
-                        <p className="text-xs text-blue-600 mt-1">
-                            {interval_analysis.pattern_summary.total_cycles} cycles analyzed
-                            {interval_analysis.optimal_interval !== null && ` · optimal ~${interval_analysis.optimal_interval} weeks`}
-                            {' · confidence: '}
-                            {interval_analysis.confidence}
-                        </p>
+            <Card className="px-5 py-1">
+                {facts.map((fact) => (
+                    <FactRow key={fact.id} fact={fact} badges={badgesFor?.(fact)} />
+                ))}
+            </Card>
+        </section>
+    );
+}
+
+// ---- Recent scans strip ----
+
+function RecentScans({ images, onOpenImaging }: { images: ImageRecord[]; onOpenImaging: () => void }) {
+    // Wire order is ascending capture_date; re-sort defensively, newest first.
+    const sorted = [...images].sort(
+        (a, b) => new Date(b.image_metadata.capture_date).getTime() - new Date(a.image_metadata.capture_date).getTime(),
+    );
+    const sides = [...new Set(sorted.map((image) => image.image_metadata.laterality.toUpperCase()))];
+    const [side, setSide] = useState(sorted[0]?.image_metadata.laterality.toUpperCase() ?? 'OD');
+    if (sorted.length === 0) {
+        return null;
+    }
+    const shown = sorted.filter((image) => image.image_metadata.laterality.toUpperCase() === side).slice(0, 2);
+    return (
+        <section data-testid="recent-scans">
+            <SectionLabel>
+                <Scan className="w-4 h-4" />
+                Recent Scans
+            </SectionLabel>
+            <Card className="p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <div className="inline-flex p-1 bg-slate-100 rounded-lg">
+                        {sides.map((option) => (
+                            <button
+                                key={option}
+                                type="button"
+                                aria-pressed={side === option}
+                                onClick={() => setSide(option)}
+                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                                    side === option ? 'text-slate-800 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                                }`}
+                            >
+                                {option}
+                            </button>
+                        ))}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onOpenImaging}
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700"
+                    >
+                        Open Imaging tab
+                        <ExternalLink className="w-3 h-3" />
+                    </button>
+                </div>
+                {shown.length === 0 ? (
+                    <p className="text-sm text-slate-400">No {side} scans on file.</p>
+                ) : (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        {shown.map((image) => (
+                            <figure key={image.id}>
+                                <ScanImage image={image} className="w-full h-40" />
+                                <figcaption className="mt-1.5 text-xs text-slate-500">
+                                    {modalityLabel(image.image_metadata.modality)} {image.image_metadata.laterality.toUpperCase()} ·{' '}
+                                    {formatDate(image.image_metadata.capture_date)}
+                                </figcaption>
+                            </figure>
+                        ))}
                     </div>
                 )}
-                {hcq_progression.progression_detected && (
-                    <div className={`p-3 rounded-lg border ${HCQ_ALERT_STYLES[hcq_progression.alert_level]}`}>
-                        <p className="text-sm font-medium flex items-center gap-1.5">
-                            <AlertTriangle className="w-4 h-4" />
-                            HCQ progression: {hcq_progression.progression_description}
-                        </p>
-                        {hcq_progression.recommendation !== '' && <p className="text-sm mt-1">{hcq_progression.recommendation}</p>}
-                    </div>
-                )}
-                <p className="text-xs text-slate-400 italic">
-                    Full imaging timeline, trends, and side-by-side comparison arrive with the imaging workstation (S2.2).
-                </p>
             </Card>
         </section>
     );
@@ -219,98 +431,50 @@ function ImagingSummary({ imaging }: { imaging: BriefContent['imaging'] }) {
 
 // ---- The tab ----
 
-export default function Overview({ brief }: { brief: BriefContent }) {
-    const whyFact = brief.facts_by_type.chief_complaint.find((fact) => fact.id === brief.why_they_are_here?.fact_id);
-    const goalFact = brief.facts_by_type.patient_goal.find((fact) => fact.id === brief.what_they_are_hoping_for?.fact_id);
-    const why = brief.why_they_are_here;
-    const hoping = brief.what_they_are_hoping_for;
+export default function Overview({
+    overview,
+    insights,
+    onOpenImaging,
+}: {
+    overview: OverviewPayload;
+    /** The async AI insights card — rendered as a sibling section, never a gate. */
+    insights: ReactNode;
+    onOpenImaging: () => void;
+}) {
+    const facts = overview.facts_by_type;
+    const medications = facts.medication ?? [];
+    const alerts = overview.contradictions.filter((row) => row.status !== 'resolved').map(projectContradictionRow);
 
     return (
         <div className="space-y-10">
-            <ContradictionAlerts alerts={brief.contradiction_alerts} />
+            <PatientHeaderBand patient={overview.patient} generatedAt={overview.generated_at} />
 
-            {why !== null && (
-                <section>
-                    <SectionLabel>Why They&rsquo;re Here</SectionLabel>
-                    <div className="text-lg text-slate-700 leading-relaxed">
-                        {why.content.statement}
-                        {whyFact !== undefined && <CitationChips citations={whyFact.sources} />}
-                    </div>
-                    <div className="mt-2 text-sm text-slate-500 space-y-0.5">
-                        {why.content.onset !== undefined && <p>Onset: {why.content.onset}</p>}
-                        {why.content.progression !== undefined && <p>Progression: {why.content.progression}</p>}
-                        {why.content.pertinent_negatives !== undefined && why.content.pertinent_negatives.length > 0 && (
-                            <p>Pertinent negatives: {why.content.pertinent_negatives.join('; ')}</p>
-                        )}
-                    </div>
-                </section>
-            )}
+            <ContradictionAlerts alerts={alerts} />
 
-            {hoping !== null && (
-                <section className="relative">
-                    {/* Highlighted card — port of ReadyToWalkIn.jsx "What They're Hoping For" */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-100/30 to-blue-50/20 rounded-2xl blur-xl" />
-                    <div className="relative bg-gradient-to-br from-blue-50 to-white rounded-2xl p-6 border-2 border-blue-200 shadow-sm">
-                        <h2 className="text-xs font-bold uppercase tracking-wider text-blue-700 mb-3">
-                            What They&rsquo;re Hoping For
-                        </h2>
-                        <div className="text-[17px] text-slate-800 leading-relaxed font-medium">
-                            {hoping.content.goal}
-                            {goalFact !== undefined && <CitationChips citations={goalFact.sources} />}
-                        </div>
-                        {hoping.content.specific_concerns !== undefined && hoping.content.specific_concerns.length > 0 && (
-                            <ul className="mt-3 space-y-1">
-                                {hoping.content.specific_concerns.map((concern, i) => (
-                                    <li key={i} className="flex items-start gap-2 text-sm text-slate-600">
-                                        <span className="text-blue-500 mt-0.5">•</span>
-                                        {concern}
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                        {hoping.content.verbatim_quotes !== undefined && hoping.content.verbatim_quotes.length > 0 && (
-                            <p className="mt-3 text-sm text-slate-500 italic">&ldquo;{hoping.content.verbatim_quotes[0]}&rdquo;</p>
-                        )}
-                    </div>
-                </section>
-            )}
+            <ChiefComplaintCard fact={(facts.chief_complaint ?? [])[0]} />
 
-            {brief.key_discussion_points.length > 0 && (
-                <section>
-                    <SectionLabel>Key Discussion Points ({brief.key_discussion_points.length})</SectionLabel>
-                    <ol className="space-y-2.5">
-                        {brief.key_discussion_points.map((point, i) => (
-                            <li key={i} className="flex items-start gap-3">
-                                <span className="flex-shrink-0 w-5 h-5 mt-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold flex items-center justify-center">
-                                    {i + 1}
-                                </span>
-                                <span className="text-slate-700">{point}</span>
-                            </li>
-                        ))}
-                    </ol>
-                </section>
-            )}
+            {insights}
 
-            {brief.questions_to_confirm.length > 0 && (
-                <section>
-                    <SectionLabel>
-                        <HelpCircle className="w-4 h-4" />
-                        Questions to Confirm ({brief.questions_to_confirm.length})
-                    </SectionLabel>
-                    <ul className="space-y-2">
-                        {brief.questions_to_confirm.map((question, i) => (
-                            <li key={i} className="flex items-start gap-3 p-3 rounded-lg bg-amber-50/60 border border-amber-100">
-                                <HelpCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                                <span className="text-sm text-slate-700">{question}</span>
-                            </li>
-                        ))}
-                    </ul>
-                </section>
-            )}
+            <FactGroupCard
+                title="Medications"
+                icon={Pill}
+                facts={medications}
+                badgesFor={(fact) =>
+                    fact.fact_type === 'medication'
+                        ? flagsForMedication(fact.content.name, overview.medication_risk_flags).map((flag, i) => (
+                              <RiskFlagBadge key={i} flag={flag} />
+                          ))
+                        : null
+                }
+            />
 
-            <MedicationRiskFlags flags={brief.medication_risk_flags} />
+            <MedicationRiskFlags flags={overview.medication_risk_flags} />
 
-            <ImagingSummary imaging={brief.imaging} />
+            <FactGroupCard title="Allergies" icon={AlertTriangle} facts={facts.allergy ?? []} />
+
+            <FactGroupCard title="Conditions" icon={Stethoscope} facts={facts.condition ?? []} />
+
+            <RecentScans images={overview.images} onOpenImaging={onOpenImaging} />
         </div>
     );
 }

@@ -8,6 +8,8 @@ import type {
     HcqProgressionAnalysis,
     ImageRecord,
     IntervalPatternAnalysis,
+    OverviewPayload,
+    PatientRecord,
     TreatmentWireRecord,
 } from '../types';
 import { briefContent, factBundle } from './fixtures';
@@ -121,11 +123,38 @@ export const wtImaging: BriefContent['imaging'] = {
 /** The margaret-chen brief with William Thompson's imaging block swapped in. */
 export const wtBriefContent: BriefContent = { ...briefContent, imaging: wtImaging };
 
+export const wtPatient: PatientRecord = {
+    id: 'william-thompson',
+    openemr_patient_id: null,
+    name: 'William Thompson',
+    demographics: {
+        dob: '1946-08-22',
+        sex: 'M',
+        mrn: 'MEC-2025-1187',
+        appointment_date: '2025-12-10',
+        appointment_time: '09:30',
+        visit_type: 'established_patient',
+    },
+};
+
 export const wtFactBundle: FactBundle = {
     ...factBundle,
-    patient: { id: 'william-thompson', openemr_patient_id: null, name: 'William Thompson', demographics: {} },
+    patient: wtPatient,
     images: wtImages,
     treatments: wtTreatments,
+};
+
+/** Deterministic overview payload for WT — imaging comes straight from the engines, no brief. */
+export const wtOverview: OverviewPayload = {
+    patient: wtPatient,
+    facts_by_type: {},
+    medication_risk_flags: [],
+    contradictions: [],
+    documents: [],
+    images: wtImages,
+    imaging: wtImaging,
+    latest_brief: null,
+    generated_at: '2025-12-10T08:00:00Z',
 };
 
 // Margaret Chen-style serial GC-IPL measurements (two OCTs, 82µm -> 70µm) for GC trend tests.

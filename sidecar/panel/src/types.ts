@@ -183,8 +183,8 @@ interface FactBase {
     sources: CitationRef[];
     verification: FactVerification;
     laterality: FactLaterality | null;
-    created_date?: string;
-    updated_date?: string;
+    created_date?: string | null;
+    updated_date?: string | null;
 }
 
 export type PatientFact = FactBase &
@@ -404,23 +404,106 @@ export interface StoredBrief {
     status: string;
 }
 
+/** Per-document leftovers the store keeps verbatim (filename, received_*, extracted_data...). */
+export interface DocumentExtras {
+    filename?: string;
+    received_method?: string;
+    received_date?: string;
+    [key: string]: unknown;
+}
+
 export interface SourceDocumentRecord {
     id?: string;
     document_id?: string;
+    /** Legacy top-level spelling — the store now carries these in `extras`. */
     filename?: string;
     document_type: string;
-    document_date: string;
+    document_date: string | null;
+    /** Legacy top-level spelling — the store now carries these in `extras`. */
     received_method?: string;
     content: {
         format: string;
         text_content?: string;
         structured_content?: Record<string, unknown>;
+        ocr_quality?: number;
     };
     metadata?: { original_filename?: string; source_system?: string };
+    extras?: DocumentExtras;
+}
+
+// ---- Patients + deterministic overview (routes/overview.ts) ----
+
+/** Seed demographics shape (store keeps arbitrary jsonb; these keys back the schedule/header). */
+export interface PatientDemographics {
+    dob?: string;
+    sex?: string;
+    mrn?: string;
+    address?: string;
+    phone?: string;
+    appointment_date?: string;
+    appointment_time?: string;
+    visit_type?: string;
+    [key: string]: unknown;
+}
+
+export interface PatientRecord {
+    id: string;
+    openemr_patient_id: string | null;
+    name: string;
+    demographics: PatientDemographics;
+}
+
+/** Stored contradiction row: payload is the raw jsonb — rich seed shape OR runtime shape. */
+export interface StoredContradictionRow {
+    id: string;
+    patient_id: string;
+    status: string;
+    severity: ContradictionSeverity;
+    payload: Record<string, unknown>;
+}
+
+/** Metadata-only document entry — full text still comes from GET /api/facts. */
+export interface OverviewDocumentMeta {
+    id: string;
+    document_type: string;
+    document_date: string | null;
+    metadata: Record<string, unknown>;
+    extras: DocumentExtras;
+}
+
+export interface LatestBriefPointer {
+    id: string;
+    prepared_at: string;
+    correlation_id: string;
+}
+
+/** GET /api/overview/:patientId — deterministic landing payload, no LLM in the load path. */
+export interface OverviewPayload {
+    patient: PatientRecord;
+    facts_by_type: Partial<Record<FactType, PatientFact[]>>;
+    medication_risk_flags: MedicationRiskFlag[];
+    contradictions: StoredContradictionRow[];
+    documents: OverviewDocumentMeta[];
+    images: ImageRecord[];
+    imaging: BriefContent['imaging'];
+    latest_brief: LatestBriefPointer | null;
+    generated_at: string;
+}
+
+/** GET /api/prep-runs/:patientId entry — stage carries live progress like `llm_extraction:7/12`. */
+export interface PrepRunRecord {
+    id: string;
+    patient_id: string;
+    correlation_id: string;
+    status: string;
+    stage: string | null;
+    error: string | null;
+    started_at: string;
+    finished_at: string | null;
 }
 
 export interface FactBundle {
-    patient: { id: string; openemr_patient_id: string | null; name: string; demographics: Record<string, unknown> };
+    patient: PatientRecord;
     facts: unknown[];
     contradictions: unknown[];
     images: ImageRecord[];

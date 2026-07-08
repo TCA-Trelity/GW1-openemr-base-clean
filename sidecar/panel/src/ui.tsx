@@ -122,3 +122,54 @@ export function formatDate(dateString: string | null | undefined): string {
 export function titleCase(value: string): string {
     return value.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
+
+// Visit-type chips for the schedule sidebar + patient header band (seed visit_type spellings).
+const VISIT_TYPE_CHIPS: Record<string, { label: string; className: string }> = {
+    new_patient: { label: 'New patient', className: 'bg-blue-50 text-blue-700 border-blue-200' },
+    established_patient: { label: 'Established', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    established: { label: 'Established', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+};
+
+export function VisitTypeChip({ visitType }: { visitType: string | undefined }) {
+    if (visitType === undefined || visitType === '') {
+        return null;
+    }
+    const config = VISIT_TYPE_CHIPS[visitType] ?? {
+        label: titleCase(visitType),
+        className: 'bg-slate-50 text-slate-600 border-slate-200',
+    };
+    return (
+        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md border text-[10px] font-medium ${config.className}`}>
+            {config.label}
+        </span>
+    );
+}
+
+/** '13:15' -> '1:15 PM' (the seed stores 24h HH:MM strings); non-matching input passes through. */
+export function formatAppointmentTime(time: string | undefined): string {
+    if (time === undefined || !/^\d{1,2}:\d{2}$/.test(time)) {
+        return time ?? '';
+    }
+    const [hoursRaw = '0', minutes = '00'] = time.split(':');
+    const hours = Number(hoursRaw);
+    const display = hours % 12 === 0 ? 12 : hours % 12;
+    return `${display}:${minutes} ${hours >= 12 ? 'PM' : 'AM'}`;
+}
+
+/** Whole-year age at the reference instant from an ISO dob; null when either is unparsable. */
+export function computeAge(dob: string | undefined, at: string): number | null {
+    if (dob === undefined || dob === '') {
+        return null;
+    }
+    const birth = new Date(dob);
+    const ref = new Date(at);
+    if (Number.isNaN(birth.getTime()) || Number.isNaN(ref.getTime())) {
+        return null;
+    }
+    let age = ref.getUTCFullYear() - birth.getUTCFullYear();
+    const monthDiff = ref.getUTCMonth() - birth.getUTCMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && ref.getUTCDate() < birth.getUTCDate())) {
+        age -= 1;
+    }
+    return age;
+}

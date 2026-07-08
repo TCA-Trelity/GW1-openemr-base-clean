@@ -7,11 +7,12 @@ import App from '../App';
 import Imaging, { mergeTimeline } from '../imaging/Imaging';
 import Trends, { extractMeasurementSeries } from '../imaging/Trends';
 import ScanImage from '../imaging/ScanImage';
-import { briefContent, storedBrief } from './fixtures';
-import { mcGcImages, wtBriefContent, wtFactBundle, wtImages, wtImaging, wtTreatments } from './imaging-fixtures';
+import { briefContent } from './fixtures';
+import { mcGcImages, wtFactBundle, wtImages, wtImaging, wtOverview, wtPatient, wtTreatments } from './imaging-fixtures';
 
 afterEach(() => {
     vi.unstubAllGlobals();
+    window.history.replaceState(null, '', '/');
 });
 
 function renderImaging() {
@@ -169,16 +170,19 @@ describe('ScanImage seam', () => {
 describe('App imaging tab', () => {
     // Failure mode: the Imaging tab lands in the wrong slot (or never mounts the
     // workstation) — it must sit between Medical Background and Sources per S2.2.
+    // Realignment note: imaging data now rides GET /api/overview — no brief involved.
     it('adds the Imaging tab between Medical Background and Sources and renders the timeline', async () => {
         vi.stubGlobal(
             'fetch',
             vi.fn(async (input: RequestInfo | URL) => {
                 const url = String(input);
-                const body = url.includes('/api/brief/')
-                    ? { ...storedBrief, content: wtBriefContent }
-                    : url.includes('/api/facts/')
-                      ? wtFactBundle
-                      : undefined;
+                const body = url.includes('/api/patients')
+                    ? { patients: [wtPatient] }
+                    : url.includes('/api/overview/')
+                      ? wtOverview
+                      : url.includes('/api/facts/')
+                        ? wtFactBundle
+                        : undefined;
                 if (body === undefined) {
                     throw new Error(`unstubbed fetch: ${url}`);
                 }

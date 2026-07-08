@@ -1,5 +1,6 @@
-// Medical Background tab — facts_by_type groups as cards; each fact row carries
-// laterality + verification badges and its citation chips (ClinicalDetail.jsx look).
+// Medical Background tab — deterministic overview.facts_by_type groups as cards; each fact
+// row carries laterality + verification badges and its citation chips (ClinicalDetail.jsx
+// look). No brief required: this renders straight from GET /api/overview.
 import {
     Pill,
     AlertTriangle,
@@ -13,8 +14,8 @@ import {
     Target,
     MessageSquare,
 } from 'lucide-react';
-import type { ComponentType } from 'react';
-import type { BriefContent, FactType, PatientFact } from './types';
+import type { ComponentType, ReactNode } from 'react';
+import type { FactType, PatientFact } from './types';
 import { Card, LateralityBadge, VerificationBadge, formatDate } from './ui';
 import { CitationChips } from './CitationChip';
 
@@ -33,7 +34,7 @@ const GROUPS: { type: FactType; title: string; icon: ComponentType<{ className?:
 ];
 
 /** Primary line + secondary detail per fact type. Exhaustive switch: a new fact type fails the build. */
-function factSummary(fact: PatientFact): { primary: string; secondary: string[] } {
+export function factSummary(fact: PatientFact): { primary: string; secondary: string[] } {
     switch (fact.fact_type) {
         case 'medication': {
             const c = fact.content;
@@ -113,7 +114,8 @@ function factSummary(fact: PatientFact): { primary: string; secondary: string[] 
     }
 }
 
-function FactRow({ fact }: { fact: PatientFact }) {
+/** Shared fact row (Overview cards reuse it); `badges` prepends extra chips, e.g. med risk flags. */
+export function FactRow({ fact, badges }: { fact: PatientFact; badges?: ReactNode }) {
     const { primary, secondary } = factSummary(fact);
     return (
         <div className="flex items-start justify-between gap-3 py-3 border-b border-slate-100 last:border-0">
@@ -125,7 +127,8 @@ function FactRow({ fact }: { fact: PatientFact }) {
                 </div>
                 {secondary.length > 0 && <p className="text-xs text-slate-500 mt-0.5">{secondary.join(' · ')}</p>}
             </div>
-            <div className="flex items-center gap-1.5 flex-shrink-0">
+            <div className="flex items-center gap-1.5 flex-wrap justify-end flex-shrink-0">
+                {badges}
                 {fact.laterality !== null && <LateralityBadge laterality={fact.laterality} />}
                 <VerificationBadge status={fact.verification.status} />
             </div>
@@ -133,22 +136,24 @@ function FactRow({ fact }: { fact: PatientFact }) {
     );
 }
 
-export default function MedicalBackground({ factsByType }: { factsByType: BriefContent['facts_by_type'] }) {
-    const groups = GROUPS.filter(({ type }) => factsByType[type].length > 0);
+export default function MedicalBackground({ factsByType }: { factsByType: Partial<Record<FactType, PatientFact[]>> }) {
+    const groups = GROUPS.map(({ type, title, icon }) => ({ type, title, icon, facts: factsByType[type] ?? [] })).filter(
+        ({ facts }) => facts.length > 0,
+    );
     if (groups.length === 0) {
         return <p className="text-sm text-slate-500 py-8 text-center">No verified facts on record for this patient.</p>;
     }
     return (
         <div className="space-y-6">
-            {groups.map(({ type, title, icon: Icon }) => (
+            {groups.map(({ type, title, icon: Icon, facts }) => (
                 <Card key={type} className="p-5">
                     <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-1">
                         <Icon className="w-4 h-4 text-slate-400" />
                         {title}
-                        <span className="text-xs font-normal text-slate-400">({factsByType[type].length})</span>
+                        <span className="text-xs font-normal text-slate-400">({facts.length})</span>
                     </h3>
                     <div>
-                        {factsByType[type].map((fact) => (
+                        {facts.map((fact) => (
                             <FactRow key={fact.id} fact={fact} />
                         ))}
                     </div>

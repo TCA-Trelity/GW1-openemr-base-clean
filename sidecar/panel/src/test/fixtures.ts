@@ -7,10 +7,16 @@ import type {
     CitationRef,
     FactBundle,
     FactType,
+    ImageRecord,
+    OverviewDocumentMeta,
+    OverviewPayload,
     PatientFact,
     PatientGoalContent,
+    PatientRecord,
+    RuntimeContradiction,
     SourceDocumentRecord,
     StoredBrief,
+    StoredContradictionRow,
 } from '../types';
 
 // ---- Source documents (shortened but faithful to the corpus voice) ----
@@ -106,22 +112,22 @@ export const bareCitation: CitationRef = {
     document_date: '2024-12-26',
 };
 
+// Wire-faithful: the store lifts id/type/date/content/metadata and keeps the rest in extras.
 export const documents: SourceDocumentRecord[] = [
     {
         id: 'doc-mc-003',
-        filename: 'rheumatology-note-2024-09-10.txt',
         document_type: 'clinical_note',
         document_date: '2024-09-10',
-        received_method: 'fax',
-        content: { format: 'text', text_content: RHEUM_NOTE_TEXT },
+        content: { format: 'text', text_content: RHEUM_NOTE_TEXT, ocr_quality: 0.88 },
         metadata: { original_filename: 'rheum_note_sept2024.pdf' },
+        extras: { filename: 'rheumatology-note-2024-09-10.txt', received_method: 'patient_upload', received_date: '2024-12-16' },
     },
     {
         id: 'doc-mc-012',
-        filename: 'intake-transcript-2024-12-26.txt',
         document_type: 'intake_transcript',
         document_date: '2024-12-26',
         content: { format: 'text', text_content: INTAKE_TEXT },
+        extras: { filename: 'intake-transcript-2024-12-26.txt' },
     },
 ];
 
@@ -273,6 +279,37 @@ const factsByType: Record<FactType, PatientFact[]> = {
     ],
 };
 
+// ---- Contradictions (named so the stored-row fixtures can reuse the runtime shape) ----
+
+export const allergyContradiction: RuntimeContradiction = {
+    id: 'contra-mc-002',
+    patient_id: 'margaret-chen',
+    status: 'active',
+    severity: 'critical',
+    type: 'allergy_discrepancy',
+    description: 'Referral letter documents NKDA; patient reported a sulfa allergy during intake',
+    suggested_question: 'Can you confirm your reaction to sulfa antibiotics and when it occurred?',
+    source_a: { type: 'referral_letter', value: 'NKDA', document_id: 'doc-mc-001', excerpt: 'ALLERGIES: NKDA' },
+    source_b: {
+        type: 'intake_transcript',
+        value: 'sulfa allergy (rash)',
+        document_id: 'doc-mc-012',
+        excerpt: 'I got a rash from a sulfa antibiotic years ago',
+    },
+};
+
+export const hcqContradiction: RuntimeContradiction = {
+    id: 'contra-mc-001',
+    patient_id: 'margaret-chen',
+    status: 'active',
+    severity: 'high',
+    type: 'temporal_discrepancy',
+    description: 'HCQ duration conflicts across sources: referral says ~4 years, pharmacy first-fill implies 5 years 11 months',
+    suggested_question: 'How long have you actually been taking hydroxychloroquine?',
+    source_a: { type: 'referral_letter', value: '~4 years', document_id: 'doc-mc-001', excerpt: '~4 years duration' },
+    source_b: { type: 'pharmacy_record', value: '5 years 11 months', document_id: 'doc-mc-002', excerpt: '"first_fill_date": "2019-01-15"' },
+};
+
 // ---- The brief ----
 
 export const briefContent: BriefContent = {
@@ -280,35 +317,7 @@ export const briefContent: BriefContent = {
         level: 'high',
         reason: 'Critical contradiction in the record: Referral letter documents NKDA; patient reported a sulfa allergy during intake',
     },
-    contradiction_alerts: [
-        {
-            id: 'contra-mc-002',
-            patient_id: 'margaret-chen',
-            status: 'active',
-            severity: 'critical',
-            type: 'allergy_discrepancy',
-            description: 'Referral letter documents NKDA; patient reported a sulfa allergy during intake',
-            suggested_question: 'Can you confirm your reaction to sulfa antibiotics and when it occurred?',
-            source_a: { type: 'referral_letter', value: 'NKDA', document_id: 'doc-mc-001', excerpt: 'ALLERGIES: NKDA' },
-            source_b: {
-                type: 'intake_transcript',
-                value: 'sulfa allergy (rash)',
-                document_id: 'doc-mc-012',
-                excerpt: 'I got a rash from a sulfa antibiotic years ago',
-            },
-        },
-        {
-            id: 'contra-mc-001',
-            patient_id: 'margaret-chen',
-            status: 'active',
-            severity: 'high',
-            type: 'temporal_discrepancy',
-            description: 'HCQ duration conflicts across sources: referral says ~4 years, pharmacy first-fill implies 5 years 11 months',
-            suggested_question: 'How long have you actually been taking hydroxychloroquine?',
-            source_a: { type: 'referral_letter', value: '~4 years', document_id: 'doc-mc-001', excerpt: '~4 years duration' },
-            source_b: { type: 'pharmacy_record', value: '5 years 11 months', document_id: 'doc-mc-002', excerpt: '"first_fill_date": "2019-01-15"' },
-        },
-    ],
+    contradiction_alerts: [allergyContradiction, hcqContradiction],
     why_they_are_here: { fact_id: 'fact-mc-cc-001', content: ccContent },
     what_they_are_hoping_for: { fact_id: 'fact-mc-goal-001', content: goalContent },
     key_discussion_points: [
@@ -377,6 +386,146 @@ export const storedBrief: StoredBrief = {
     correlation_id: briefContent.correlation_id,
     content: briefContent,
     status: 'complete',
+};
+
+// ---- Patients + deterministic overview (S2.11 realignment) ----
+
+export const margaretChen: PatientRecord = {
+    id: 'margaret-chen',
+    openemr_patient_id: null,
+    name: 'Margaret Chen',
+    demographics: {
+        dob: '1967-03-14',
+        sex: 'F',
+        mrn: 'FPA-2019-4521',
+        appointment_date: '2024-12-26',
+        appointment_time: '10:30',
+        visit_type: 'new_patient',
+    },
+};
+
+export const williamThompson: PatientRecord = {
+    id: 'william-thompson',
+    openemr_patient_id: null,
+    name: 'William Thompson',
+    demographics: {
+        dob: '1946-08-22',
+        sex: 'M',
+        mrn: 'MEC-2025-1187',
+        appointment_date: '2024-12-26',
+        appointment_time: '13:15',
+        visit_type: 'established_patient',
+    },
+};
+
+/** Deliberately unsorted — the sidebar must order by appointment_time (Margaret 10:30 first). */
+export const patients: PatientRecord[] = [williamThompson, margaretChen];
+
+/** Stored rows carry the raw jsonb payload: one runtime detector shape + one rich seed shape. */
+export const storedContradictions: StoredContradictionRow[] = [
+    {
+        id: 'contra-mc-002',
+        patient_id: 'margaret-chen',
+        status: 'active',
+        severity: 'critical',
+        payload: allergyContradiction as unknown as Record<string, unknown>,
+    },
+    {
+        id: 'contra-mc-001',
+        patient_id: 'margaret-chen',
+        status: 'active',
+        severity: 'high',
+        payload: {
+            contradiction_id: 'contra-mc-001',
+            patient_id: 'margaret-chen',
+            type: 'temporal_discrepancy',
+            category: 'medication_duration',
+            severity: 'high',
+            status: 'active',
+            clinical_significance:
+                'HCQ duration conflicts across sources: referral says ~4 years, pharmacy first-fill implies 5 years 11 months',
+            source_documents: [
+                {
+                    source_document_id: 'doc-mc-001',
+                    filename: 'referral-letter-pcp-2024-12-15.txt',
+                    claim: '~4 years duration',
+                    exact_text: 'Hydroxychloroquine (Plaquenil) 200mg daily - for RA, ~4 years duration',
+                    certainty: 'hedged',
+                },
+                {
+                    source_document_id: 'doc-mc-002',
+                    filename: 'pharmacy-pull-2024-12-26.json',
+                    claim: 'First fill 2019-01-15 = 5 years 11 months',
+                    exact_text: '"first_fill_date": "2019-01-15"',
+                    certainty: 'definitive',
+                },
+            ],
+            physician_workflow: {
+                surface_in_briefing: true,
+                auto_generate_question: 'How long have you actually been taking hydroxychloroquine?',
+                suggested_briefing_language: 'IMPORTANT: Medication duration discrepancy may affect screening urgency',
+            },
+        },
+    },
+];
+
+/** Ascending capture_date, as GET /api/overview serves them; no storage_key -> ScanImage placeholder. */
+export const overviewImages: ImageRecord[] = [
+    { id: 'img-mc-001', patient_id: 'margaret-chen', image_metadata: { capture_date: '2024-12-26T10:15:00Z', modality: 'oct', laterality: 'od' } },
+    { id: 'img-mc-002', patient_id: 'margaret-chen', image_metadata: { capture_date: '2024-12-26T10:22:00Z', modality: 'oct', laterality: 'os' } },
+];
+
+export const overviewDocuments: OverviewDocumentMeta[] = documents.map((doc) => ({
+    id: doc.id ?? '',
+    document_type: doc.document_type,
+    document_date: doc.document_date,
+    metadata: doc.metadata ?? {},
+    extras: doc.extras ?? {},
+}));
+
+export const emptyImaging: BriefContent['imaging'] = {
+    timeline_summary: [],
+    interval_analysis: {
+        intervals: [],
+        pattern_summary: { total_cycles: 0, good_response_count: 0, poor_response_count: 0, average_interval: null },
+        optimal_interval: null,
+        recommendation: '',
+        confidence: 'low',
+    },
+    hcq_progression: {
+        gc_thickness_trend: [],
+        rpe_changes_trend: [],
+        progression_detected: false,
+        progression_description: '',
+        alert_level: 'low',
+        recommendation: '',
+    },
+};
+
+export const overviewPayload: OverviewPayload = {
+    patient: margaretChen,
+    facts_by_type: briefContent.facts_by_type,
+    medication_risk_flags: briefContent.medication_risk_flags,
+    contradictions: storedContradictions,
+    documents: overviewDocuments,
+    images: overviewImages,
+    imaging: briefContent.imaging,
+    latest_brief: { id: 'brief-fixture-001', prepared_at: briefContent.prepared_at, correlation_id: briefContent.correlation_id },
+    generated_at: '2024-12-26T09:55:00Z',
+};
+
+export const overviewNoBrief: OverviewPayload = { ...overviewPayload, latest_brief: null };
+
+export const williamOverview: OverviewPayload = {
+    patient: williamThompson,
+    facts_by_type: {},
+    medication_risk_flags: [],
+    contradictions: [],
+    documents: [],
+    images: [],
+    imaging: emptyImaging,
+    latest_brief: null,
+    generated_at: '2024-12-26T09:55:00Z',
 };
 
 export const factBundle: FactBundle = {
