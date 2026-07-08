@@ -55,6 +55,20 @@ jobs:
           echo "HTTP $code"; cat /tmp/ready.json | head -c 600; echo
           [ "$code" = "200" ] || { echo "sidecar not ready"; exit 1; }
 
+          echo "== Deterministic layer: patients, overview, scan bytes =="
+          curl -s --max-time 30 "$SIDECAR_URL/api/patients" -o /tmp/patients.json
+          jq -e '.patients | length >= 2' /tmp/patients.json >/dev/null \
+            && echo "patients: $(jq '.patients | length' /tmp/patients.json) OK" || { echo "patients FAILED"; cat /tmp/patients.json; exit 1; }
+          curl -s --max-time 30 "$SIDECAR_URL/api/overview/margaret-chen" -o /tmp/overview.json
+          jq -e '.medication_risk_flags | length > 0' /tmp/overview.json >/dev/null \
+            && echo "overview med-risk flags OK" || { echo "overview med-risk FAILED"; exit 1; }
+          jq -e '.contradictions | length > 0' /tmp/overview.json >/dev/null \
+            && echo "overview contradictions OK" || { echo "overview contradictions FAILED"; exit 1; }
+          key=$(jq -r '.images[0].storage_key // empty' /tmp/overview.json)
+          [ -n "$key" ] || { echo "images missing storage_key — reseed needed"; exit 1; }
+          ctype=$(curl -s -o /dev/null -w '%{content_type}' --max-time 30 "$SIDECAR_URL/api/images/$key")
+          case "$ctype" in image/*) echo "scan bytes OK ($key, $ctype)";; *) echo "scan fetch FAILED ($ctype)"; exit 1;; esac
+
           echo "== POST /api/prep/margaret-chen =="
           code=$(curl -s -X POST -o /tmp/prep.json -w '%{http_code}' --max-time 30 "$SIDECAR_URL/api/prep/margaret-chen")
           echo "HTTP $code"; cat /tmp/prep.json; echo
