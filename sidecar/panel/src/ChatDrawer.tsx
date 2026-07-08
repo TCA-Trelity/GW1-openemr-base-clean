@@ -1,8 +1,8 @@
 // Chat drawer (S2.3, R5 native citations): the docked "Ask the record" slide-over,
 // reachable from every tab. Replies stream over POST /api/chat SSE as clean prose — no
 // inline tokens. Provenance rides the stream's citation events (already server-verified
-// verbatim against the stored documents): verified citations render as numbered chips
-// appended to the bubble, deep-linking into the source viewer at the cited character
+// verbatim against the stored documents): verified citations render as source-labelled
+// chips appended to the bubble, deep-linking into the source viewer at the cited character
 // range; unverified ones are never rendered as chips, only counted in the amber footer.
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { AlertTriangle, MessageCircle, RefreshCw, Send, X } from 'lucide-react';

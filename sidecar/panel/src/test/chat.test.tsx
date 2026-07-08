@@ -1,6 +1,6 @@
 // Chat drawer tests (S2.3, R5 native citations): scripted SSE streams over a mocked
 // fetch — delta accumulation over clean prose, live citation events rendering as
-// numbered chips (verified only, deduped by document+start), the amber unverified
+// source-labelled chips (verified only, deduped by document+start), the amber unverified
 // footer from the done event, the chip -> source-viewer deep link, pre-stream guard
 // rejections (429 budget), history replay on reopen (text only), quick-prompt sends.
 import { describe, expect, it, vi, afterEach } from 'vitest';
@@ -130,11 +130,14 @@ describe('ChatDrawer streaming', () => {
         // Input stays locked while the reply streams.
         expect(screen.getByLabelText('Chat message')).toBeDisabled();
 
-        // Citations stream live — the chip renders before the done event.
+        // Citations stream live — the chip renders before the done event, labelled with
+        // the document type parsed from document_title (R8), not a number.
         await act(async () => {
             controller.enqueue(sseChunk({ type: 'citation', citation: hcqChatCitation }));
         });
-        expect(await screen.findByRole('button', { name: 'Citation 1: Clinical Note' })).toBeInTheDocument();
+        const clinicalNoteChip = await screen.findByRole('button', { name: 'Citation 1: Clinical Note' });
+        expect(clinicalNoteChip).toHaveTextContent('Clinical note');
+        expect(clinicalNoteChip.textContent).not.toMatch(/\d/);
 
         await act(async () => {
             controller.enqueue(sseChunk({ type: 'delta', text: ' with new floaters reported at intake.' }));
@@ -154,8 +157,8 @@ describe('ChatDrawer streaming', () => {
             controller.close();
         });
 
-        // Numbered chips in arrival order, deduped; the unverified one is only a count.
-        expect(await screen.findByRole('button', { name: 'Citation 2: Intake Transcript' })).toBeInTheDocument();
+        // Labelled chips in arrival order, deduped; the unverified one is only a count.
+        expect(await screen.findByRole('button', { name: 'Citation 2: Intake Transcript' })).toHaveTextContent('Intake');
         expect(screen.getAllByRole('button', { name: /^Citation \d/ })).toHaveLength(2);
         expect(screen.getByText('1 citation could not be verified')).toBeInTheDocument();
         expect(screen.queryByText(/referral_letter/)).not.toBeInTheDocument();

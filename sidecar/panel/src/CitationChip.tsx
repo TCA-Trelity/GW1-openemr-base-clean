@@ -1,9 +1,12 @@
 // Citation chip + source card (the verification affordance, presearch Q10 / CitationBubble.jsx
-// port): numbered chip -> popover card with type badge, date, attribution, and the verbatim
-// excerpt highlighted in context; "View source" deep-links into the Sources tab.
+// port, R8 source labels): a compact pill naming the source type ("Pharmacy", "Intake") ->
+// popover card with type badge, date, attribution, and the verbatim excerpt highlighted in
+// context; "View source" deep-links into the Sources tab. Same-source-type citations on one
+// claim collapse into a single chip with a ×n count.
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Calendar, MapPin, User } from 'lucide-react';
 import type { Attribution, CitationRef, PatientFact } from './types';
+import { sourceChipLabel } from './sourceLabels';
 import { formatDate, sourceTypeConfig, titleCase } from './ui';
 
 /** Provided by App; lets any chip anywhere jump to the Sources tab. No-op by default so chips render standalone. */
@@ -55,12 +58,22 @@ function Excerpt({ citation }: { citation: CitationRef }) {
     );
 }
 
-export function CitationChip({ citation, index }: { citation: CitationRef; index: number }) {
+export function CitationChip({
+    citation,
+    index,
+    count = 1,
+}: {
+    citation: CitationRef;
+    index: number;
+    /** How many same-source-type citations this chip stands for; > 1 renders a ×n count. */
+    count?: number;
+}) {
     const [isOpen, setIsOpen] = useState(false);
     const rootRef = useRef<HTMLSpanElement>(null);
     const viewSource = useContext(SourceNavContext);
     const config = sourceTypeConfig(citation.source_type);
     const Icon = config.icon;
+    const label = sourceChipLabel(citation.source_type);
 
     // Close on outside click / Escape — plain-React stand-in for the prototype's Popover.
     useEffect(() => {
@@ -91,10 +104,12 @@ export function CitationChip({ citation, index }: { citation: CitationRef; index
                 type="button"
                 aria-label={`Citation ${index}: ${citation.source_label}`}
                 aria-expanded={isOpen}
+                title={count > 1 ? `${label} — ${count} citations` : label}
                 onClick={() => setIsOpen((open) => !open)}
-                className={`inline-flex items-center justify-center min-w-[1.15rem] h-[1.15rem] px-1 ml-0.5 rounded-full border text-[10px] font-semibold cursor-pointer transition-colors ${config.color}`}
+                className={`inline-flex items-center gap-0.5 h-[1.15rem] px-1.5 ml-0.5 rounded-full border text-[10px] font-semibold cursor-pointer transition-colors ${config.color}`}
             >
-                {index}
+                <span className="truncate max-w-[14ch]">{label}</span>
+                {count > 1 && <span className="flex-shrink-0 opacity-75">×{count}</span>}
             </button>
             {isOpen && (
                 <div
@@ -172,15 +187,43 @@ export function factChipCitation(fact: PatientFact): CitationRef {
     );
 }
 
-/** Numbered chip row for a claim's citation list — the one component shared everywhere. */
-export function CitationChips({ citations }: { citations: CitationRef[] }) {
+interface ChipGroup {
+    /** The group's representative citation (first in list order) — its card opens on click. */
+    citation: CitationRef;
+    count: number;
+}
+
+/** Collapse same-source-type citations into one chip each, preserving first-appearance order. */
+function groupBySourceType(citations: CitationRef[]): ChipGroup[] {
+    const groups = new Map<string, ChipGroup>();
+    for (const citation of citations) {
+        const existing = groups.get(citation.source_type);
+        if (existing === undefined) {
+            groups.set(citation.source_type, { citation, count: 1 });
+        } else {
+            existing.count += 1;
+        }
+    }
+    return [...groups.values()];
+}
+
+/** Source-labelled chip row for a claim's citation list — the one component shared everywhere. */
+export function CitationChips({
+    citations,
+    group = true,
+}: {
+    citations: CitationRef[];
+    /** Set false where each citation is a distinct claim that must stay its own chip (e.g. the two sides of a contradiction). */
+    group?: boolean;
+}) {
     if (citations.length === 0) {
         return null;
     }
+    const chips = group ? groupBySourceType(citations) : citations.map((citation) => ({ citation, count: 1 }));
     return (
         <span className="inline-flex items-center gap-0.5 ml-1">
-            {citations.map((citation, i) => (
-                <CitationChip key={citation.id} citation={citation} index={i + 1} />
+            {chips.map(({ citation, count }, i) => (
+                <CitationChip key={citation.id} citation={citation} index={i + 1} count={count} />
             ))}
         </span>
     );

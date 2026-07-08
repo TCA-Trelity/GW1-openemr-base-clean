@@ -1,11 +1,39 @@
-// Component tests: citation chip/source card behavior, Medical Background badges,
-// and the Sources tab list + highlight rendering.
+// Component tests: citation chip/source card behavior (R8 source labels + same-source
+// grouping), Medical Background badges, and the Sources tab list + highlight rendering.
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { CitationChip } from '../CitationChip';
+import { CitationChip, CitationChips } from '../CitationChip';
 import MedicalBackground from '../MedicalBackground';
 import SourcesTab from '../SourcesTab';
+import { sourceChipLabel } from '../sourceLabels';
 import { HCQ_EXCERPT, bareCitation, briefContent, documents, hcqCitation } from './fixtures';
+
+describe('sourceChipLabel', () => {
+    // Failure mode: a chip regresses to a bare number (or the wrong spelling) and the
+    // doctor loses provenance-at-a-glance — the mapping is the contract.
+    it('maps every canonical source type to its short chip spelling', () => {
+        expect(sourceChipLabel('intake_transcript')).toBe('Intake');
+        expect(sourceChipLabel('provider_note')).toBe('Provider note');
+        expect(sourceChipLabel('pharmacy_record')).toBe('Pharmacy');
+        expect(sourceChipLabel('imaging_report')).toBe('Imaging report');
+        expect(sourceChipLabel('lab_report')).toBe('Lab');
+        expect(sourceChipLabel('prior_visit_note')).toBe('Prior visit');
+        expect(sourceChipLabel('referral_letter')).toBe('Referral');
+        expect(sourceChipLabel('patient_self_report')).toBe('Patient report');
+        expect(sourceChipLabel('clinical_observation')).toBe('Exam');
+        expect(sourceChipLabel('external_ehr_import')).toBe('EHR');
+        expect(sourceChipLabel('scribe_transcript')).toBe('Scribe');
+    });
+
+    // Failure mode: an unmapped type (corpus document_type spellings, future additions)
+    // renders raw snake_case instead of a humanized label.
+    it('humanizes unmapped types: underscores to spaces, first letter capitalized', () => {
+        expect(sourceChipLabel('clinical_note')).toBe('Clinical note');
+        expect(sourceChipLabel('tech_workup')).toBe('Tech workup');
+        expect(sourceChipLabel('patient_portal_message')).toBe('Patient portal message');
+        expect(sourceChipLabel('')).toBe('Source');
+    });
+});
 
 describe('CitationChip', () => {
     // Failure mode: the source card paraphrases or truncates the excerpt — the chip's
@@ -34,6 +62,41 @@ describe('CitationChip', () => {
         render(<CitationChip citation={bareCitation} index={2} />);
         fireEvent.click(screen.getByRole('button', { name: /Citation 2/ }));
         expect(screen.getByText('No excerpt available')).toBeInTheDocument();
+    });
+
+    // Failure mode (R8): the chip renders a number instead of the source name — the
+    // doctor should read provenance off the pill before clicking.
+    it('renders the source label on the chip, not a number, for a pharmacy_record citation', () => {
+        render(<CitationChip citation={bareCitation} index={1} />);
+        const chip = screen.getByRole('button', { name: /Citation 1/ });
+        expect(chip).toHaveTextContent('Pharmacy');
+        expect(chip.textContent).not.toMatch(/\d/);
+    });
+});
+
+describe('CitationChips grouping', () => {
+    // Failure mode (R8): a fact with several citations from the same source type renders
+    // duplicate identical pills instead of one chip with a ×n count.
+    it('collapses same-source-type citations into one chip with a ×n count', () => {
+        const secondPharmacy = { ...bareCitation, id: 'cit-mc-bare-2' };
+        render(<CitationChips citations={[bareCitation, secondPharmacy]} />);
+        const chips = screen.getAllByRole('button');
+        expect(chips).toHaveLength(1);
+        expect(chips[0]).toHaveTextContent('Pharmacy');
+        expect(chips[0]).toHaveTextContent('×2');
+        // Clicking still opens the representative (first) citation's source card.
+        fireEvent.click(chips[0]!);
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(screen.getByText('SureScripts pharmacy history')).toBeInTheDocument();
+    });
+
+    it('keeps citations from different source types as separate chips without counts', () => {
+        render(<CitationChips citations={[hcqCitation, bareCitation]} />);
+        const chips = screen.getAllByRole('button');
+        expect(chips).toHaveLength(2);
+        expect(chips[0]).toHaveTextContent('Prior visit');
+        expect(chips[1]).toHaveTextContent('Pharmacy');
+        expect(screen.queryByText(/×\d/)).not.toBeInTheDocument();
     });
 });
 

@@ -1,8 +1,8 @@
-// Overview landing (S2.11, R2 IA) — rendered instantly from GET /api/overview, no LLM in
-// the path: contradiction alerts, chief complaint with the recent-scans strip directly
-// beneath it, meds + deterministic risk flags, allergies, conditions. The patient header
-// band is exported for App to mount above the tab bar (it hosts the AI insights control);
-// AI insights itself lives on its own tab.
+// Overview landing (S2.11, R2 IA, R7 order) — rendered instantly from GET /api/overview,
+// no LLM in the path: chief complaint with the recent-scans strip directly beneath it,
+// then the data-conflicts card, then meds + deterministic risk flags, allergies,
+// conditions. The patient header band is exported for App to mount above the tab bar (it
+// hosts the AI insights control); AI insights itself lives on its own tab.
 import { useState, type ComponentType, type ReactNode } from 'react';
 import {
     AlertTriangle,
@@ -173,7 +173,9 @@ export function ContradictionAlerts({
                                 {/* div, not p: the chip popover nests block elements */}
                                 <div className={`text-sm ${config.subText}`}>
                                     <span className="font-medium">{titleCase(alert.type)}:</span> {alert.description}
+                                    {/* group={false}: the two sides of a conflict are distinct claims — never collapse them into one ×2 chip */}
                                     <CitationChips
+                                        group={false}
                                         citations={[
                                             ...(alert.source_a !== null ? [contradictionCitation(alert.id, 'a', alert.source_a)] : []),
                                             ...(alert.source_b !== null ? [contradictionCitation(alert.id, 'b', alert.source_b)] : []),
@@ -465,11 +467,11 @@ export default function Overview({
 
     return (
         <div className="space-y-10">
-            <ContradictionAlerts alerts={alerts} />
-
             <ChiefComplaintCard fact={(facts.chief_complaint ?? [])[0]} />
 
             <RecentScans images={overview.images} onOpenImaging={onOpenImaging} />
+
+            <ContradictionAlerts alerts={alerts} />
 
             <FactGroupCard
                 title="Medications"

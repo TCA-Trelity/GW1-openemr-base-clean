@@ -118,11 +118,14 @@ describe('App landing (deterministic overview)', () => {
         expect(screen.getByText(/Referral letter documents NKDA/)).toBeInTheDocument();
         expect(screen.getByText(/HCQ duration conflicts across sources/)).toBeInTheDocument();
         expect(screen.getByText(/How long have you actually been taking hydroxychloroquine\?/)).toBeInTheDocument();
-        // Recent scans strip (placeholder pixels) sits directly below the chief complaint (R2)
+        // R7 section order: chief complaint -> recent scans -> data conflicts -> meds
         const strip = screen.getByTestId('recent-scans');
         const complaint = screen.getByText(/Floaters and flashes x 2-3 weeks, worse OD/);
+        const conflicts = screen.getByText('2 Data Conflicts Detected');
+        const meds = screen.getByText(/Hydroxychloroquine \(Plaquenil\) · 200mg/);
         expect(complaint.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect(strip.compareDocumentPosition(screen.getByText(/Hydroxychloroquine \(Plaquenil\) · 200mg/)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(strip.compareDocumentPosition(conflicts) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(conflicts.compareDocumentPosition(meds) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         // The Generate control lives in the patient header band, left of the time chip (R2)
         expect(screen.getByRole('button', { name: /Generate AI insights/i })).toBeInTheDocument();
         // The invariant itself: zero /api/brief traffic
@@ -146,7 +149,8 @@ describe('App landing (deterministic overview)', () => {
     });
 
     // Failure mode: a stored contradiction quotes only one side — the doctor cannot
-    // weigh the conflict without both verbatim sources.
+    // weigh the conflict without both verbatim sources. Same-source-type grouping (R8)
+    // must never collapse a conflict's two sides into one chip.
     it('quotes both sources of a rich-seed contradiction via citation chips', async () => {
         stubApp({ overview: overviewNoBrief });
         render(<App />);
@@ -156,6 +160,9 @@ describe('App landing (deterministic overview)', () => {
         fireEvent.click(chips[0]!);
         const card = await screen.findByRole('dialog');
         expect(within(card).getByText(/Hydroxychloroquine \(Plaquenil\) 200mg daily - for RA, ~4 years duration/)).toBeInTheDocument();
+        // R8 labels: runtime-shape sides carry their real source types on the chip
+        expect(screen.getByRole('button', { name: 'Citation 1: Referral Letter' })).toHaveTextContent('Referral');
+        expect(screen.getByRole('button', { name: 'Citation 2: Intake Transcript' })).toHaveTextContent('Intake');
     });
 
     // Failure mode: the scans strip loses the OD/OS toggle or the Imaging deep link.
@@ -295,11 +302,11 @@ describe('AI insights', () => {
         const tab = screen.getByTestId('ai-insights');
         const points = within(tab).getAllByTestId('discussion-point');
         expect(points).toHaveLength(3);
-        // risk_flag point: kind icon + terse text + citation chip resolved from fact_ids
+        // risk_flag point: kind icon + terse text + source-labelled citation chip (R8)
         expect(points[0]).toHaveTextContent('Hydroxychloroquine (Plaquenil): HIGH retinal toxicity risk');
         expect(
             within(points[0]!).getByRole('button', { name: 'Citation 1: Rheumatology office note - Dr. Anita Patel' }),
-        ).toBeInTheDocument();
+        ).toHaveTextContent('Prior visit');
         // contradiction point: link to the matching alert card
         expect(within(points[1]!).getByRole('button', { name: /view conflict/i })).toBeInTheDocument();
         // legacy plain string renders plainly, numbered
@@ -455,8 +462,9 @@ describe('Citation deep links', () => {
     it('deep-links from a landing citation chip to the Sources tab with the excerpt highlighted', async () => {
         stubApp({ overview: overviewNoBrief });
         const { container } = render(<App />);
-        // Open the chief-complaint citation chip on the landing card.
+        // Open the chief-complaint citation chip on the landing card (labelled "Intake", R8).
         const chips = await screen.findAllByRole('button', { name: /Citation 1: Conversational intake transcript/i });
+        expect(chips[0]).toHaveTextContent('Intake');
         fireEvent.click(chips[0]!);
         const card = await screen.findByRole('dialog', { name: /Source: Conversational intake transcript/i });
         fireEvent.click(within(card).getByRole('button', { name: /View source/i }));
