@@ -172,6 +172,7 @@ export interface StoredBrief {
 
 export type PrepRunStatus = 'complete' | 'failed';
 const PrepRunStatusSchema = z.enum(['complete', 'failed']);
+const ChatRoleSchema = z.enum(['user', 'assistant']);
 
 /** Operational view of a prep run: status + the last stage entered (where a failure died). */
 export interface StoredPrepRun {
@@ -548,6 +549,57 @@ export class FactStore {
         }));
     }
 
+    /** One chat turn row (S2.3). Returns the message id. */
+    public async saveChatMessage(input: {
+        patient_id: string;
+        conversation_id: string;
+        role: 'user' | 'assistant';
+        content: string;
+        correlation_id: string;
+    }): Promise<string> {
+        const result = await this.pool.query<{ id: string }>(
+            `INSERT INTO chat_messages (patient_id, conversation_id, role, content, correlation_id)
+             VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+            [input.patient_id, input.conversation_id, input.role, input.content, input.correlation_id],
+        );
+        const row = result.rows[0];
+        if (row === undefined) {
+            throw new Error('chat message insert returned no row');
+        }
+        return row.id;
+    }
+
+    /** Oldest-first conversation replay — feeds both the LLM history and the panel. */
+    public async getChatMessages(patientId: string, conversationId: string, limit = 100): Promise<
+        {
+            id: string;
+            patient_id: string;
+            conversation_id: string;
+            role: 'user' | 'assistant';
+            content: string;
+            correlation_id: string;
+            created_at: string;
+        }[]
+    > {
+        const result = await this.pool.query<ChatMessageRow>(
+            `SELECT id, patient_id, conversation_id, role, content, correlation_id, created_at
+             FROM chat_messages
+             WHERE patient_id = $1 AND conversation_id = $2
+             ORDER BY created_at ASC
+             LIMIT $3`,
+            [patientId, conversationId, limit],
+        );
+        return result.rows.map((row) => ({
+            id: row.id,
+            patient_id: row.patient_id,
+            conversation_id: row.conversation_id,
+            role: ChatRoleSchema.parse(row.role),
+            content: row.content,
+            correlation_id: row.correlation_id,
+            created_at: row.created_at.toISOString(),
+        }));
+    }
+
     /** Rebuild lever: drops the patient's entire derived view (cascades); prep_runs survive as audit. */
     public async wipePatient(patientId: string): Promise<void> {
         await this.pool.query('DELETE FROM patients WHERE id = $1', [patientId]);
@@ -604,6 +656,15 @@ type ImageRow = {
 };
 type TreatmentRow = { id: string; patient_id: string; treatment_date: string; payload: unknown };
 type BriefRow = { id: string; patient_id: string; prepared_at: Date; correlation_id: string; content: unknown; status: string };
+type ChatMessageRow = {
+    id: string;
+    patient_id: string;
+    conversation_id: string;
+    role: string;
+    content: string;
+    correlation_id: string;
+    created_at: Date;
+};
 type PrepRunRow = {
     id: string;
     patient_id: string;

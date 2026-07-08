@@ -11,6 +11,9 @@ const EnvSchema = z.object({
     // Haiku 4.5 for all prep extraction (user call, 2026-07-08): no default thinking to
     // spiral, 1/5 the Sonnet price, and per-document calls fit comfortably in its window.
     ANTHROPIC_MODEL_PREP: z.string().min(1).default('claude-haiku-4-5'),
+    ANTHROPIC_MODEL_CHAT: z.string().min(1).default('claude-haiku-4-5'),
+    // Chat replies are short by design; a tight ceiling caps worst-case turn cost.
+    LLM_CHAT_MAX_OUTPUT_TOKENS: z.coerce.number().int().positive().default(1024),
     LANGFUSE_HOST: z.string().url().optional(),
     // Scan-image directory for /api/images (defaults to the baked-in seed/images).
     SCAN_IMAGES_DIR: z.string().min(1).optional(),

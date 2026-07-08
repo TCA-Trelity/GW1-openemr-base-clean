@@ -9,12 +9,14 @@ import { fileURLToPath } from 'node:url';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { Langfuse } from 'langfuse';
+import { ChatService } from './chat/chat.js';
 import { loadConfig, type Config } from './config.js';
 import { LangfuseTracer } from './obs/langfuse.js';
 import { AnthropicClient } from './prep/anthropic.js';
 import { SpendGuard } from './prep/budget.js';
 import { FactExtractor } from './prep/extraction.js';
 import { StoreDocumentSource } from './prep/sources.js';
+import { registerChatRoutes, type ChatRouteDeps } from './routes/chat.js';
 import { registerHealthRoutes } from './routes/health.js';
 import { registerOverviewRoutes, type OverviewRouteDeps } from './routes/overview.js';
 import { registerPrepRoutes, type PrepRouteDeps } from './routes/prep.js';
@@ -29,6 +31,8 @@ export interface AppDeps {
     prep: PrepRouteDeps;
     /** Deterministic landing-page reads (no LLM in the load path). */
     overview: OverviewRouteDeps;
+    /** Streaming chat over the stored fact bundle (S2.3). */
+    chat: ChatRouteDeps;
 }
 
 // Store-backed dependencies exist only when DATABASE_URL is configured; without it the
@@ -85,6 +89,19 @@ export function buildDeps(config: Config): AppDeps | undefined {
             maxConcurrentPreps: config.LLM_MAX_CONCURRENT_PREPS,
         },
         overview: { store },
+        chat: {
+            store,
+            service: new ChatService(
+                new AnthropicClient({
+                    apiKey: config.ANTHROPIC_API_KEY ?? '',
+                    model: config.ANTHROPIC_MODEL_CHAT,
+                    maxTokens: config.LLM_CHAT_MAX_OUTPUT_TOKENS,
+                }),
+                store,
+                spendGuard,
+            ),
+            spendGuard,
+        },
     };
 }
 
@@ -103,6 +120,7 @@ export function buildServer(config: Config, deps?: AppDeps): FastifyInstance {
     registerHealthRoutes(app, config, deps === undefined ? undefined : { checkPostgres: deps.checkPostgres });
     registerPrepRoutes(app, deps?.prep);
     registerOverviewRoutes(app, deps?.overview);
+    registerChatRoutes(app, deps?.chat);
 
     // Scan images (S2.13): image_records carry a storage_key; the panel loads
     // /api/images/<storage_key>. fastify-static owns traversal safety.

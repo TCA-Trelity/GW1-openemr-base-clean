@@ -566,7 +566,7 @@ describe('AnthropicClient streaming', () => {
             heartbeatMs: 10,
         });
         const progress = vi.fn();
-        const completion = await client.complete('sys', [{ role: 'user', content: 'hi' }], 'corr-beat', progress);
+        const completion = await client.complete('sys', [{ role: 'user', content: 'hi' }], 'corr-beat', { onProgress: progress });
         expect(completion.text).toBe('chunk-one');
         expect(progress).toHaveBeenCalled();
         const last = progress.mock.calls.at(-1)![0] as { textChars: number; elapsedMs: number };

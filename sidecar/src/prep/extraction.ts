@@ -271,12 +271,13 @@ export class FactExtractor {
             try {
                 // Streaming heartbeat: a long call logs progress every ~15s, so a silent
                 // Railway log means hung (and the client's idle timeout will kill it), not slow.
-                completion = await this.client.complete(system, messages, correlationId, (progress) =>
-                    logger.info(
-                        { correlationId, label, attempt, text_chars: progress.textChars, elapsed_ms: progress.elapsedMs },
-                        'extraction stream in progress',
-                    ),
-                );
+                completion = await this.client.complete(system, messages, correlationId, {
+                    onProgress: (progress) =>
+                        logger.info(
+                            { correlationId, label, attempt, text_chars: progress.textChars, elapsed_ms: progress.elapsedMs },
+                            'extraction stream in progress',
+                        ),
+                });
             } catch (error) {
                 if (isTransientAnthropicError(error) && freshRetries < 1) {
                     freshRetries += 1;

@@ -31,6 +31,12 @@ export interface StreamProgress {
 }
 export type OnProgress = (progress: StreamProgress) => void;
 
+/** Per-call hooks: heartbeat cadence + raw text deltas (chat streams them to the browser). */
+export interface CompleteHooks {
+    onProgress?: OnProgress;
+    onTextDelta?: (text: string) => void;
+}
+
 // Typed API failure: status plus the API error type/message only — never the raw body.
 export class AnthropicApiError extends Error {
     constructor(
@@ -104,8 +110,9 @@ export class AnthropicClient {
         system: string,
         messages: AnthropicMessage[],
         correlationId: string,
-        onProgress?: OnProgress,
+        hooks?: CompleteHooks,
     ): Promise<AnthropicCompletion> {
+        const onProgress = hooks?.onProgress;
         if (this.apiKey === '') {
             throw new AnthropicApiError(0, 'not_configured', 'ANTHROPIC_API_KEY is not configured');
         }
@@ -190,10 +197,16 @@ export class AnthropicClient {
                 const lines = buffer.split('\n');
                 buffer = lines.pop() ?? '';
                 for (const line of lines) {
-                    handleSseLine(line, state);
+                    const delta = handleSseLine(line, state);
+                    if (delta !== undefined) {
+                        hooks?.onTextDelta?.(delta);
+                    }
                 }
             }
-            handleSseLine(buffer, state);
+            const tail = handleSseLine(buffer, state);
+            if (tail !== undefined) {
+                hooks?.onTextDelta?.(tail);
+            }
             return {
                 text: state.text,
                 usage: { input_tokens: state.inputTokens, output_tokens: state.outputTokens },
@@ -225,9 +238,10 @@ interface StreamState {
 }
 
 // One SSE line. Only `data:` lines matter — the payload's own `type` field routes it.
-function handleSseLine(line: string, state: StreamState): void {
+// Returns the text delta appended by this line, if any.
+function handleSseLine(line: string, state: StreamState): string | undefined {
     if (!line.startsWith('data:')) {
-        return;
+        return undefined;
     }
     let event: unknown;
     try {
@@ -236,7 +250,7 @@ function handleSseLine(line: string, state: StreamState): void {
         return; // tolerate keep-alive noise; real malformation surfaces as validation failure downstream
     }
     if (!isRecord(event)) {
-        return;
+        return undefined;
     }
     switch (event['type']) {
         case 'message_start': {
@@ -244,28 +258,29 @@ function handleSseLine(line: string, state: StreamState): void {
             state.model = asString(message?.['model']) ?? state.model;
             const usage = isRecord(message?.['usage']) ? message['usage'] : undefined;
             state.inputTokens = asNumber(usage?.['input_tokens']) ?? state.inputTokens;
-            return;
+            return undefined;
         }
         case 'content_block_delta': {
             const delta = isRecord(event['delta']) ? event['delta'] : undefined;
             if (delta?.['type'] === 'text_delta' && typeof delta['text'] === 'string') {
                 state.text += delta['text'];
+                return delta['text'];
             }
-            return;
+            return undefined;
         }
         case 'message_delta': {
             const delta = isRecord(event['delta']) ? event['delta'] : undefined;
             state.stopReason = asString(delta?.['stop_reason']) ?? state.stopReason;
             const usage = isRecord(event['usage']) ? event['usage'] : undefined;
             state.outputTokens = asNumber(usage?.['output_tokens']) ?? state.outputTokens;
-            return;
+            return undefined;
         }
         case 'error': {
             const error = isRecord(event['error']) ? event['error'] : undefined;
             throw new AnthropicApiError(0, asString(error?.['type']) ?? 'stream_error', asString(error?.['message']));
         }
         default:
-            return; // ping, content_block_start/stop, message_stop
+            return undefined; // ping, content_block_start/stop, message_stop
     }
 }
 
