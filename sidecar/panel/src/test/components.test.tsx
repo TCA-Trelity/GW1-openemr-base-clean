@@ -98,4 +98,23 @@ describe('SourcesTab', () => {
         render(<SourcesTab documents={[]} focus={null} onClearFocus={() => undefined} />);
         expect(screen.getByText('No source documents available for this patient.')).toBeInTheDocument();
     });
+
+    // Failure mode (S2.12): provenance stops being visible at a glance — how a document
+    // arrived (fax/portal/upload), its raw filename, and its OCR confidence all matter
+    // when a doctor weighs a source.
+    it('elevates received method, filename, and OCR quality badges on the document list', () => {
+        render(<SourcesTab documents={documents} focus={null} onClearFocus={() => undefined} />);
+        // extras.received_method badge
+        expect(screen.getByText('Patient Upload')).toBeInTheDocument();
+        // content.ocr_quality badge, amber below 90%
+        const ocrBadge = screen.getByText('OCR 88%');
+        expect(ocrBadge.className).toContain('text-amber-700');
+        // extras.filename: title for the transcript (no metadata), sub-line under the pdf title
+        expect(screen.getByText('intake-transcript-2024-12-26.txt')).toBeInTheDocument();
+        expect(screen.getByText('rheumatology-note-2024-09-10.txt')).toBeInTheDocument();
+
+        // The viewer header repeats the provenance line
+        fireEvent.click(screen.getByRole('button', { name: /rheum_note_sept2024\.pdf/ }));
+        expect(screen.getByText(/via patient_upload · received Dec 16, 2024 · OCR 88%/)).toBeInTheDocument();
+    });
 });

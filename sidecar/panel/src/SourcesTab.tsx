@@ -1,9 +1,10 @@
-// Sources tab — document list + full-text panel with cited-span highlighting
+// Sources tab (S2.12 elevation) — document list with provenance badges (type, date,
+// received method, filename, OCR quality) + full-text panel with cited-span highlighting
 // (port of SourcesView.jsx: char-range first, excerpt-text fallback).
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { FileText, MapPin, X } from 'lucide-react';
+import { FileText, Inbox, MapPin, ScanText, X } from 'lucide-react';
 import type { SourceDocumentRecord } from './types';
-import { Card, formatDate, sourceTypeConfig } from './ui';
+import { Card, formatDate, sourceTypeConfig, titleCase } from './ui';
 
 export interface SourceFocus {
     documentId: string | null;
@@ -16,8 +17,47 @@ function docId(doc: SourceDocumentRecord): string {
     return doc.id ?? doc.document_id ?? '';
 }
 
+/** The store carries filename/received_* in extras; legacy top-level spellings still win a fallback. */
+function docFilename(doc: SourceDocumentRecord): string | undefined {
+    return doc.extras?.filename ?? doc.filename;
+}
+
+function docReceivedMethod(doc: SourceDocumentRecord): string | undefined {
+    return doc.extras?.received_method ?? doc.received_method;
+}
+
 function docTitle(doc: SourceDocumentRecord): string {
-    return doc.metadata?.original_filename ?? doc.filename ?? docId(doc);
+    return doc.metadata?.original_filename ?? docFilename(doc) ?? docId(doc);
+}
+
+/** Provenance badges: how the document arrived + OCR confidence when the content carries one. */
+function ProvenanceBadges({ doc }: { doc: SourceDocumentRecord }) {
+    const method = docReceivedMethod(doc);
+    const ocr = doc.content.ocr_quality;
+    if (method === undefined && ocr === undefined) {
+        return null;
+    }
+    return (
+        <span className="flex flex-wrap items-center gap-1 mt-1">
+            {method !== undefined && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[10px] font-medium bg-slate-50 text-slate-600 border-slate-200">
+                    <Inbox className="w-3 h-3" />
+                    {titleCase(method)}
+                </span>
+            )}
+            {ocr !== undefined && (
+                <span
+                    title={`OCR confidence ${String(ocr)}`}
+                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[10px] font-medium ${
+                        ocr < 0.9 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    }`}
+                >
+                    <ScanText className="w-3 h-3" />
+                    OCR {Math.round(ocr * 100)}%
+                </span>
+            )}
+        </span>
+    );
 }
 
 function docText(doc: SourceDocumentRecord): string {
@@ -152,7 +192,11 @@ export default function SourcesTab({
                                             {config.label}
                                         </span>
                                         <span className="block text-sm font-medium text-slate-700 truncate mt-1">{docTitle(doc)}</span>
+                                        {docFilename(doc) !== undefined && docFilename(doc) !== docTitle(doc) && (
+                                            <span className="block text-[10px] text-slate-400 truncate mt-0.5">{docFilename(doc)}</span>
+                                        )}
                                         <span className="block text-xs text-slate-400 mt-0.5">{formatDate(doc.document_date)}</span>
+                                        <ProvenanceBadges doc={doc} />
                                     </span>
                                 </div>
                             </button>
@@ -168,7 +212,11 @@ export default function SourcesTab({
                                 <h3 className="font-semibold text-slate-800">{docTitle(selected)}</h3>
                                 <p className="text-xs text-slate-400 mt-0.5">
                                     {sourceTypeConfig(selected.document_type).label} · {formatDate(selected.document_date)}
-                                    {selected.received_method !== undefined && ` · via ${selected.received_method}`}
+                                    {docReceivedMethod(selected) !== undefined && ` · via ${docReceivedMethod(selected)}`}
+                                    {selected.extras?.received_date !== undefined &&
+                                        ` · received ${formatDate(selected.extras.received_date)}`}
+                                    {selected.content.ocr_quality !== undefined &&
+                                        ` · OCR ${Math.round(selected.content.ocr_quality * 100)}%`}
                                 </p>
                             </div>
                             <button
