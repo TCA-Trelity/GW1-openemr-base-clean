@@ -86,6 +86,32 @@ LLM output is an async enhancement card, never a gate. Priority stack confirmed:
 | S2.8 | `COSTS.md`: actual dev spend (Anthropic console + Langfuse tokens) + 100/1K/10K/100K projections w/ architecture inflections (from ARCHITECTURE §11) | main | S2.6 | review | ☑ |
 | S2.9 | Demo video #2: script update (brief → drill-down chat → imaging story → contradiction verify → dashboards), user records | main + user | all above | — | ☐ |
 
+### Wave R — UI refinement (user feedback, 2026-07-08 PM)
+
+*Root causes behind the feedback: (1) brief assembly flattens facts into prose
+strings, dropping their citation refs — that's why insight bullets have no
+chips; (2) chat/brief prompts have no length contract — physicians get
+paragraphs where they have seconds; (3) the Imaging tab shows scans and
+analytics in separate sub-views instead of second-opinion's one-sweep
+image+findings+measurements layout (`AIFindingsPanel`/`CombinedImagingSection`);
+(4) Diagnosis & Care waits on the LLM instead of deriving a deterministic plan.
+Citations verdict: adopt the **Anthropic native Citations API** (document
+blocks, `citations_delta` streaming, exact cited_text + char ranges — supported
+on Haiku 4.5) for chat, keeping our verbatim gate as server-side verification;
+no model/vendor switch needed.*
+
+**Execution shape: backend contracts first (main), then ONE panel agent for all
+UI moves (avoids collisions in `sidecar/panel/`), corpus agent in parallel.**
+
+| ID | Ticket | Agent | Depends | Verify | Done |
+|---|---|---|---|---|---|
+| R1 | Corpus: +3 lighter patients (5 total; plausible ophtho variety), staggered appointment times with **Margaret earliest so the panel lands on her**; reuse existing CC scans; reseed on Railway | sub | — | screenshot | ☐ |
+| R2 | Panel IA: AI Insights becomes its own tab (right of Imaging) and leaves Overview; **Generate button moves into the patient header bar** (left of the time chip); **Recent scans move directly under Chief Complaint** | sub (panel batch) | R4, R5 | screenshot | ☐ |
+| R3 | Deterministic Diagnosis & Care on first load (no LLM): active conditions w/ status, current treatment protocol from treatments/events, monitoring plan + follow-up recommendation from engines (HCQ cadence, treat-and-extend interval) | main (API) + sub (panel batch) | S2.10 | unit + screenshot | ☐ |
+| R4 | Brevity contract system-wide: chat answers ≤3 bullets/~1 sentence each by default (hard prompt cap, expand-on-ask); brief assembly emits terse one-line items (conflict core only, no doc-id prose); insights/chat UI density pass | main + sub (panel batch) | — | screenshot | ☐ |
+| R5 | Citations fixed end-to-end: (a) brief assembly carries fact/citation refs per item → chips render in the Insights tab like Conditions; (b) chat migrates to the native Citations API (documents as content blocks, citations_delta → chips with char-range deep-links, spans re-verified by the gate server-side); `[[fact:id]]` contract retired | main + sub (panel batch) | — | unit + screenshot | ☐ |
+| R6 | Integrated image analysis (port second-opinion `AIFindingsPanel` + `CombinedImagingSection`): selecting any scan shows image beside findings (severity/trend icons), measurements grid w/ reference ranges, delta vs prior, adjacent trend — one sweep | sub (panel batch) | S2.13 | screenshot | ☐ |
+
 **Phase 2 exit criteria:** agent works in the live environment (embedded), eval results committed, dashboard live, video submitted.
 
 ## Phase 3 — Tier 2 / Final
