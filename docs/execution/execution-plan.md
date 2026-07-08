@@ -92,5 +92,6 @@ deploy logs).
 
 - **Sequencing invariant:** platform (P0) before code; skeleton deployed before surface; the embed decision point is Thu 1 PM CT.
 - **Subagent protocol:** worktree isolation for parallel tickets; every subagent diff gets a code-review pass before merge; no subagent touches `sidecar/src/schemas/` after S1.2 lands except via main.
-- **Session continuity:** each new session starts by reading this file + `docs/HANDOFF.md`. Status updates are commits, not memory.
+- **Session continuity:** each new session starts by reading this file + `docs/HANDOFF.md` + `docs/execution/DECISIONS.md`. Status updates are commits, not memory.
 - **Live verification:** the dev session never assumes live behavior — CI smoke (S1.10) is the arbiter.
+- **Software-factory conventions** (`.claude/skills/software-factory/`) apply to all build work: GATE 1 = this plan approved before Phase 1 code; GATE 2 = deploys/pushes per the already-authorized Railway flow, with anything scope-changing or hard-to-reverse re-gated explicitly. Code style: 1–3-line file header comments (what/why), no speculative abstraction, fewer files, dependencies must pull real weight. Communication: quiet during routine work; every judgment call surfaced as a vetoable `DECISION:` one-liner and logged to `DECISIONS.md`. Verification findings (including the **untested** list) are written to the state docs, not just chat. Healthcare domain escalation: verification design is production-grade at every tier.

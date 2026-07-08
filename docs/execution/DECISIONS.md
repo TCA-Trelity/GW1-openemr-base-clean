@@ -1,0 +1,37 @@
+# DECISIONS.md — Clinical Co-Pilot build-out
+
+*Audit trail per the software-factory skill: every judgment call gets one
+line + rationale, surfaced as a `DECISION:` line in chat when vetoable in
+real time. Newest entries at the bottom. Deeper argumentation lives in
+`ARCHITECTURE.md` / the PRD; this file is the ledger.*
+
+## Production-factory block swaps
+
+The software-factory production stack lists 11 default blocks with the rule
+"swap a block when the project demands it, log the swap." This build swaps
+five — each driven by the brownfield EHR context and the already-submitted
+architecture docs:
+
+- DECISION: Work record = `docs/execution/execution-plan.md` (repo-native) over Linear — evaluators must see scope/status in the public repo; no external tracker access to grant.
+- DECISION: Observability = self-hosted Langfuse over LangSmith — traces of clinical conversations stay inside the deployment boundary (`ARCHITECTURE.md` §7); also the committed, submitted choice.
+- DECISION: Delivery target = Railway over Vercel+Supabase — the sidecar must live beside the OpenEMR EHR in one private network; one platform for app+db+queue+observability.
+- DECISION: Orchestrator = plain pipeline + single tool-using chat loop over LangGraph — latency is the binding constraint and the submitted defense argues against orchestration frameworks; gates are process (plan approval, deploy sign-off), not `interrupt()` nodes.
+- DECISION: Memory = `docs/HANDOFF.md` (session state) + this file + execution plan over `memory/*.md` — same mechanism, evaluator-friendly locations that already exist.
+
+## Domain escalation (healthcare)
+
+- DECISION: Verification design runs at production grade regardless of tier per the skill's domain-escalation rule — citation gate, deterministic clinical arithmetic, and role-gated human verification are Tier 1 scope, not polish. (Matches `ARCHITECTURE.md` §4.)
+
+## Build decisions (2026-07-07 planning session)
+
+- DECISION: Imaging metadata authored at seed time — analytics engines consume authored `ai_analysis` ground truth; a live vision read slots in later behind the same schema. Deterministic, evaluable, honestly labeled.
+- DECISION: Scan imagery from public research OCT datasets (Kermany-class mapping: CNV for fluid visits, normal post-treatment/HCQ) — CC BY attribution recorded in `docs/data-sources.md` when sourced.
+- DECISION: All four imaging features (timeline+context badges, treat-and-extend, trend charts, side-by-side) are Thursday scope — they share one data spine; marginal cost per tab is small.
+- DECISION: Panel embedded in the OpenEMR chart is Thursday scope (user call, against the de-risk recommendation) — built standalone-first as the iframe target; embed timeboxed to Thu AM with a 1 PM CT fallback decision (chart link to standalone panel).
+- DECISION: Fence F9 resolved — `medicationRiskFlags.jsx` is the canonical med-risk engine (fully pure, carries AAO source citation); the divergent service copy is not ported.
+- DECISION: Fence F10 upheld — `analyzeOCT`'s fabricated (Math.random) pixel analysis is never ported; nothing fabricates clinical data.
+- DECISION: Scan storage = sidecar Railway volume behind an `ImageStore` interface — object storage becomes a config swap at pilot scale.
+- DECISION: Sidecar lives in this repo under `sidecar/` as its own Railway service with Watch Paths — sidecar iterations must not trigger 15-minute EHR rebuilds.
+- DECISION: Keep BullMQ/Redis and the two-tier model split (Sonnet 5 prep / Haiku 4.5 chat) exactly as submitted — doc/build consistency is an interview asset.
+- DECISION: Live verification runs in GitHub Actions (public runners reach the Railway URL; the dev session cannot) — CI smoke is the arbiter of "works in the live environment."
+- DECISION: OAuth registration + corpus seeding execute as scripts on the Railway sidecar service, not from the dev session (same egress constraint).
