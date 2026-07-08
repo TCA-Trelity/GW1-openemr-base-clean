@@ -53,7 +53,9 @@ function buildChecks(config: Config, probes?: HealthProbes): DepCheck[] {
         },
         {
             name: 'langfuse',
-            requiredInProduction: true,
+            // Flips to required when the observability service deploys (S2.6);
+            // until then an absent LANGFUSE_HOST must not fail readiness.
+            requiredInProduction: false,
             configured: config.LANGFUSE_HOST !== undefined,
             check: () => fetchOk(`${config.LANGFUSE_HOST}/api/public/health`),
         },
