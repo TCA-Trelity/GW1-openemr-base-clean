@@ -53,33 +53,45 @@ content) and the AgentForge course PDF.
 
 ## Current status / immediate next steps
 
-- **DONE:** all Tier-0 documents committed and pushed; PR #1 open.
-- **PENDING (user):** run `deploy/railway-runbook.md` (~10 min) → paste the
-  public URL + the generated `OE_PASS`; record demo video from script;
-  confirm Gauntlet's actual submission venue; optional `USER.md` pointer file
-  (PDF is inconsistent: Stage-4 says `USERS.md`, final table says `USER.md`).
-- **NEXT (agent, once URL exists):** verify deploy; register OAuth clients
-  (SMART app + system client) against the live instance; seed 1–2 smoke
-  patients via API; update PR description + README with the URL; then begin
-  Tier 1 in PRD unit order (U1.1 scaffold → U1.2 engines → U1.3 migrations →
-  U1.4 module → …). Railway services to add at T1: `sidecar`, `postgres`,
-  `redis`, `langfuse` (self-hosted); `ANTHROPIC_API_KEY` set by user directly
-  in Railway variables — never shared in repo or chat.
+*(Updated 2026-07-07 evening — Tier 0 SUBMITTED.)*
+
+- **DONE (Tier 0):** MVP submitted. Live app at
+  https://gw1-openemr-base-clean-production.up.railway.app (Railway project:
+  OpenEMR app service + mariadb over private networking; fork source baked
+  into a `openemr/openemr:flex`-derived image; boot fixes in root
+  `Dockerfile` + `deploy/wait-and-start.sh`; `DEMO_MODE=standard` loads the
+  demo dataset — demo login resets to admin/pass on re-setup, then gets
+  changed). PR #1 merged to `main`; `main` is canonical; GitLab mirror via
+  `.github/workflows/mirror-to-gitlab.yml` (secrets `GITLAB_REPO` +
+  `GITLAB_TOKEN`).
+- **NOW (Tier 1/2):** execution is tracked ticket-by-ticket in
+  `docs/execution/execution-plan.md`; decisions ledger in
+  `docs/execution/DECISIONS.md`; software-factory conventions binding
+  (`.claude/skills/software-factory/`). GATE 1 approved 2026-07-07. Phase 1
+  in progress: S1.1 scaffold done (`sidecar/`), S1.2 schemas + S1.4 corpus
+  fanned out to subagents.
+- **PENDING (user):** P0.1 attach Railway volume at
+  `/var/www/localhost/htdocs/openemr/sites`; P0.2 Watch Paths ignoring
+  `sidecar/**` + `docs/**`; later `ANTHROPIC_API_KEY` on the sidecar service
+  — set directly in Railway variables, never in repo or chat.
 
 ## Known constraints for any new session
 
-- Egress: Railway/Render/Fly APIs are 403-blocked; googleapis reachable;
-  the deployed app's public URL will be reachable over HTTPS (use it for
-  API-based verification/seeding).
+- Egress: Railway/Render/Fly APIs AND `*.up.railway.app` are 403-blocked
+  from the dev session. GitHub Actions runners CAN reach the live URL —
+  CI smoke is the arbiter of live behavior; seeding/OAuth registration run
+  as scripts on the Railway sidecar service.
+- Pushes to the branch rebuild the OpenEMR service (and reset its DB until
+  P0.1's volume is attached); watch paths (P0.2) stop sidecar/docs pushes
+  from triggering EHR rebuilds.
 - OpenEMR PHP additions must clear PHPStan level 10 with zero new baseline
   entries (see `CLAUDE.md`).
-- The two prototype med-risk engines diverge — reconcile per PRD F9/U1.2
-  before porting.
-- `analyzeOCT` in the prototype fabricates data — never port as logic (F10).
+- F9 resolved: `medicationRiskFlags.jsx` is the canonical med-risk engine.
+  F10 stands: `analyzeOCT` fabricates data — never port as logic.
 
 ## Suggested kickoff prompt for a fresh session
 
-> Read `docs/HANDOFF.md`, then `docs/defense/PRD-clinical-copilot.md`.
-> Tier 0 status: [deployed URL: ___ / video: done or not]. Continue with
-> [close Tier 0 / begin Tier 1 at U1.1], keeping the public-repo hygiene
+> Read `docs/HANDOFF.md`, `docs/execution/execution-plan.md`, and
+> `docs/execution/DECISIONS.md`. Continue the build at the first unchecked
+> ticket, keeping the software-factory conventions and public-repo hygiene
 > rules from the handoff.
