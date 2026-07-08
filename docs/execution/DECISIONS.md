@@ -56,3 +56,9 @@ architecture docs:
 - DECISION: Extraction is map-reduce — one bounded call per document (output structurally limited by one document's content, `LLM_MAX_OUTPUT_TOKENS` default 8192) + one contradiction pass over compact fact summaries. Never the full corpus in a single mega-call. Per-doc progress stamps `llm_extraction:N/12` onto prep_runs.
 - DECISION: Character offsets are best-effort BY CONTRACT — the prompt tells the model estimates are fine and to never count characters; the citation gate verifies excerpt_text verbatim and corrects ranges (`ok_search`), so provenance strictness is unchanged. context_before/context_after are always null (panel derives context from stored document text).
 - DECISION: Truncation (stop_reason max_tokens) is never feedback-retried — feeding a cut-off response back cannot fix a structural cap hit and doubles the burn. One fresh retry, then fail the call with a clear error.
+
+## Wave R (2026-07-08 PM, user UI review)
+
+- DECISION: Chat grounding = the Anthropic native Citations API (document content blocks, `citations_delta` streaming) over the `[[fact:id]]` token contract — the model no longer emits citation syntax to fumble; every cited span arrives with exact quoted text + char ranges, is re-verified verbatim against our stored copy server-side, and unverifiable spans are reported, never rendered. No vendor switch needed (supported on Haiku 4.5).
+- DECISION: Brevity is a hard contract, not a style hint — chat defaults to ≤3 short bullets (~50 words, expand on ask); brief discussion points are structured items capped at 90 chars whose detail lives in linked cards. Physicians read in seconds.
+- DECISION: Diagnosis & Care is deterministic on first load (care_plan block from stored facts + engines); LLM output never gates a care surface.
