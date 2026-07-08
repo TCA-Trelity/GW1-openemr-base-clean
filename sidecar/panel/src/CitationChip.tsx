@@ -3,8 +3,8 @@
 // excerpt highlighted in context; "View source" deep-links into the Sources tab.
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Calendar, MapPin, User } from 'lucide-react';
-import type { Attribution, CitationRef } from './types';
-import { formatDate, sourceTypeConfig } from './ui';
+import type { Attribution, CitationRef, PatientFact } from './types';
+import { formatDate, sourceTypeConfig, titleCase } from './ui';
 
 /** Provided by App; lets any chip anywhere jump to the Sources tab. No-op by default so chips render standalone. */
 export const SourceNavContext = createContext<(citation: CitationRef) => void>(() => undefined);
@@ -152,6 +152,23 @@ export function CitationChip({ citation, index }: { citation: CitationRef; index
                 </div>
             )}
         </span>
+    );
+}
+
+/** A fact's chip ref: its own first source, else a minimal synthesized one (insights points share this). */
+export function factChipCitation(fact: PatientFact): CitationRef {
+    return (
+        fact.sources[0] ?? {
+            id: `fact-cit-${fact.id}`,
+            fact_id: fact.id,
+            source_label: titleCase(fact.fact_type),
+            source_type: 'provider_note',
+            excerpt_text: null,
+            excerpt_location: null,
+            attribution: null,
+            source_document_id: fact.source_document_id,
+            document_date: fact.created_date ?? null,
+        }
     );
 }
 

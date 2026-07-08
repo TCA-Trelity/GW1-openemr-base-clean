@@ -1,10 +1,13 @@
-// App-level tests (S2.11/S2.12 realignment): instant deterministic landing from
-// /api/overview, day-schedule sidebar + ?patient= deep links, async AI insights card
-// (generate/poll/reuse/429), and the chip -> Sources deep link. fetch is stubbed per test.
+// App-level tests (S2.11/S2.12 realignment + R2/R3/R4): instant deterministic landing
+// from /api/overview, day-schedule sidebar + ?patient= deep links, the header-bar AI
+// insights control (generate/poll/reuse/429) with the brief on its own tab, the
+// deterministic Diagnosis & Care tab, and the chip -> Sources deep link. fetch is
+// stubbed per test.
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import App from '../App';
 import {
+    briefContent,
     factBundle,
     overviewNoBrief,
     overviewPayload,
@@ -12,6 +15,7 @@ import {
     storedBrief,
     williamOverview,
 } from './fixtures';
+import { wtOverview } from './imaging-fixtures';
 import type { OverviewPayload, PatientRecord } from '../types';
 
 type FetchStub = (url: string, init?: RequestInit) => { status: number; body: unknown } | undefined;
@@ -114,11 +118,31 @@ describe('App landing (deterministic overview)', () => {
         expect(screen.getByText(/Referral letter documents NKDA/)).toBeInTheDocument();
         expect(screen.getByText(/HCQ duration conflicts across sources/)).toBeInTheDocument();
         expect(screen.getByText(/How long have you actually been taking hydroxychloroquine\?/)).toBeInTheDocument();
-        // Recent scans strip (placeholder pixels) + insights idle card
-        expect(screen.getByTestId('recent-scans')).toBeInTheDocument();
+        // Recent scans strip (placeholder pixels) sits directly below the chief complaint (R2)
+        const strip = screen.getByTestId('recent-scans');
+        const complaint = screen.getByText(/Floaters and flashes x 2-3 weeks, worse OD/);
+        expect(complaint.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(strip.compareDocumentPosition(screen.getByText(/Hydroxychloroquine \(Plaquenil\) · 200mg/)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        // The Generate control lives in the patient header band, left of the time chip (R2)
         expect(screen.getByRole('button', { name: /Generate AI insights/i })).toBeInTheDocument();
         // The invariant itself: zero /api/brief traffic
         expect(briefCalls(mock)).toBe(0);
+    });
+
+    // Failure mode: the tab bar regresses to the old IA — AI Insights must be its own
+    // top-level tab immediately right of Imaging (R2).
+    it('orders the tabs Overview, Medical Background, Imaging, AI Insights, Diagnosis & Care, Sources', async () => {
+        stubApp({ overview: overviewNoBrief });
+        render(<App />);
+        const tabs = await screen.findAllByRole('tab');
+        expect(tabs.map((tab) => tab.textContent)).toEqual([
+            'Overview',
+            'Medical Background',
+            'Imaging',
+            'AI Insights',
+            'Diagnosis & Care',
+            'Sources',
+        ]);
     });
 
     // Failure mode: a stored contradiction quotes only one side — the doctor cannot
@@ -157,14 +181,47 @@ describe('App landing (deterministic overview)', () => {
         expect(screen.getAllByRole('button', { name: /Retry/i }).length).toBeGreaterThanOrEqual(1);
     });
 
-    // Failure mode: the Diagnosis & Care tab renders stale/fabricated care-plan data
-    // before S2.3 exists, instead of an honest placeholder.
-    it('renders the Diagnosis & Care tab as a "Coming with chat" placeholder', async () => {
-        stubApp();
+    // Failure mode (R3): the Diagnosis & Care tab waits on an LLM or renders a
+    // placeholder — it must render deterministically on first load from care_plan.
+    it('renders the Diagnosis & Care tab deterministically from the overview care_plan', async () => {
+        const mock = stubApp({ overview: overviewNoBrief });
         render(<App />);
         fireEvent.click(await screen.findByRole('tab', { name: /Diagnosis & Care/ }));
-        expect(screen.getByText('Coming with chat')).toBeInTheDocument();
-        expect(screen.getByText(/S2\.3/)).toBeInTheDocument();
+        // Active conditions resolve fact ids against facts_by_type.condition (shared row)
+        expect(screen.getByText(/Active Conditions \(1\)/)).toBeInTheDocument();
+        expect(screen.getByText(/Rheumatoid arthritis \(M06\.9\)/)).toBeInTheDocument();
+        // No protocol for Margaret — honest empty state, not a blank card
+        expect(screen.getByText('No active treatment protocol on record.')).toBeInTheDocument();
+        // Monitoring rows: severity-styled, source attributed
+        const rows = screen.getAllByTestId('monitoring-item');
+        expect(rows).toHaveLength(2);
+        expect(rows[0]).toHaveTextContent('Baseline and annual OCT plus visual field screening');
+        expect(rows[0]!.className).toContain('bg-red-50');
+        expect(rows[0]).toHaveTextContent('AAO HCQ Screening Guidelines 2016 (revised 2020)');
+        expect(rows[1]!.className).toContain('bg-amber-50');
+        expect(rows[1]).toHaveTextContent('imaging trend analysis');
+        // Follow-up card with confidence, no fabricated recommendation
+        const followUp = screen.getByTestId('follow-up-card');
+        expect(followUp).toHaveTextContent(/No interval recommendation yet/);
+        expect(followUp).toHaveTextContent('low confidence');
+        // Zero LLM traffic in this path
+        expect(briefCalls(mock)).toBe(0);
+    });
+
+    // Failure mode (R3): a treatment-bearing record loses its protocol/follow-up cards.
+    it('renders protocol and follow-up from a treatment-bearing care_plan', async () => {
+        window.history.replaceState(null, '', '?patient=william-thompson');
+        stubApp({ overviews: { 'william-thompson': wtOverview } });
+        render(<App />);
+        fireEvent.click(await screen.findByRole('tab', { name: /Diagnosis & Care/ }));
+        const protocol = screen.getByTestId('protocol-card');
+        expect(protocol).toHaveTextContent('Eylea protocol');
+        expect(protocol).toHaveTextContent('4 injections on record');
+        expect(protocol).toHaveTextContent('Last: Oct 22, 2025');
+        const followUp = screen.getByTestId('follow-up-card');
+        expect(followUp).toHaveTextContent('Optimal: 7 weeks');
+        expect(followUp).toHaveTextContent(/Recommend 7-week intervals/);
+        expect(followUp).toHaveTextContent('high confidence');
     });
 });
 
@@ -204,30 +261,96 @@ describe('Day-schedule sidebar', () => {
     });
 });
 
-describe('AI insights card', () => {
+describe('AI insights', () => {
     // Failure mode: an existing brief renders unlabeled (or the gate metrics vanish) —
     // LLM output must be visibly marked as AI-prepared and citation-gated.
-    it('renders the LLM sections from an existing brief, clearly labeled', async () => {
-        stubApp(); // overviewPayload carries latest_brief -> the card fetches /api/brief
+    it('renders the LLM sections from an existing brief on the AI Insights tab', async () => {
+        stubApp(); // overviewPayload carries latest_brief -> the hook fetches /api/brief
         render(<App />);
-        const card = await screen.findByTestId('ai-insights');
-        expect(await within(card).findByText('AI-prepared · citation-gated')).toBeInTheDocument();
-        expect(within(card).getByText(/Prepared Dec 26, 2024/)).toBeInTheDocument();
-        expect(within(card).getByText(/13\/14 claims verified/)).toBeInTheDocument();
-        // Urgency banner lives INSIDE the card now, red for high
-        const banner = within(card).getByTestId('urgency-banner');
+        // Header flips to the subtle refresh affordance once the stored brief loads (R2)
+        expect(await screen.findByRole('button', { name: /Refresh insights/i })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('tab', { name: 'AI Insights' }));
+        const tab = screen.getByTestId('ai-insights');
+        expect(within(tab).getByText('AI-prepared · citation-gated')).toBeInTheDocument();
+        expect(within(tab).getByText(/Prepared Dec 26, 2024/)).toBeInTheDocument();
+        expect(within(tab).getByText(/13\/14 claims verified/)).toBeInTheDocument();
+        // Urgency banner, red for high
+        const banner = within(tab).getByTestId('urgency-banner');
         expect(banner.className).toContain('bg-red-50');
         expect(banner).toHaveTextContent('Critical contradiction in the record');
-        // The four LLM-derived sections
-        expect(within(card).getByText(/Why They.re Here/i)).toBeInTheDocument();
-        expect(within(card).getByText(/rule out the retinal detachment her mother had/)).toBeInTheDocument();
-        expect(within(card).getByText(/Key Discussion Points \(3\)/)).toBeInTheDocument();
-        expect(within(card).getByText(/Questions to Confirm \(2\)/)).toBeInTheDocument();
+        // The LLM-derived sections
+        expect(within(tab).getByText(/Why They.re Here/i)).toBeInTheDocument();
+        expect(within(tab).getByText(/rule out the retinal detachment her mother had/)).toBeInTheDocument();
+        expect(within(tab).getByText(/Key Discussion Points \(3\)/)).toBeInTheDocument();
+        expect(within(tab).getByText(/Questions to Confirm \(2\)/)).toBeInTheDocument();
     });
 
-    // Failure mode: Generate blocks or repaints the page instead of running as an
-    // in-card async enhancement with live stage progress.
-    it('POSTs /api/prep on Generate and shows the live prep-run stage in-card only', async () => {
+    // Failure mode (R4): structured discussion points render as blobs (or crash on the
+    // legacy plain-string shape) instead of one-line rows with chips and conflict links.
+    it('renders structured discussion points as one-line rows with chips, tolerating strings', async () => {
+        stubApp();
+        render(<App />);
+        await screen.findByRole('button', { name: /Refresh insights/i });
+        fireEvent.click(screen.getByRole('tab', { name: 'AI Insights' }));
+        const tab = screen.getByTestId('ai-insights');
+        const points = within(tab).getAllByTestId('discussion-point');
+        expect(points).toHaveLength(3);
+        // risk_flag point: kind icon + terse text + citation chip resolved from fact_ids
+        expect(points[0]).toHaveTextContent('Hydroxychloroquine (Plaquenil): HIGH retinal toxicity risk');
+        expect(
+            within(points[0]!).getByRole('button', { name: 'Citation 1: Rheumatology office note - Dr. Anita Patel' }),
+        ).toBeInTheDocument();
+        // contradiction point: link to the matching alert card
+        expect(within(points[1]!).getByRole('button', { name: /view conflict/i })).toBeInTheDocument();
+        // legacy plain string renders plainly, numbered
+        expect(points[2]).toHaveTextContent('Family history of retinal detachment (mother) with new floaters');
+        expect(within(points[2]!).queryByRole('button')).not.toBeInTheDocument();
+    });
+
+    // Failure mode (R4): the conflict link is decorative — it must scroll to the
+    // matching contradiction alert card rendered on the same tab.
+    it('scrolls to the matching contradiction alert card from a contradiction point', async () => {
+        const scrollSpy = vi.fn();
+        const original = window.HTMLElement.prototype.scrollIntoView;
+        window.HTMLElement.prototype.scrollIntoView = scrollSpy;
+        try {
+            stubApp();
+            render(<App />);
+            await screen.findByRole('button', { name: /Refresh insights/i });
+            fireEvent.click(screen.getByRole('tab', { name: 'AI Insights' }));
+            const tab = screen.getByTestId('ai-insights');
+            // The alert card carries the anchor id the point links to
+            const anchor = document.getElementById('insights-alert-contra-mc-002');
+            expect(anchor).not.toBeNull();
+            expect(anchor).toHaveTextContent(/Referral letter documents NKDA/);
+            fireEvent.click(within(tab).getByRole('button', { name: /view conflict/i }));
+            expect(scrollSpy).toHaveBeenCalled();
+        } finally {
+            window.HTMLElement.prototype.scrollIntoView = original;
+        }
+    });
+
+    // Failure mode (R4): a long question list buries the page — cap at 4 with an
+    // explicit "show all" expander.
+    it('caps visible questions at 4 with a show-all expander', async () => {
+        const manyQuestions = {
+            ...storedBrief,
+            content: { ...briefContent, questions_to_confirm: ['Q1?', 'Q2?', 'Q3?', 'Q4?', 'Q5?', 'Q6?'] },
+        };
+        stubApp({ brief: { status: 200, body: manyQuestions } });
+        render(<App />);
+        await screen.findByRole('button', { name: /Refresh insights/i });
+        fireEvent.click(screen.getByRole('tab', { name: 'AI Insights' }));
+        expect(screen.getByText(/Questions to Confirm \(6\)/)).toBeInTheDocument();
+        expect(screen.getAllByTestId('question-item')).toHaveLength(4);
+        fireEvent.click(screen.getByRole('button', { name: /Show all \(6\)/i }));
+        expect(screen.getAllByTestId('question-item')).toHaveLength(6);
+        expect(screen.queryByRole('button', { name: /Show all/i })).not.toBeInTheDocument();
+    });
+
+    // Failure mode (R2): Generate navigates away or repaints the page instead of running
+    // as a header-bar affordance with compact live progress.
+    it('POSTs /api/prep on the header Generate and shows compact progress without navigating', async () => {
         const mock = stubApp({
             overview: overviewNoBrief,
             prepRuns: {
@@ -250,13 +373,19 @@ describe('AI insights card', () => {
         });
         render(<App />);
         fireEvent.click(await screen.findByRole('button', { name: /Generate AI insights/i }));
-        expect(await screen.findByText(/Reading documents 7\/12/)).toBeInTheDocument();
+        // Compact progress in the header chip; clicking never navigated
+        const progress = await screen.findByTestId('insights-header-progress');
+        await waitFor(() => expect(progress).toHaveTextContent('Reading 7/12'));
+        expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
         const prepCall = mock.mock.calls.find(
             ([input, init]) => String(input).includes('/api/prep/margaret-chen') && (init as RequestInit | undefined)?.method === 'POST',
         );
         expect(prepCall).toBeDefined();
         // The rest of the landing never blanks while generating
         expect(screen.getByText(/Hydroxychloroquine \(Plaquenil\) · 200mg/)).toBeInTheDocument();
+        // The AI Insights tab reports the same run with the full stage label
+        fireEvent.click(screen.getByRole('tab', { name: 'AI Insights' }));
+        expect(screen.getByTestId('insights-progress')).toHaveTextContent('Reading documents 7/12');
         expect(briefCalls(mock)).toBe(0);
     });
 
@@ -269,18 +398,23 @@ describe('AI insights card', () => {
         });
         render(<App />);
         fireEvent.click(await screen.findByRole('button', { name: /Generate AI insights/i }));
+        expect(await screen.findByRole('button', { name: /Refresh insights/i })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('tab', { name: 'AI Insights' }));
         expect(await screen.findByText('AI-prepared · citation-gated')).toBeInTheDocument();
     });
 
-    // Failure mode: a 429 guard rejection crashes the card or takes the page with it.
-    it('surfaces a 429 guard rejection gracefully inside the card', async () => {
+    // Failure mode: a 429 guard rejection crashes the header control or takes the page
+    // with it — it must surface compactly in the header and in full on the tab.
+    it('surfaces a 429 guard rejection gracefully in the header and on the tab', async () => {
         stubApp({ overview: overviewNoBrief, prep: { status: 429, body: { error: 'too_many_preps' } } });
         render(<App />);
         fireEvent.click(await screen.findByRole('button', { name: /Generate AI insights/i }));
-        expect(await screen.findByText(/pipeline is busy/i)).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /Try again/i })).toBeInTheDocument();
+        expect(await screen.findByRole('button', { name: /Retry insights/i })).toBeInTheDocument();
         // Page unaffected
         expect(screen.getByText(/Floaters and flashes x 2-3 weeks/)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('tab', { name: 'AI Insights' }));
+        expect(await screen.findByText(/pipeline is busy/i)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Try again/i })).toBeInTheDocument();
     });
 
     // Failure mode: a failed prep run polls forever instead of reporting the error.
@@ -307,6 +441,8 @@ describe('AI insights card', () => {
         });
         render(<App />);
         fireEvent.click(await screen.findByRole('button', { name: /Generate AI insights/i }));
+        expect(await screen.findByRole('button', { name: /Retry insights/i })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('tab', { name: 'AI Insights' }));
         expect(await screen.findByText(/extraction failed: model refused/)).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /Try again/i })).toBeInTheDocument();
     });

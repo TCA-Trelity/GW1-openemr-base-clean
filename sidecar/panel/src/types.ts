@@ -291,12 +291,24 @@ export interface GateMetrics {
     citationsFailed: number;
 }
 
+/** Structured discussion point (prep/brief.ts DiscussionPointSchema, R4): terse one-line
+ * text (<=90 chars) plus refs the panel renders as chips/links. */
+export type DiscussionPointKind = 'med_change' | 'risk_flag' | 'contradiction' | 'imaging' | 'interval';
+
+export interface DiscussionPoint {
+    text: string;
+    kind: DiscussionPointKind;
+    fact_ids: string[];
+    contradiction_id: string | null;
+}
+
 export interface BriefContent {
     urgency: { level: 'high' | 'moderate'; reason: string } | null;
     contradiction_alerts: RuntimeContradiction[];
     why_they_are_here: { fact_id: string; content: ChiefComplaintContent } | null;
     what_they_are_hoping_for: { fact_id: string; content: PatientGoalContent } | null;
-    key_discussion_points: string[];
+    /** Older stored briefs carry plain strings — tolerate both shapes when rendering. */
+    key_discussion_points: (string | DiscussionPoint)[];
     questions_to_confirm: string[];
     medication_risk_flags: MedicationRiskFlag[];
     imaging: {
@@ -477,11 +489,40 @@ export interface LatestBriefPointer {
     correlation_id: string;
 }
 
+// ---- Deterministic care plan (routes/overview.ts buildOverview, R3) ----
+
+export interface CarePlanProtocol {
+    last_treatment_date: string;
+    medication: string | null;
+    treatment_count: number;
+}
+
+export interface CarePlanMonitoringItem {
+    text: string;
+    severity: 'high' | 'medium' | 'low';
+    source: string;
+}
+
+export interface CarePlanFollowUp {
+    recommendation: string | null;
+    optimal_interval_weeks: number | null;
+    confidence: 'high' | 'medium' | 'low';
+}
+
+/** Diagnosis & Care payload — pure engine output, populated on first load, no LLM anywhere. */
+export interface CarePlan {
+    active_condition_fact_ids: string[];
+    protocol: CarePlanProtocol | null;
+    monitoring: CarePlanMonitoringItem[];
+    follow_up: CarePlanFollowUp;
+}
+
 /** GET /api/overview/:patientId — deterministic landing payload, no LLM in the load path. */
 export interface OverviewPayload {
     patient: PatientRecord;
     facts_by_type: Partial<Record<FactType, PatientFact[]>>;
     medication_risk_flags: MedicationRiskFlag[];
+    care_plan: CarePlan;
     contradictions: StoredContradictionRow[];
     documents: OverviewDocumentMeta[];
     images: ImageRecord[];
@@ -500,6 +541,18 @@ export interface PrepRunRecord {
     error: string | null;
     started_at: string;
     finished_at: string | null;
+}
+
+// ---- Chat citations (chat/chat.ts ChatCitation, R5) ----
+
+/** A native Citations-API citation mapped to OUR document ids and server-verified verbatim. */
+export interface ChatCitation {
+    document_id: string;
+    document_title: string;
+    cited_text: string;
+    start_char: number;
+    end_char: number;
+    verified: boolean;
 }
 
 export interface FactBundle {

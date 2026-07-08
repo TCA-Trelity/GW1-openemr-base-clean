@@ -1,29 +1,22 @@
-// Imaging workstation tab (S2.2) — port of ImagingView.jsx into the panel's light shell:
-// Timeline / Trends / Intervals / Compare sub-tabs over the fact bundle's image+treatment
-// records. Timeline merging and series extraction are display math only; the clinical
-// judgments (interval recommendation, HCQ progression) render from brief.content.imaging.
+// Imaging workstation tab (S2.2, R6 combined view) — port of ImagingView.jsx into the
+// panel's light shell: Timeline / Trends / Intervals / Compare sub-tabs over the fact
+// bundle's image+treatment records. Selecting a scan from the timeline opens the combined
+// image + analysis view (ScanDetail). Timeline merging and series extraction are display
+// math only; the clinical judgments (interval recommendation, HCQ progression) render
+// from the overview's imaging block.
 import { useState } from 'react';
-import {
-    AlertTriangle,
-    CalendarRange,
-    CheckCircle,
-    Clock,
-    GitCompare,
-    Minus,
-    Syringe,
-    TrendingDown,
-    TrendingUp,
-} from 'lucide-react';
+import { AlertTriangle, CalendarRange, CheckCircle, Clock, GitCompare, Syringe, TrendingUp } from 'lucide-react';
 import type {
     BriefContent,
     ImageRecord,
     IntervalPatternAnalysis,
-    OverallChange,
     TreatmentResponseAssessment,
     TreatmentWireRecord,
 } from '../types';
 import { Card, formatDate, titleCase } from '../ui';
+import { CHANGE_ICONS, RESPONSE_BADGES, TreatmentContextBadge, medicationLabel } from './badges';
 import ScanImage, { modalityLabel } from './ScanImage';
+import ScanDetail from './ScanDetail';
 import Trends from './Trends';
 import Compare from './Compare';
 
@@ -50,33 +43,6 @@ export function mergeTimeline(images: ImageRecord[], treatments: TreatmentWireRe
     ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
-const MEDICATION_LABELS: Record<string, string> = {
-    eylea: 'Eylea',
-    avastin: 'Avastin',
-    lucentis: 'Lucentis',
-    vabysmo: 'Vabysmo',
-    beovu: 'Beovu',
-    ozurdex: 'Ozurdex',
-};
-
-function medicationLabel(medication: string): string {
-    return MEDICATION_LABELS[medication.toLowerCase()] ?? medication;
-}
-
-const RESPONSE_BADGES: Record<TreatmentResponseAssessment, { label: string; className: string }> = {
-    good_response: { label: 'Good response', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    worsened: { label: 'Worsened', className: 'bg-red-50 text-red-700 border-red-200' },
-    no_response: { label: 'No response', className: 'bg-red-50 text-red-700 border-red-200' },
-    partial_response: { label: 'Partial response', className: 'bg-amber-50 text-amber-700 border-amber-200' },
-};
-
-const CHANGE_ICONS: Record<OverallChange, { icon: typeof Minus; className: string }> = {
-    improved: { icon: TrendingUp, className: 'text-emerald-600' },
-    worsened: { icon: TrendingDown, className: 'text-red-600' },
-    stable: { icon: Minus, className: 'text-blue-600' },
-    mixed: { icon: Minus, className: 'text-amber-600' },
-};
-
 function TreatmentRow({ treatment }: { treatment: TreatmentWireRecord }) {
     const details = treatment.payload.injection_details;
     const name =
@@ -101,7 +67,7 @@ function TreatmentRow({ treatment }: { treatment: TreatmentWireRecord }) {
     );
 }
 
-function ImageRow({ image }: { image: ImageRecord }) {
+function ImageRow({ image, onSelect }: { image: ImageRecord; onSelect: () => void }) {
     const meta = image.image_metadata;
     const analysis = image.ai_analysis;
     const change = analysis?.comparison_to_prior?.overall_change;
@@ -109,12 +75,16 @@ function ImageRow({ image }: { image: ImageRecord }) {
     const ChangeIcon = changeConfig?.icon ?? null;
     const response = analysis?.comparison_to_prior?.treatment_response;
     const crt = analysis?.measurements?.find((m) => m.measurement_type === 'central_retinal_thickness');
-    const daysPost = image.treatment_context?.days_since_last_treatment;
-    const lastMedication = image.treatment_context?.last_treatment?.medication;
     const highAlert = analysis?.summary?.alerts?.some((alert) => alert.level === 'high') ?? false;
 
     return (
-        <div data-testid="timeline-event" className="flex items-start gap-3 p-3 rounded-xl bg-white border border-slate-200">
+        <button
+            type="button"
+            data-testid="timeline-event"
+            aria-label={`Open ${modalityLabel(meta.modality)} ${meta.laterality.toUpperCase()} — ${formatDate(meta.capture_date)}`}
+            onClick={onSelect}
+            className="w-full text-left flex items-start gap-3 p-3 rounded-xl bg-white border border-slate-200 hover:border-blue-300 hover:shadow-sm transition-all"
+        >
             <ScanImage image={image} className="w-20 h-14 flex-shrink-0" />
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
@@ -128,12 +98,7 @@ function ImageRow({ image }: { image: ImageRecord }) {
                 </div>
                 <p className="text-xs text-slate-500 mb-1 flex items-center gap-2 flex-wrap">
                     {formatDate(meta.capture_date)}
-                    {daysPost != null && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[11px] font-medium bg-purple-50 text-purple-700 border-purple-200">
-                            <Syringe className="w-3 h-3" />
-                            {daysPost}d post-{lastMedication !== undefined ? medicationLabel(lastMedication) : 'injection'}
-                        </span>
-                    )}
+                    <TreatmentContextBadge context={image.treatment_context} />
                 </p>
                 {analysis?.summary?.headline !== undefined && (
                     <p className="text-xs text-slate-600 truncate">{analysis.summary.headline}</p>
@@ -151,17 +116,25 @@ function ImageRow({ image }: { image: ImageRecord }) {
                     )}
                 </div>
             </div>
-        </div>
+        </button>
     );
 }
 
-function Timeline({ images, treatments }: { images: ImageRecord[]; treatments: TreatmentWireRecord[] }) {
+function Timeline({
+    images,
+    treatments,
+    onSelectImage,
+}: {
+    images: ImageRecord[];
+    treatments: TreatmentWireRecord[];
+    onSelectImage: (id: string) => void;
+}) {
     const events = mergeTimeline(images, treatments);
     return (
         <div className="space-y-2">
             {events.map((event) =>
                 event.kind === 'image' ? (
-                    <ImageRow key={`img-${event.image.id}`} image={event.image} />
+                    <ImageRow key={`img-${event.image.id}`} image={event.image} onSelect={() => onSelectImage(event.image.id)} />
                 ) : (
                     <TreatmentRow key={`tx-${event.treatment.id}`} treatment={event.treatment} />
                 ),
@@ -297,6 +270,8 @@ export default function Imaging({
 }) {
     const [activeSubTab, setActiveSubTab] = useState<SubTabId>('timeline');
     const [compareIds, setCompareIds] = useState<string[]>([]);
+    const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
+    const selectedImage = images.find((image) => image.id === selectedImageId) ?? null;
 
     if (images.length === 0 && treatments.length === 0) {
         return (
@@ -345,9 +320,17 @@ export default function Imaging({
             </div>
 
             <div role="tabpanel">
-                {activeSubTab === 'timeline' && (
+                {activeSubTab === 'timeline' && selectedImage !== null && (
+                    <ScanDetail
+                        image={selectedImage}
+                        images={images}
+                        hcq={imaging.hcq_progression}
+                        onBack={() => setSelectedImageId(null)}
+                    />
+                )}
+                {activeSubTab === 'timeline' && selectedImage === null && (
                     <>
-                        <Timeline images={images} treatments={treatments} />
+                        <Timeline images={images} treatments={treatments} onSelectImage={setSelectedImageId} />
                         <IntervalRecommendationBanner analysis={imaging.interval_analysis} />
                     </>
                 )}

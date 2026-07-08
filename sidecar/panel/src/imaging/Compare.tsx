@@ -1,18 +1,11 @@
 // Compare sub-tab — port of ImageComparison.jsx: up to 4 side-by-side ScanImage cards with
 // per-image change badges, picked via a checkbox list (selection state lives in Imaging.tsx).
-import type { ImageRecord, OverallChange } from '../types';
+import type { ImageRecord } from '../types';
 import { formatDate } from '../ui';
+import { CHANGE_BADGES } from './badges';
 import ScanImage, { modalityLabel } from './ScanImage';
 
 export const MAX_COMPARE = 4;
-
-// Light-theme translation of the prototype's overall_change badge palette.
-const CHANGE_BADGES: Record<OverallChange, string> = {
-    improved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    worsened: 'bg-red-50 text-red-700 border-red-200',
-    stable: 'bg-blue-50 text-blue-700 border-blue-200',
-    mixed: 'bg-amber-50 text-amber-700 border-amber-200',
-};
 
 const GRID_BY_COUNT: Record<number, string> = {
     1: 'grid-cols-1',

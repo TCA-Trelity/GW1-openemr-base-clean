@@ -3,6 +3,7 @@
 // against the fixture text so range-based highlighting is exercised for real).
 import type {
     BriefContent,
+    CarePlan,
     ChiefComplaintContent,
     CitationRef,
     FactBundle,
@@ -320,9 +321,20 @@ export const briefContent: BriefContent = {
     contradiction_alerts: [allergyContradiction, hcqContradiction],
     why_they_are_here: { fact_id: 'fact-mc-cc-001', content: ccContent },
     what_they_are_hoping_for: { fact_id: 'fact-mc-goal-001', content: goalContent },
+    // Structured items (R4) plus one legacy plain string — the panel must tolerate both.
     key_discussion_points: [
-        'High risk of retinal toxicity: 5.9 years of hydroxychloroquine use',
-        'Conflicting records (allergy_discrepancy): Referral letter documents NKDA; patient reported a sulfa allergy during intake',
+        {
+            text: 'Hydroxychloroquine (Plaquenil): HIGH retinal toxicity risk',
+            kind: 'risk_flag',
+            fact_ids: ['fact-mc-med-001'],
+            contradiction_id: null,
+        },
+        {
+            text: 'Referral letter documents NKDA; patient reported a sulfa allergy during intake',
+            kind: 'contradiction',
+            fact_ids: [],
+            contradiction_id: 'contra-mc-002',
+        },
         'Family history of retinal detachment (mother) with new floaters',
     ],
     questions_to_confirm: [
@@ -502,10 +514,37 @@ export const emptyImaging: BriefContent['imaging'] = {
     },
 };
 
+/** What buildOverview derives for Margaret: HCQ risk flag + HCQ trend monitoring, no protocol. */
+export const margaretCarePlan: CarePlan = {
+    active_condition_fact_ids: ['fact-mc-cond-001'],
+    protocol: null,
+    monitoring: [
+        {
+            text: 'Baseline and annual OCT plus visual field screening',
+            severity: 'high',
+            source: 'AAO HCQ Screening Guidelines 2016 (revised 2020)',
+        },
+        {
+            text: 'Correlate with visual fields; discuss HCQ dosing with rheumatology',
+            severity: 'medium',
+            source: 'imaging trend analysis',
+        },
+    ],
+    follow_up: { recommendation: null, optimal_interval_weeks: null, confidence: 'low' },
+};
+
+export const emptyCarePlan: CarePlan = {
+    active_condition_fact_ids: [],
+    protocol: null,
+    monitoring: [],
+    follow_up: { recommendation: null, optimal_interval_weeks: null, confidence: 'low' },
+};
+
 export const overviewPayload: OverviewPayload = {
     patient: margaretChen,
     facts_by_type: briefContent.facts_by_type,
     medication_risk_flags: briefContent.medication_risk_flags,
+    care_plan: margaretCarePlan,
     contradictions: storedContradictions,
     documents: overviewDocuments,
     images: overviewImages,
@@ -520,6 +559,7 @@ export const williamOverview: OverviewPayload = {
     patient: williamThompson,
     facts_by_type: {},
     medication_risk_flags: [],
+    care_plan: emptyCarePlan,
     contradictions: [],
     documents: [],
     images: [],

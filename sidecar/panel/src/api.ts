@@ -1,7 +1,7 @@
 // Typed fetch client for the sidecar endpoints. Deterministic reads (patients, overview,
 // facts) back the instant landing; brief/prep/prep-runs back the async AI insights card;
 // chat streams SSE over fetch (EventSource cannot POST) for the S2.3 drawer.
-import type { FactBundle, OverviewPayload, PatientRecord, PrepRunRecord, StoredBrief } from './types';
+import type { ChatCitation, FactBundle, OverviewPayload, PatientRecord, PrepRunRecord, StoredBrief } from './types';
 
 const UNREACHABLE = 'Could not reach the sidecar API.';
 
@@ -146,11 +146,11 @@ export async function fetchChatHistory(patientId: string, conversationId: string
     }
 }
 
-/** The done event's payload — citation validation happened server-side against the fact bundle. */
+/** The done event's payload — citations were re-verified server-side against the stored documents. */
 export interface ChatStreamDone {
     conversationId: string;
-    citedFactIds: string[];
-    invalidCitationIds: string[];
+    citations: ChatCitation[];
+    unverifiedCount: number;
 }
 
 export type ChatSendResult =
@@ -192,20 +192,49 @@ function parseSseLine(line: string): Record<string, unknown> | null {
     }
 }
 
-function stringArray(value: unknown): string[] {
-    return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+/** Narrow one wire citation object into a ChatCitation, else null (malformed events are dropped). */
+function parseChatCitation(value: unknown): ChatCitation | null {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return null;
+    }
+    const record = value as Record<string, unknown>;
+    const { document_id, document_title, cited_text, start_char, end_char, verified } = record;
+    if (
+        typeof document_id !== 'string' ||
+        typeof document_title !== 'string' ||
+        typeof cited_text !== 'string' ||
+        typeof start_char !== 'number' ||
+        typeof end_char !== 'number' ||
+        typeof verified !== 'boolean'
+    ) {
+        return null;
+    }
+    return { document_id, document_title, cited_text, start_char, end_char, verified };
+}
+
+function chatCitationArray(value: unknown): ChatCitation[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+    return value.flatMap((item) => {
+        const citation = parseChatCitation(item);
+        return citation === null ? [] : [citation];
+    });
 }
 
 /**
  * POST /api/chat — the reply streams as SSE over fetch + getReader (the sidecar's own
  * client in src/prep/anthropic.ts is the parsing reference). Guards answer as plain
- * JSON before the stream opens; after it opens, only delta/done/error events remain.
+ * JSON before the stream opens; after it opens, only delta/citation/done/error events
+ * remain. The text is clean prose — provenance rides the citation events, which arrive
+ * already server-verified, then the done event repeats the full list authoritatively.
  */
 export async function sendChatMessage(
     patientId: string,
     message: string,
     conversationId: string | null,
     onDelta: (text: string) => void,
+    onCitation: (citation: ChatCitation) => void,
 ): Promise<ChatSendResult> {
     let res: Response;
     try {
@@ -232,11 +261,16 @@ export async function sendChatMessage(
         }
         if (event.type === 'delta' && typeof event.text === 'string') {
             onDelta(event.text);
+        } else if (event.type === 'citation') {
+            const citation = parseChatCitation(event.citation);
+            if (citation !== null) {
+                onCitation(citation);
+            }
         } else if (event.type === 'done' && typeof event.conversation_id === 'string') {
             done = {
                 conversationId: event.conversation_id,
-                citedFactIds: stringArray(event.cited_fact_ids),
-                invalidCitationIds: stringArray(event.invalid_citation_ids),
+                citations: chatCitationArray(event.citations),
+                unverifiedCount: typeof event.unverified_count === 'number' ? event.unverified_count : 0,
             };
         } else if (event.type === 'error') {
             failed = true;

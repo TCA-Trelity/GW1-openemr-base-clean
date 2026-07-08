@@ -53,6 +53,28 @@ export const wtImages: ImageRecord[] = IMAGE_SPECS.map((spec) => ({
         treatment_cycle_number: spec.treatment_cycle_number,
     },
     ai_analysis: {
+        // The leak scan carries authored findings + a high alert (exercises the R6 combined view).
+        findings:
+            spec.id === 'img-wt-005'
+                ? [
+                      {
+                          finding_id: 'find-wt-005-1',
+                          finding_type: 'subretinal_fluid',
+                          location: 'subfoveal',
+                          severity: 'moderate',
+                          confidence: 0.94,
+                          description: 'Recurrent subretinal fluid at the extended interval',
+                      },
+                      {
+                          finding_id: 'find-wt-005-2',
+                          finding_type: 'pigment_epithelial_detachment',
+                          location: 'juxtafoveal',
+                          severity: 'mild',
+                          confidence: 0.81,
+                          description: 'Shallow PED, unchanged',
+                      },
+                  ]
+                : [],
         measurements: [
             { measurement_type: 'central_retinal_thickness', value: spec.crt, unit: 'microns', reference_range: { normal_min: 240, normal_max: 280 } },
         ],
@@ -63,7 +85,10 @@ export const wtImages: ImageRecord[] = IMAGE_SPECS.map((spec) => ({
                       ...(spec.overall_change !== undefined ? { overall_change: spec.overall_change } : {}),
                       treatment_response: { assessment: spec.assessment },
                   },
-        summary: { headline: spec.headline },
+        summary:
+            spec.id === 'img-wt-005'
+                ? { headline: spec.headline, alerts: [{ level: 'high', message: 'Fluid recurrence — interval extension failed' }] }
+                : { headline: spec.headline },
     },
 }));
 
@@ -149,6 +174,17 @@ export const wtOverview: OverviewPayload = {
     patient: wtPatient,
     facts_by_type: {},
     medication_risk_flags: [],
+    // buildOverview over the 4 Eylea injections + the interval engine's recommendation.
+    care_plan: {
+        active_condition_fact_ids: [],
+        protocol: { last_treatment_date: '2025-10-22', medication: 'Eylea', treatment_count: 4 },
+        monitoring: [],
+        follow_up: {
+            recommendation: wtIntervalAnalysis.recommendation,
+            optimal_interval_weeks: wtIntervalAnalysis.optimal_interval,
+            confidence: wtIntervalAnalysis.confidence,
+        },
+    },
     contradictions: [],
     documents: [],
     images: wtImages,

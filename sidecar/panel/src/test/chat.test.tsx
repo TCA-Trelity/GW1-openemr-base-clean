@@ -1,17 +1,21 @@
-// Chat drawer tests (S2.3): scripted SSE streams over a mocked fetch — delta accumulation,
-// done-event citation gating (valid ids -> chips, unverifiable removed + amber footer),
-// pre-stream guard rejections (429 budget), history replay on reopen, quick-prompt sends.
+// Chat drawer tests (S2.3, R5 native citations): scripted SSE streams over a mocked
+// fetch — delta accumulation over clean prose, live citation events rendering as
+// numbered chips (verified only, deduped by document+start), the amber unverified
+// footer from the done event, the chip -> source-viewer deep link, pre-stream guard
+// rejections (429 budget), history replay on reopen (text only), quick-prompt sends.
 import { describe, expect, it, vi, afterEach } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { useState } from 'react';
 import ChatDrawer from '../ChatDrawer';
-import { briefContent } from './fixtures';
+import { SourceNavContext } from '../CitationChip';
+import type { CitationRef } from '../types';
 
 // ---- Harness: ChatDrawer with the lifted open state App owns ----
 
-function Harness({ patientId = 'margaret-chen' }: { patientId?: string }) {
+function Harness({ patientId = 'margaret-chen', onViewSource }: { patientId?: string; onViewSource?: (citation: CitationRef) => void }) {
     const [open, setOpen] = useState(false);
-    return <ChatDrawer patientId={patientId} factsByType={briefContent.facts_by_type} open={open} onToggle={setOpen} />;
+    const drawer = <ChatDrawer patientId={patientId} open={open} onToggle={setOpen} />;
+    return onViewSource === undefined ? drawer : <SourceNavContext.Provider value={onViewSource}>{drawer}</SourceNavContext.Provider>;
 }
 
 // ---- Fetch stubbing: JSON guards + SSE stream bodies ----
@@ -63,15 +67,44 @@ function sendMessage(text: string) {
     fireEvent.keyDown(screen.getByLabelText('Chat message'), { key: 'Enter' });
 }
 
+// ---- Wire-shaped citations (chat/chat.ts ChatCitation) ----
+
+const hcqChatCitation = {
+    document_id: 'doc-mc-003',
+    document_title: 'clinical_note (2024-09-10)',
+    cited_text: 'Hydroxychloroquine 200mg PO daily - initiated 01/15/2019',
+    start_char: 421,
+    end_char: 477,
+    verified: true,
+};
+
+const intakeChatCitation = {
+    document_id: 'doc-mc-012',
+    document_title: 'intake_transcript (2024-12-26)',
+    cited_text: "I've been seeing these floaters in my vision, especially in my right eye.",
+    start_char: 130,
+    end_char: 204,
+    verified: true,
+};
+
+const ghostChatCitation = {
+    document_id: 'doc-mc-001',
+    document_title: 'referral_letter (2024-12-15)',
+    cited_text: 'a span that is not in our copy of the document',
+    start_char: -1,
+    end_char: -1,
+    verified: false,
+};
+
 afterEach(() => {
     vi.unstubAllGlobals();
     window.sessionStorage.clear();
 });
 
 describe('ChatDrawer streaming', () => {
-    // Failure mode: deltas overwrite instead of accumulate, or the done event's citation
-    // gate is ignored and invented [[fact:...]] tokens render as provenance chips.
-    it('accumulates streamed deltas and finalizes with chips for valid citation ids only', async () => {
+    // Failure mode: deltas overwrite instead of accumulate, citation events are dropped
+    // (or duplicated), or unverified citations render as provenance chips.
+    it('accumulates deltas and renders live citation events as chips — verified only, deduped', async () => {
         let controller!: ReadableStreamDefaultController<Uint8Array>;
         const body = new ReadableStream<Uint8Array>({
             start(c) {
@@ -91,58 +124,94 @@ describe('ChatDrawer streaming', () => {
         // The user bubble lands immediately; the reply streams into the assistant bubble.
         expect(screen.getByText('What is she taking?')).toBeInTheDocument();
         await act(async () => {
-            controller.enqueue(sseChunk({ type: 'delta', text: 'On hydroxychloroquine 200mg daily ' }));
+            controller.enqueue(sseChunk({ type: 'delta', text: 'On hydroxychloroquine 200mg daily' }));
         });
         expect(await screen.findByText(/On hydroxychloroquine 200mg daily/)).toBeInTheDocument();
         // Input stays locked while the reply streams.
         expect(screen.getByLabelText('Chat message')).toBeDisabled();
 
+        // Citations stream live — the chip renders before the done event.
         await act(async () => {
-            controller.enqueue(
-                sseChunk({
-                    type: 'delta',
-                    text: '[[fact:fact-mc-med-001]] with floaters reported [[fact:fact-mc-cc-001]] plus an invented claim [[fact:fact-invented]].',
-                }),
-            );
+            controller.enqueue(sseChunk({ type: 'citation', citation: hcqChatCitation }));
+        });
+        expect(await screen.findByRole('button', { name: 'Citation 1: Clinical Note' })).toBeInTheDocument();
+
+        await act(async () => {
+            controller.enqueue(sseChunk({ type: 'delta', text: ' with new floaters reported at intake.' }));
+            // Duplicate (same document_id+start_char) must not mint a second chip.
+            controller.enqueue(sseChunk({ type: 'citation', citation: hcqChatCitation }));
+            controller.enqueue(sseChunk({ type: 'citation', citation: intakeChatCitation }));
+            // Unverified citations are never rendered as chips.
+            controller.enqueue(sseChunk({ type: 'citation', citation: ghostChatCitation }));
             controller.enqueue(
                 sseChunk({
                     type: 'done',
                     conversation_id: 'conv-1',
-                    cited_fact_ids: ['fact-mc-med-001', 'fact-mc-cc-001'],
-                    invalid_citation_ids: ['fact-invented'],
+                    citations: [hcqChatCitation, hcqChatCitation, intakeChatCitation, ghostChatCitation],
+                    unverified_count: 1,
                 }),
             );
             controller.close();
         });
 
-        // Valid ids become numbered chips resolved against the overview facts …
-        expect(
-            await screen.findByRole('button', { name: 'Citation 1: Rheumatology office note - Dr. Anita Patel' }),
-        ).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Citation 2: Conversational intake transcript' })).toBeInTheDocument();
-        // … and no raw token ever reaches the DOM (the invented one is removed, not rendered).
-        expect(screen.queryByText(/\[\[fact:/)).not.toBeInTheDocument();
-        expect(screen.queryByText(/fact-invented/)).not.toBeInTheDocument();
+        // Numbered chips in arrival order, deduped; the unverified one is only a count.
+        expect(await screen.findByRole('button', { name: 'Citation 2: Intake Transcript' })).toBeInTheDocument();
+        expect(screen.getAllByRole('button', { name: /^Citation \d/ })).toHaveLength(2);
+        expect(screen.getByText('1 citation could not be verified')).toBeInTheDocument();
+        expect(screen.queryByText(/referral_letter/)).not.toBeInTheDocument();
         // The conversation id is persisted per patient, and the input unlocks.
         await waitFor(() => expect(window.sessionStorage.getItem('copilot.chat.margaret-chen')).toBe('conv-1'));
         expect(screen.getByLabelText('Chat message')).not.toBeDisabled();
     });
 
-    // Failure mode: invented citations disappear silently — the doctor must see that
-    // part of the reply failed verification against the record.
-    it('shows the amber unverified-citation footer when the done event reports invalid ids', async () => {
+    // Failure mode: the chip is decorative — it must deep-link into the existing source
+    // viewer at the cited document + character range.
+    it('deep-links a citation chip into the source viewer with the cited range', async () => {
         stubFetch((url, init) => {
             if (url.includes('/api/chat/') && init?.method === 'POST') {
                 return sseResponse([
-                    {
-                        type: 'delta',
-                        text: 'Allergy documented [[fact:fact-mc-allergy-001]] but also [[fact:ghost-1]] and [[fact:ghost-2]].',
-                    },
+                    { type: 'delta', text: 'On hydroxychloroquine 200mg daily since January 2019.' },
+                    { type: 'citation', citation: hcqChatCitation },
+                    { type: 'done', conversation_id: 'conv-2', citations: [hcqChatCitation], unverified_count: 0 },
+                ]);
+            }
+            return undefined;
+        });
+        const viewSource = vi.fn();
+        render(<Harness onViewSource={viewSource} />);
+        openDrawer();
+        sendMessage('How long on HCQ?');
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Citation 1: Clinical Note' }));
+        const card = await screen.findByRole('dialog');
+        // The popover shows the verbatim cited span and the parsed document date.
+        expect(within(card).getByText(/Hydroxychloroquine 200mg PO daily - initiated 01\/15\/2019/)).toBeInTheDocument();
+        expect(within(card).getByText('Sep 10, 2024')).toBeInTheDocument();
+        fireEvent.click(within(card).getByRole('button', { name: /View source/i }));
+        expect(viewSource).toHaveBeenCalledWith(
+            expect.objectContaining({
+                source_document_id: 'doc-mc-003',
+                excerpt_text: hcqChatCitation.cited_text,
+                excerpt_location: expect.objectContaining({ start_char: 421, end_char: 477 }),
+            }),
+        );
+    });
+
+    // Failure mode: invented citations disappear silently — the doctor must see that
+    // part of the reply failed verification against the record.
+    it('shows the amber unverified footer without rendering any chip for unverified citations', async () => {
+        stubFetch((url, init) => {
+            if (url.includes('/api/chat/') && init?.method === 'POST') {
+                return sseResponse([
+                    { type: 'delta', text: 'Sulfa allergy documented at intake; the referral disagrees.' },
+                    { type: 'citation', citation: intakeChatCitation },
+                    { type: 'citation', citation: ghostChatCitation },
+                    { type: 'citation', citation: { ...ghostChatCitation, start_char: 55 } },
                     {
                         type: 'done',
-                        conversation_id: 'conv-2',
-                        cited_fact_ids: ['fact-mc-allergy-001'],
-                        invalid_citation_ids: ['ghost-1', 'ghost-2'],
+                        conversation_id: 'conv-3',
+                        citations: [intakeChatCitation, ghostChatCitation, { ...ghostChatCitation, start_char: 55 }],
+                        unverified_count: 2,
                     },
                 ]);
             }
@@ -152,10 +221,9 @@ describe('ChatDrawer streaming', () => {
         openDrawer();
         sendMessage('Any allergies?');
 
-        expect(await screen.findByText('2 citations could not be verified against the record')).toBeInTheDocument();
-        // The verified claim still chips (synthesized ref: the allergy fact has no sources).
-        expect(screen.getByRole('button', { name: 'Citation 1: Allergy' })).toBeInTheDocument();
-        expect(screen.queryByText(/ghost/)).not.toBeInTheDocument();
+        expect(await screen.findByText('2 citations could not be verified')).toBeInTheDocument();
+        expect(screen.getAllByRole('button', { name: /^Citation \d/ })).toHaveLength(1);
+        expect(screen.getByRole('button', { name: 'Citation 1: Intake Transcript' })).toBeInTheDocument();
     });
 
     // Failure mode: a guard rejection wedges the input or renders a raw HTTP error.
@@ -186,7 +254,7 @@ describe('ChatDrawer streaming', () => {
                     ? sseResponse([{ type: 'delta', text: 'Partial answer' }, { type: 'error', error: 'chat_failed' }])
                     : sseResponse([
                           { type: 'delta', text: 'Full answer.' },
-                          { type: 'done', conversation_id: 'conv-4', cited_fact_ids: [], invalid_citation_ids: [] },
+                          { type: 'done', conversation_id: 'conv-4', citations: [], unverified_count: 0 },
                       ]);
             }
             return undefined;
@@ -204,8 +272,8 @@ describe('ChatDrawer streaming', () => {
 
 describe('ChatDrawer persistence', () => {
     // Failure mode: reopening the panel loses the conversation — the stored id must
-    // replay its history via GET, tokens re-resolving into chips client-side.
-    it('replays stored conversation history via GET when reopened with a stored id', async () => {
+    // replay its history via GET. Replayed messages carry no citations: text only.
+    it('replays stored conversation history via GET as text-only bubbles', async () => {
         window.sessionStorage.setItem('copilot.chat.margaret-chen', 'conv-9');
         const mock = stubFetch((url, init) => {
             if (url.includes('/api/chat/margaret-chen?conversation_id=conv-9') && init?.method !== 'POST') {
@@ -215,7 +283,7 @@ describe('ChatDrawer persistence', () => {
                         { role: 'user', content: 'Why is she here?', created_at: '2024-12-26T10:00:00Z' },
                         {
                             role: 'assistant',
-                            content: 'Floaters and flashes x 2-3 weeks, worse OD [[fact:fact-mc-cc-001]]',
+                            content: 'Floaters and flashes x 2-3 weeks, worse OD.',
                             created_at: '2024-12-26T10:00:05Z',
                         },
                     ],
@@ -228,8 +296,9 @@ describe('ChatDrawer persistence', () => {
 
         expect(await screen.findByText('Why is she here?')).toBeInTheDocument();
         expect(screen.getByText(/Floaters and flashes x 2-3 weeks, worse OD/)).toBeInTheDocument();
-        // Replayed tokens resolve into chips against the overview facts.
-        expect(screen.getByRole('button', { name: 'Citation 1: Conversational intake transcript' })).toBeInTheDocument();
+        // No citation chips and no unverified footer on replayed history.
+        expect(screen.queryByRole('button', { name: /^Citation \d/ })).not.toBeInTheDocument();
+        expect(screen.queryByText(/could not be verified/)).not.toBeInTheDocument();
         expect(mock.mock.calls.some(([input]) => String(input).includes('conversation_id=conv-9'))).toBe(true);
     });
 
@@ -240,7 +309,7 @@ describe('ChatDrawer persistence', () => {
             if (url.includes('/api/chat/') && init?.method === 'POST') {
                 return sseResponse([
                     { type: 'delta', text: 'Still here.' },
-                    { type: 'done', conversation_id: 'conv-5', cited_fact_ids: [], invalid_citation_ids: [] },
+                    { type: 'done', conversation_id: 'conv-5', citations: [], unverified_count: 0 },
                 ]);
             }
             return undefined;
@@ -266,7 +335,7 @@ describe('ChatDrawer quick prompts', () => {
             if (url.includes('/api/chat/') && init?.method === 'POST') {
                 return sseResponse([
                     { type: 'delta', text: 'No high-risk interactions in the record.' },
-                    { type: 'done', conversation_id: 'conv-3', cited_fact_ids: [], invalid_citation_ids: [] },
+                    { type: 'done', conversation_id: 'conv-6', citations: [], unverified_count: 0 },
                 ]);
             }
             return undefined;

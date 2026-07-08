@@ -1,12 +1,15 @@
-// Chat drawer (S2.3): the docked "Ask the record" slide-over, reachable from every tab.
-// Replies stream over POST /api/chat SSE; inline [[fact:<id>]] tokens render as the shared
-// numbered CitationChip resolved against the overview's facts — unverifiable ones are removed.
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+// Chat drawer (S2.3, R5 native citations): the docked "Ask the record" slide-over,
+// reachable from every tab. Replies stream over POST /api/chat SSE as clean prose — no
+// inline tokens. Provenance rides the stream's citation events (already server-verified
+// verbatim against the stored documents): verified citations render as numbered chips
+// appended to the bubble, deep-linking into the source viewer at the cited character
+// range; unverified ones are never rendered as chips, only counted in the amber footer.
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { AlertTriangle, MessageCircle, RefreshCw, Send, X } from 'lucide-react';
 import { fetchChatHistory, sendChatMessage } from './api';
-import type { CitationRef, FactType, PatientFact } from './types';
-import { CitationChip } from './CitationChip';
-import { titleCase } from './ui';
+import type { ChatCitation, CitationRef } from './types';
+import { CitationChips } from './CitationChip';
+import { asSourceType, titleCase } from './ui';
 
 const MAX_MESSAGE_CHARS = 2000; // mirrors routes/chat.ts MAX_MESSAGE_CHARS
 
@@ -44,9 +47,10 @@ interface ChatBubble {
     role: 'user' | 'assistant';
     content: string;
     status: 'complete' | 'streaming' | 'error';
-    /** null until the done event lands — and for replayed history, which carries no ids. */
-    citedFactIds: string[] | null;
-    invalidCitationIds: string[];
+    /** Streamed citations in arrival order, deduped — replayed history carries none. */
+    citations: ChatCitation[];
+    /** From the done event; unverifiable spans are surfaced here, never as chips. */
+    unverifiedCount: number;
     /** The user message that produced this assistant bubble — what Retry resends. */
     requestText: string;
     errorText: string | null;
@@ -58,132 +62,86 @@ function bubbleId(prefix: string): string {
     return `${prefix}-${nextBubbleSeq}`;
 }
 
-// ---- Citation token rendering ----
+// ---- Citation handling ----
 
-const CITATION_TOKEN = /\[\[fact:([A-Za-z0-9._-]+)\]\]/g;
+const citationKey = (citation: ChatCitation): string => `${citation.document_id}:${citation.start_char}`;
 
-/** In partial replies (streaming/interrupted), hide a trailing half-received token so it never shows raw. */
-function visibleText(content: string, partial: boolean): string {
-    return partial ? content.replace(/\[\[[^\]]*\]?$/, '') : content;
+function appendCitation(citations: ChatCitation[], citation: ChatCitation): ChatCitation[] {
+    return citations.some((existing) => citationKey(existing) === citationKey(citation))
+        ? citations
+        : [...citations, citation];
 }
 
-/** The chip renders a CitationRef: the fact's own first source, else a minimal synthesized one. */
-function chipCitation(fact: PatientFact): CitationRef {
-    return (
-        fact.sources[0] ?? {
-            id: `chat-cit-${fact.id}`,
-            fact_id: fact.id,
-            source_label: titleCase(fact.fact_type),
-            source_type: 'provider_note',
-            excerpt_text: null,
-            excerpt_location: null,
-            attribution: null,
-            source_document_id: fact.source_document_id,
-            document_date: fact.created_date ?? null,
+function dedupeCitations(citations: ChatCitation[]): ChatCitation[] {
+    const seen = new Set<string>();
+    const out: ChatCitation[] = [];
+    for (const citation of citations) {
+        const key = citationKey(citation);
+        if (!seen.has(key)) {
+            seen.add(key);
+            out.push(citation);
         }
-    );
-}
-
-interface RenderedReply {
-    nodes: ReactNode[];
-    /** Distinct citation ids removed because they could not be verified against the record. */
-    unverifiedCount: number;
+    }
+    return out;
 }
 
 /**
- * Replace each VERIFIABLE [[fact:<id>]] token with a numbered CitationChip and remove the
- * rest — an unverifiable citation is never rendered as a chip. Verifiable = not reported in
- * invalid_citation_ids, resolvable against the overview's facts, and (once the done event
- * has landed) present in cited_fact_ids. While citedFactIds is null (mid-stream, or replayed
- * history which carries no ids) resolvable tokens render optimistically.
+ * Project a ChatCitation into the shared CitationRef so the chip deep-links into the
+ * existing source viewer with the cited character range highlighted. The backend titles
+ * documents `${document_type} (${document_date})` — split that back apart for the card.
  */
-export function renderAssistantReply(
-    content: string,
-    factById: Map<string, PatientFact>,
-    citedFactIds: string[] | null,
-    invalidCitationIds: string[],
-    partial: boolean,
-): RenderedReply {
-    const text = visibleText(content, partial);
-    const cited = citedFactIds === null ? null : new Set(citedFactIds);
-    const invalid = new Set(invalidCitationIds);
-    const nodes: ReactNode[] = [];
-    const chipNumbers = new Map<string, number>();
-    const removed = new Set<string>();
-    let cursor = 0;
-    let key = 0;
-    for (const match of text.matchAll(CITATION_TOKEN)) {
-        const id = match[1];
-        const start = match.index ?? -1;
-        if (id === undefined || start < 0) {
-            continue;
-        }
-        let before = text.slice(cursor, start);
-        cursor = start + match[0].length;
-        const fact = factById.get(id);
-        const verifiable = fact !== undefined && !invalid.has(id) && (cited === null || cited.has(id));
-        if (!verifiable) {
-            removed.add(id);
-            before = before.replace(/[ \t]+$/, ''); // no dangling double space where the token sat
-            if (before !== '') {
-                nodes.push(<span key={key++}>{before}</span>);
-            }
-            continue;
-        }
-        if (before !== '') {
-            nodes.push(<span key={key++}>{before}</span>);
-        }
-        const number = chipNumbers.get(id) ?? chipNumbers.size + 1;
-        chipNumbers.set(id, number);
-        nodes.push(<CitationChip key={key++} citation={chipCitation(fact)} index={number} />);
-    }
-    const tail = text.slice(cursor);
-    if (tail !== '') {
-        nodes.push(<span key={key++}>{tail}</span>);
-    }
-    return { nodes, unverifiedCount: removed.size };
+export function chatCitationRef(citation: ChatCitation): CitationRef {
+    const titleMatch = /^(.*?)\s*\(([^)]*)\)\s*$/.exec(citation.document_title);
+    const typePart = titleMatch?.[1] ?? citation.document_title;
+    const datePart = titleMatch?.[2];
+    return {
+        id: `chat-${citationKey(citation)}`,
+        source_label: titleCase(typePart),
+        source_type: asSourceType(typePart),
+        excerpt_text: citation.cited_text,
+        excerpt_location:
+            citation.start_char >= 0 && citation.end_char > citation.start_char
+                ? {
+                      type: 'character_range',
+                      start_char: citation.start_char,
+                      end_char: citation.end_char,
+                      context_before: null,
+                      context_after: null,
+                  }
+                : null,
+        attribution: null,
+        source_document_id: citation.document_id,
+        document_date: datePart !== undefined && datePart !== '' && datePart !== 'null' ? datePart : null,
+    };
 }
 
 // ---- Bubbles ----
 
-function AssistantBubble({
-    bubble,
-    factById,
-    onRetry,
-}: {
-    bubble: ChatBubble;
-    factById: Map<string, PatientFact>;
-    onRetry: (bubble: ChatBubble) => void;
-}) {
-    const { nodes, unverifiedCount } = useMemo(
-        () =>
-            renderAssistantReply(
-                bubble.content,
-                factById,
-                bubble.citedFactIds,
-                bubble.invalidCitationIds,
-                bubble.status !== 'complete',
-            ),
-        [bubble, factById],
+function AssistantBubble({ bubble, onRetry }: { bubble: ChatBubble; onRetry: (bubble: ChatBubble) => void }) {
+    // Chips: verified citations only, in arrival order — an unverifiable citation is never provenance.
+    const chips = useMemo(
+        () => bubble.citations.filter((citation) => citation.verified).map(chatCitationRef),
+        [bubble.citations],
     );
     return (
         <div className="flex justify-start">
             <div className="max-w-[85%]">
-                {(nodes.length > 0 || bubble.status === 'streaming') && (
-                    <div className="rounded-xl rounded-bl-sm bg-slate-100 px-3.5 py-2.5 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                        {nodes}
+                {(bubble.content !== '' || bubble.status === 'streaming' || chips.length > 0) && (
+                    <div className="rounded-xl rounded-bl-sm bg-slate-100 px-3.5 py-2 text-[13px] text-slate-700 leading-snug whitespace-pre-wrap">
+                        {bubble.content}
                         {bubble.status === 'streaming' && (
                             <span
                                 data-testid="chat-streaming"
                                 className="inline-block w-1.5 h-3.5 ml-0.5 align-middle rounded-sm bg-slate-400 animate-pulse"
                             />
                         )}
+                        {chips.length > 0 && <CitationChips citations={chips} />}
                     </div>
                 )}
-                {bubble.status === 'complete' && unverifiedCount > 0 && (
+                {bubble.status === 'complete' && bubble.unverifiedCount > 0 && (
                     <p className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-amber-200 bg-amber-50 text-xs text-amber-700">
                         <AlertTriangle className="w-3 h-3 flex-shrink-0" />
-                        {unverifiedCount} citation{unverifiedCount === 1 ? '' : 's'} could not be verified against the record
+                        {bubble.unverifiedCount} citation{bubble.unverifiedCount === 1 ? '' : 's'} could not be verified
                     </p>
                 )}
                 {bubble.status === 'error' && (
@@ -208,13 +166,10 @@ function AssistantBubble({
 
 export default function ChatDrawer({
     patientId,
-    factsByType,
     open,
     onToggle,
 }: {
     patientId: string;
-    /** The already-fetched overview's facts_by_type — the token -> fact resolution source. */
-    factsByType: Partial<Record<FactType, PatientFact[]>>;
     open: boolean;
     onToggle: (open: boolean) => void;
 }) {
@@ -229,17 +184,8 @@ export default function ChatDrawer({
     const scrollRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
-    const factById = useMemo(() => {
-        const map = new Map<string, PatientFact>();
-        for (const group of Object.values(factsByType)) {
-            for (const fact of group ?? []) {
-                map.set(fact.id, fact);
-            }
-        }
-        return map;
-    }, [factsByType]);
-
-    // First open with a stored conversation id: replay its history via GET.
+    // First open with a stored conversation id: replay its history via GET (text only —
+    // replayed messages carry no citations).
     useEffect(() => {
         if (!open || historyRequested.current) {
             return;
@@ -261,8 +207,8 @@ export default function ChatDrawer({
                                   role: message.role,
                                   content: message.content,
                                   status: 'complete',
-                                  citedFactIds: null,
-                                  invalidCitationIds: [],
+                                  citations: [],
+                                  unverifiedCount: 0,
                                   requestText: '',
                                   errorText: null,
                               }),
@@ -296,17 +242,26 @@ export default function ChatDrawer({
         async (text: string, assistantId: string) => {
             sendingRef.current = true;
             setSending(true);
-            const result = await sendChatMessage(patientId, text, conversationIdRef.current, (delta) => {
-                patch(assistantId, (bubble) => ({ ...bubble, content: bubble.content + delta }));
-            });
+            const result = await sendChatMessage(
+                patientId,
+                text,
+                conversationIdRef.current,
+                (delta) => {
+                    patch(assistantId, (bubble) => ({ ...bubble, content: bubble.content + delta }));
+                },
+                (citation) => {
+                    // Verified chips render live as they stream; dedupe by document+start.
+                    patch(assistantId, (bubble) => ({ ...bubble, citations: appendCitation(bubble.citations, citation) }));
+                },
+            );
             if (result.kind === 'done') {
                 conversationIdRef.current = result.done.conversationId;
                 storeConversationId(patientId, result.done.conversationId);
                 patch(assistantId, (bubble) => ({
                     ...bubble,
                     status: 'complete',
-                    citedFactIds: result.done.citedFactIds,
-                    invalidCitationIds: result.done.invalidCitationIds,
+                    citations: dedupeCitations(result.done.citations),
+                    unverifiedCount: result.done.unverifiedCount,
                 }));
             } else if (result.kind === 'stream_error') {
                 patch(assistantId, (bubble) => ({ ...bubble, status: 'error', errorText: 'The reply was interrupted.' }));
@@ -333,8 +288,8 @@ export default function ChatDrawer({
                     role: 'user',
                     content: text,
                     status: 'complete',
-                    citedFactIds: null,
-                    invalidCitationIds: [],
+                    citations: [],
+                    unverifiedCount: 0,
                     requestText: '',
                     errorText: null,
                 },
@@ -343,8 +298,8 @@ export default function ChatDrawer({
                     role: 'assistant',
                     content: '',
                     status: 'streaming',
-                    citedFactIds: null,
-                    invalidCitationIds: [],
+                    citations: [],
+                    unverifiedCount: 0,
                     requestText: text,
                     errorText: null,
                 },
@@ -364,8 +319,8 @@ export default function ChatDrawer({
                 ...prev,
                 content: '',
                 status: 'streaming',
-                citedFactIds: null,
-                invalidCitationIds: [],
+                citations: [],
+                unverifiedCount: 0,
                 errorText: null,
             }));
             void run(bubble.requestText, bubble.id);
@@ -429,7 +384,7 @@ export default function ChatDrawer({
                         <div className="text-center py-8">
                             <MessageCircle className="w-8 h-8 mx-auto mb-3 text-slate-300" />
                             <p className="text-sm font-medium text-slate-500">Ask anything about this record</p>
-                            <p className="text-xs text-slate-400 mt-1">Replies cite the underlying facts, chip by chip.</p>
+                            <p className="text-xs text-slate-400 mt-1">Replies cite the source documents, chip by chip.</p>
                             <div className="mt-4 flex flex-wrap justify-center gap-2">
                                 {QUICK_PROMPTS.map((prompt) => (
                                     <button
@@ -447,12 +402,12 @@ export default function ChatDrawer({
                     {bubbles.map((bubble) =>
                         bubble.role === 'user' ? (
                             <div key={bubble.id} className="flex justify-end">
-                                <div className="max-w-[85%] rounded-xl rounded-br-sm bg-blue-600 text-white px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap">
+                                <div className="max-w-[85%] rounded-xl rounded-br-sm bg-blue-600 text-white px-3.5 py-2 text-[13px] leading-snug whitespace-pre-wrap">
                                     {bubble.content}
                                 </div>
                             </div>
                         ) : (
-                            <AssistantBubble key={bubble.id} bubble={bubble} factById={factById} onRetry={retry} />
+                            <AssistantBubble key={bubble.id} bubble={bubble} onRetry={retry} />
                         ),
                     )}
                 </div>

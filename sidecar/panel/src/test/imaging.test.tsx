@@ -167,11 +167,51 @@ describe('ScanImage seam', () => {
     });
 });
 
+describe('Imaging combined scan view', () => {
+    // Failure mode (R6): selecting a scan goes nowhere (or opens a bare lightbox) —
+    // it must open the combined view: image left, record-authored analysis right
+    // (findings, measurements + reference ranges, delta vs the prior in the series,
+    // treatment context), with the Trends chart directly beneath.
+    it('opens the combined image + analysis view when a timeline scan is selected', () => {
+        renderImaging();
+        fireEvent.click(screen.getByRole('button', { name: 'Open OCT OD — Oct 22, 2025' }));
+        const detail = screen.getByTestId('scan-detail');
+
+        // Headline + overall-change badge from the record's own ai_analysis
+        expect(within(detail).getByText('Fluid recurrence at extended 10-week interval')).toBeInTheDocument();
+        expect(within(detail).getByText('worsened')).toBeInTheDocument();
+        // High alert row
+        expect(within(detail).getByText('Fluid recurrence — interval extension failed')).toBeInTheDocument();
+        // Findings: severity-styled one-line rows with confidence
+        const findings = within(detail).getAllByTestId('finding-row');
+        expect(findings).toHaveLength(2);
+        expect(findings[0]).toHaveTextContent('Subretinal Fluid');
+        expect(findings[0]).toHaveTextContent('moderate');
+        expect(findings[0]).toHaveTextContent('94%');
+        expect(findings[1]).toHaveTextContent('Pigment Epithelial Detachment');
+        // Measurements: value + reference range + delta vs the prior in the series (264 -> 331)
+        const measurement = within(detail).getByTestId('measurement-row');
+        expect(measurement).toHaveTextContent('Central Retinal Thickness');
+        expect(measurement).toHaveTextContent('331');
+        expect(measurement).toHaveTextContent('normal 240–280');
+        expect(within(detail).getByTestId('measurement-delta')).toHaveTextContent('+67 vs prior');
+        // Treatment context + treatment-response assessment
+        expect(within(detail).getByTestId('treatment-context-badge')).toHaveTextContent('71d post-Eylea');
+        expect(within(detail).getByText('Worsened')).toBeInTheDocument();
+        // Trends chart rides directly beneath — no sub-tab hop
+        expect(within(detail).getByText('Central Retinal Thickness Over Time')).toBeInTheDocument();
+
+        // Back returns to the timeline; Compare stays reachable throughout
+        expect(screen.getByRole('tab', { name: /Compare/ })).toBeInTheDocument();
+        fireEvent.click(within(detail).getByRole('button', { name: /Back to timeline/i }));
+        expect(screen.getAllByTestId('timeline-event')).toHaveLength(11);
+    });
+});
+
 describe('App imaging tab', () => {
-    // Failure mode: the Imaging tab lands in the wrong slot (or never mounts the
-    // workstation) — it must sit between Medical Background and Sources per S2.2.
-    // Realignment note: imaging data now rides GET /api/overview — no brief involved.
-    it('adds the Imaging tab between Medical Background and Sources and renders the timeline', async () => {
+    // Failure mode: the tab bar regresses — Imaging must sit between Medical Background
+    // and AI Insights (R2 order), still mounting the workstation from GET /api/overview.
+    it('keeps the Imaging tab in the R2 tab order and renders the timeline', async () => {
         vi.stubGlobal(
             'fetch',
             vi.fn(async (input: RequestInfo | URL) => {
@@ -195,6 +235,7 @@ describe('App imaging tab', () => {
             'Overview',
             'Medical Background',
             'Imaging',
+            'AI Insights',
             'Diagnosis & Care',
             'Sources',
         ]);

@@ -1,9 +1,11 @@
-// Panel shell (S2.11 realignment): day-schedule sidebar + instant deterministic landing
-// from GET /api/overview — no LLM in any load path; the brief is an async enhancement
-// card inside the Overview tab. ?patient= deep links stay authoritative. The S2.3 chat
-// drawer ("Ask the record") docks over every tab, one conversation per patient.
+// Panel shell (S2.11 realignment, R2 IA): day-schedule sidebar + instant deterministic
+// landing from GET /api/overview — no LLM in any load path. The patient header band sits
+// above the tab bar on every tab and hosts the AI insights control (Generate -> compact
+// progress -> Refresh); the brief renders on its own AI Insights tab, and Diagnosis &
+// Care renders deterministically from the overview's care_plan. ?patient= deep links
+// stay authoritative. The S2.3 chat drawer ("Ask the record") docks over every tab.
 import { useCallback, useEffect, useState } from 'react';
-import { MessageSquare, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import {
     fetchFacts,
     fetchOverview,
@@ -15,19 +17,21 @@ import {
 import type { CitationRef } from './types';
 import { SourceNavContext } from './CitationChip';
 import PatientSidebar, { sortByAppointment } from './PatientSidebar';
-import AiInsights from './AiInsights';
+import AiInsightsTab, { InsightsHeaderControl, useInsights } from './AiInsights';
+import CarePlan from './CarePlan';
 import ChatDrawer from './ChatDrawer';
-import Overview from './Overview';
+import Overview, { PatientHeaderBand } from './Overview';
 import MedicalBackground from './MedicalBackground';
 import Imaging from './imaging/Imaging';
 import SourcesTab, { type SourceFocus } from './SourcesTab';
 
-type TabId = 'overview' | 'background' | 'imaging' | 'careplan' | 'sources';
+type TabId = 'overview' | 'background' | 'imaging' | 'insights' | 'careplan' | 'sources';
 
 const TABS: { id: TabId; label: string }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'background', label: 'Medical Background' },
     { id: 'imaging', label: 'Imaging' },
+    { id: 'insights', label: 'AI Insights' },
     { id: 'careplan', label: 'Diagnosis & Care' },
     { id: 'sources', label: 'Sources' },
 ];
@@ -119,6 +123,8 @@ export default function App() {
     }, []);
 
     const overview = overviewState.kind === 'ready' ? overviewState.overview : null;
+    // The insights state machine is shared by the header control and the AI Insights tab.
+    const insights = useInsights(patientId, overview?.latest_brief ?? null);
     const documents = factsState.kind === 'ready' ? (factsState.bundle.documents ?? []) : [];
     const patientName =
         overview?.patient.name ??
@@ -185,6 +191,21 @@ export default function App() {
 
                         {patientId !== null && overview !== null && (
                             <>
+                                {/* Patient header band on every tab — hosts the insights control (R2) */}
+                                <div className="mb-6">
+                                    <PatientHeaderBand
+                                        patient={overview.patient}
+                                        generatedAt={overview.generated_at}
+                                        action={
+                                            <InsightsHeaderControl
+                                                state={insights.state}
+                                                onGenerate={insights.generate}
+                                                onRetry={insights.retry}
+                                            />
+                                        }
+                                    />
+                                </div>
+
                                 <div className="mb-8">
                                     <div role="tablist" className="inline-flex p-1 bg-slate-100 rounded-xl">
                                         {TABS.map((tab) => (
@@ -207,14 +228,7 @@ export default function App() {
 
                                 <div role="tabpanel">
                                     {activeTab === 'overview' && (
-                                        <Overview
-                                            key={patientId}
-                                            overview={overview}
-                                            insights={
-                                                <AiInsights key={patientId} patientId={patientId} latestBrief={overview.latest_brief} />
-                                            }
-                                            onOpenImaging={() => setActiveTab('imaging')}
-                                        />
+                                        <Overview key={patientId} overview={overview} onOpenImaging={() => setActiveTab('imaging')} />
                                     )}
                                     {activeTab === 'background' && <MedicalBackground factsByType={overview.facts_by_type} />}
                                     {activeTab === 'imaging' && (
@@ -225,18 +239,16 @@ export default function App() {
                                                 </p>
                                             )}
                                             <Imaging
+                                                key={patientId}
                                                 imaging={overview.imaging}
                                                 images={overview.images}
                                                 treatments={factsState.kind === 'ready' ? factsState.bundle.treatments : []}
                                             />
                                         </>
                                     )}
+                                    {activeTab === 'insights' && <AiInsightsTab state={insights.state} onRetry={insights.retry} />}
                                     {activeTab === 'careplan' && (
-                                        <div className="text-center py-16 text-slate-400 border border-dashed border-slate-200 rounded-xl">
-                                            <MessageSquare className="w-10 h-10 mx-auto mb-3 text-slate-300" />
-                                            <p className="text-sm font-medium text-slate-500">Coming with chat</p>
-                                            <p className="text-xs mt-1">Diagnosis &amp; Care arrives with the consult chat loop (S2.3).</p>
-                                        </div>
+                                        <CarePlan carePlan={overview.care_plan} conditions={overview.facts_by_type.condition ?? []} />
                                     )}
                                     {activeTab === 'sources' && (
                                         <>
@@ -262,13 +274,7 @@ export default function App() {
 
                 {/* Docked chat — keyed by patient so switching patients switches conversations */}
                 {patientId !== null && overview !== null && (
-                    <ChatDrawer
-                        key={patientId}
-                        patientId={patientId}
-                        factsByType={overview.facts_by_type}
-                        open={chatOpen}
-                        onToggle={setChatOpen}
-                    />
+                    <ChatDrawer key={patientId} patientId={patientId} open={chatOpen} onToggle={setChatOpen} />
                 )}
             </div>
         </SourceNavContext.Provider>

@@ -1,6 +1,8 @@
-// Overview landing (S2.11) — rendered instantly from GET /api/overview, no LLM in the
-// path: patient band, contradiction alerts, chief complaint, meds + deterministic risk
-// flags, allergies, conditions, recent-scans strip; the AI insights card slots in async.
+// Overview landing (S2.11, R2 IA) — rendered instantly from GET /api/overview, no LLM in
+// the path: contradiction alerts, chief complaint with the recent-scans strip directly
+// beneath it, meds + deterministic risk flags, allergies, conditions. The patient header
+// band is exported for App to mount above the tab bar (it hosts the AI insights control);
+// AI insights itself lives on its own tab.
 import { useState, type ComponentType, type ReactNode } from 'react';
 import {
     AlertTriangle,
@@ -133,7 +135,14 @@ function contradictionCitation(alertId: string, side: 'a' | 'b', source: Runtime
     };
 }
 
-export function ContradictionAlerts({ alerts }: { alerts: RuntimeContradiction[] }) {
+export function ContradictionAlerts({
+    alerts,
+    anchorPrefix,
+}: {
+    alerts: RuntimeContradiction[];
+    /** When set, each alert row gets id `${anchorPrefix}-${alert.id}` so links can scroll to it. */
+    anchorPrefix?: string;
+}) {
     if (alerts.length === 0) {
         return null;
     }
@@ -160,7 +169,7 @@ export function ContradictionAlerts({ alerts }: { alerts: RuntimeContradiction[]
                     </div>
                     <ul className="space-y-3">
                         {alerts.map((alert) => (
-                            <li key={alert.id}>
+                            <li key={alert.id} id={anchorPrefix !== undefined ? `${anchorPrefix}-${alert.id}` : undefined}>
                                 {/* div, not p: the chip popover nests block elements */}
                                 <div className={`text-sm ${config.subText}`}>
                                     <span className="font-medium">{titleCase(alert.type)}:</span> {alert.description}
@@ -275,7 +284,16 @@ function MedicationRiskFlags({ flags }: { flags: MedicationRiskFlag[] }) {
 
 const SEX_LABELS: Record<string, string> = { F: 'Female', M: 'Male' };
 
-function PatientHeaderBand({ patient, generatedAt }: { patient: PatientRecord; generatedAt: string }) {
+export function PatientHeaderBand({
+    patient,
+    generatedAt,
+    action,
+}: {
+    patient: PatientRecord;
+    generatedAt: string;
+    /** The AI insights control (R2) — rendered just left of the time chip. */
+    action?: ReactNode;
+}) {
     const demo = patient.demographics;
     const age = computeAge(demo.dob, generatedAt);
     const identity = [
@@ -289,14 +307,17 @@ function PatientHeaderBand({ patient, generatedAt }: { patient: PatientRecord; g
                 <h2 className="text-xl font-semibold text-slate-800">{patient.name}</h2>
                 {identity.length > 0 && <p className="text-sm text-slate-500 mt-0.5">{identity.join(' · ')}</p>}
             </div>
-            <div className="flex items-center gap-2 text-sm text-slate-600">
-                {demo.appointment_time !== undefined && demo.appointment_time !== '' && (
-                    <span className="inline-flex items-center gap-1.5">
-                        <Clock className="w-4 h-4 text-slate-400" />
-                        {formatAppointmentTime(demo.appointment_time)}
-                    </span>
-                )}
-                <VisitTypeChip visitType={demo.visit_type} />
+            <div className="flex flex-wrap items-center gap-3">
+                {action}
+                <div className="flex items-center gap-2 text-sm text-slate-600">
+                    {demo.appointment_time !== undefined && demo.appointment_time !== '' && (
+                        <span className="inline-flex items-center gap-1.5">
+                            <Clock className="w-4 h-4 text-slate-400" />
+                            {formatAppointmentTime(demo.appointment_time)}
+                        </span>
+                    )}
+                    <VisitTypeChip visitType={demo.visit_type} />
+                </div>
             </div>
         </Card>
     );
@@ -433,12 +454,9 @@ function RecentScans({ images, onOpenImaging }: { images: ImageRecord[]; onOpenI
 
 export default function Overview({
     overview,
-    insights,
     onOpenImaging,
 }: {
     overview: OverviewPayload;
-    /** The async AI insights card — rendered as a sibling section, never a gate. */
-    insights: ReactNode;
     onOpenImaging: () => void;
 }) {
     const facts = overview.facts_by_type;
@@ -447,13 +465,11 @@ export default function Overview({
 
     return (
         <div className="space-y-10">
-            <PatientHeaderBand patient={overview.patient} generatedAt={overview.generated_at} />
-
             <ContradictionAlerts alerts={alerts} />
 
             <ChiefComplaintCard fact={(facts.chief_complaint ?? [])[0]} />
 
-            {insights}
+            <RecentScans images={overview.images} onOpenImaging={onOpenImaging} />
 
             <FactGroupCard
                 title="Medications"
@@ -473,8 +489,6 @@ export default function Overview({
             <FactGroupCard title="Allergies" icon={AlertTriangle} facts={facts.allergy ?? []} />
 
             <FactGroupCard title="Conditions" icon={Stethoscope} facts={facts.condition ?? []} />
-
-            <RecentScans images={overview.images} onOpenImaging={onOpenImaging} />
         </div>
     );
 }
