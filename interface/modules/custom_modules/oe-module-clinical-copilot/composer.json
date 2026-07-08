@@ -1,0 +1,19 @@
+{
+    "name": "openemr/oe-module-clinical-copilot",
+    "description": "Embeds the Clinical Co-Pilot pre-visit brief panel into the patient chart",
+    "type": "openemr-module",
+    "license": "GPL-3.0-or-later",
+    "authors": [
+        {
+            "name": "Clinical Co-Pilot Project"
+        }
+    ],
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "OpenEMR\\Modules\\ClinicalCopilot\\": "src/"
+        }
+    }
+}
