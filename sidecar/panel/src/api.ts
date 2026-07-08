@@ -1,6 +1,6 @@
 // Typed fetch client for the sidecar endpoints. Deterministic reads (patients, overview,
-// facts) back the instant landing; brief/prep/prep-runs back the async AI insights card,
-// whose caller owns the polling loop.
+// facts) back the instant landing; brief/prep/prep-runs back the async AI insights card;
+// chat streams SSE over fetch (EventSource cannot POST) for the S2.3 drawer.
 import type { FactBundle, OverviewPayload, PatientRecord, PrepRunRecord, StoredBrief } from './types';
 
 const UNREACHABLE = 'Could not reach the sidecar API.';
@@ -117,6 +117,156 @@ export async function startPrep(patientId: string): Promise<PrepStartResult> {
 export type PrepRunsFetchResult =
     | { kind: 'ready'; runs: PrepRunRecord[] }
     | { kind: 'error'; message: string };
+
+// ---- Chat (routes/chat.ts) ----
+
+export interface ChatHistoryMessage {
+    role: 'user' | 'assistant';
+    content: string;
+    created_at: string;
+}
+
+export type ChatHistoryFetchResult =
+    | { kind: 'ready'; conversationId: string; messages: ChatHistoryMessage[] }
+    | { kind: 'error'; message: string };
+
+/** GET /api/chat — oldest-first replay of a stored conversation. */
+export async function fetchChatHistory(patientId: string, conversationId: string): Promise<ChatHistoryFetchResult> {
+    try {
+        const res = await fetch(
+            `/api/chat/${encodeURIComponent(patientId)}?conversation_id=${encodeURIComponent(conversationId)}`,
+        );
+        if (!res.ok) {
+            return { kind: 'error', message: `Chat history request failed (HTTP ${res.status}).` };
+        }
+        const body = (await res.json()) as { conversation_id: string; messages: ChatHistoryMessage[] };
+        return { kind: 'ready', conversationId: body.conversation_id, messages: body.messages };
+    } catch {
+        return { kind: 'error', message: UNREACHABLE };
+    }
+}
+
+/** The done event's payload — citation validation happened server-side against the fact bundle. */
+export interface ChatStreamDone {
+    conversationId: string;
+    citedFactIds: string[];
+    invalidCitationIds: string[];
+}
+
+export type ChatSendResult =
+    | { kind: 'done'; done: ChatStreamDone }
+    /** An in-stream `{type:'error'}` event, or the stream cut before the done event. */
+    | { kind: 'stream_error' }
+    /** A pre-stream guard answered with plain JSON (400/404/429/503). */
+    | { kind: 'rejected'; message: string }
+    | { kind: 'error'; message: string };
+
+function guardMessage(status: number): string {
+    if (status === 429) {
+        return 'Daily AI budget reached — try tomorrow';
+    }
+    if (status === 404) {
+        return 'Patient is not registered in the sidecar.';
+    }
+    if (status === 400) {
+        return 'Message rejected — it must be 1 to 2000 characters.';
+    }
+    if (status === 503) {
+        return 'Chat is unavailable — the sidecar store is not configured.';
+    }
+    return `Chat request failed (HTTP ${status}).`;
+}
+
+/** One `data: {...}` SSE line -> its parsed JSON object, else null (keep-alive noise etc.). */
+function parseSseLine(line: string): Record<string, unknown> | null {
+    if (!line.startsWith('data:')) {
+        return null;
+    }
+    try {
+        const parsed: unknown = JSON.parse(line.slice(5).trim());
+        return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+            ? (parsed as Record<string, unknown>)
+            : null;
+    } catch {
+        return null;
+    }
+}
+
+function stringArray(value: unknown): string[] {
+    return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+/**
+ * POST /api/chat — the reply streams as SSE over fetch + getReader (the sidecar's own
+ * client in src/prep/anthropic.ts is the parsing reference). Guards answer as plain
+ * JSON before the stream opens; after it opens, only delta/done/error events remain.
+ */
+export async function sendChatMessage(
+    patientId: string,
+    message: string,
+    conversationId: string | null,
+    onDelta: (text: string) => void,
+): Promise<ChatSendResult> {
+    let res: Response;
+    try {
+        res = await fetch(`/api/chat/${encodeURIComponent(patientId)}`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(conversationId !== null ? { message, conversation_id: conversationId } : { message }),
+        });
+    } catch {
+        return { kind: 'error', message: UNREACHABLE };
+    }
+    if (!res.ok) {
+        return { kind: 'rejected', message: guardMessage(res.status) };
+    }
+    if (res.body === null) {
+        return { kind: 'stream_error' };
+    }
+    let done: ChatStreamDone | null = null;
+    let failed = false;
+    const handleLine = (line: string): void => {
+        const event = parseSseLine(line);
+        if (event === null) {
+            return;
+        }
+        if (event.type === 'delta' && typeof event.text === 'string') {
+            onDelta(event.text);
+        } else if (event.type === 'done' && typeof event.conversation_id === 'string') {
+            done = {
+                conversationId: event.conversation_id,
+                citedFactIds: stringArray(event.cited_fact_ids),
+                invalidCitationIds: stringArray(event.invalid_citation_ids),
+            };
+        } else if (event.type === 'error') {
+            failed = true;
+        }
+    };
+    try {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        for (;;) {
+            const chunk = await reader.read();
+            if (chunk.done) {
+                break;
+            }
+            buffer += decoder.decode(chunk.value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() ?? '';
+            for (const line of lines) {
+                handleLine(line);
+            }
+        }
+        handleLine(buffer);
+    } catch {
+        return { kind: 'stream_error' };
+    }
+    if (failed || done === null) {
+        return { kind: 'stream_error' };
+    }
+    return { kind: 'done', done };
+}
 
 /** GET /api/prep-runs — newest-first run history with live stage progress. */
 export async function fetchPrepRuns(patientId: string): Promise<PrepRunsFetchResult> {

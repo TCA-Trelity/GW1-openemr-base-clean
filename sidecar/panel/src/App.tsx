@@ -1,6 +1,7 @@
 // Panel shell (S2.11 realignment): day-schedule sidebar + instant deterministic landing
 // from GET /api/overview — no LLM in any load path; the brief is an async enhancement
-// card inside the Overview tab. ?patient= deep links stay authoritative.
+// card inside the Overview tab. ?patient= deep links stay authoritative. The S2.3 chat
+// drawer ("Ask the record") docks over every tab, one conversation per patient.
 import { useCallback, useEffect, useState } from 'react';
 import { MessageSquare, RefreshCw } from 'lucide-react';
 import {
@@ -15,6 +16,7 @@ import type { CitationRef } from './types';
 import { SourceNavContext } from './CitationChip';
 import PatientSidebar, { sortByAppointment } from './PatientSidebar';
 import AiInsights from './AiInsights';
+import ChatDrawer from './ChatDrawer';
 import Overview from './Overview';
 import MedicalBackground from './MedicalBackground';
 import Imaging from './imaging/Imaging';
@@ -42,6 +44,7 @@ export default function App() {
     const [activeTab, setActiveTab] = useState<TabId>('overview');
     const [sourceFocus, setSourceFocus] = useState<SourceFocus | null>(null);
     const [reloadNonce, setReloadNonce] = useState(0);
+    const [chatOpen, setChatOpen] = useState(false);
 
     const loadPatients = useCallback(async () => {
         setPatientsState({ kind: 'loading' });
@@ -256,6 +259,17 @@ export default function App() {
                         )}
                     </main>
                 </div>
+
+                {/* Docked chat — keyed by patient so switching patients switches conversations */}
+                {patientId !== null && overview !== null && (
+                    <ChatDrawer
+                        key={patientId}
+                        patientId={patientId}
+                        factsByType={overview.facts_by_type}
+                        open={chatOpen}
+                        onToggle={setChatOpen}
+                    />
+                )}
             </div>
         </SourceNavContext.Provider>
     );
