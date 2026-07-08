@@ -2,6 +2,7 @@
 // across the top of the Imaging tab. Adaptive — each card renders only when the patient has that
 // data, so William (CST + treat-and-extend) and Margaret (CST + GC-IPL, no injections) each get
 // the cards their record supports and nothing is zero-filled.
+import type { ReactNode } from 'react';
 import { Activity, AlertTriangle, CalendarClock, ShieldCheck } from 'lucide-react';
 import type { TreatmentResponseAssessment } from '../types';
 import { Card } from '../ui';
@@ -9,11 +10,11 @@ import { DeltaBadge } from './delta';
 import { FluidChip } from './fluid';
 import type { AlertLevel, MetricSummary, VisitSummary } from './summary';
 
-function StatCard({ children }: { children: React.ReactNode }) {
+function StatCard({ children }: { children: ReactNode }) {
     return <Card className="p-3 min-w-0">{children}</Card>;
 }
 
-function CardLabel({ children }: { children: React.ReactNode }) {
+function CardLabel({ children }: { children: ReactNode }) {
     return <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">{children}</p>;
 }
 

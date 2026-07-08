@@ -78,7 +78,8 @@ export default function IntervalLadder({ analysis }: { analysis: IntervalPattern
     const maxWeeks = Math.max(...data.map((datum) => datum.weeks), analysis.optimal_interval ?? 0);
 
     return (
-        <Card className="p-5" data-testid="interval-ladder">
+        <Card className="p-5">
+            <div data-testid="interval-ladder">
             <h3 className="text-base font-semibold text-slate-800 mb-1">Treat-and-Extend Interval Ladder</h3>
             <p className="text-xs text-slate-500 mb-3">
                 Weeks between injection and follow-up scan, colored by outcome. Bars above the optimal line are
@@ -130,6 +131,7 @@ export default function IntervalLadder({ analysis }: { analysis: IntervalPattern
                     <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: OUTCOME_FILL.partial_response }} />
                     Partial
                 </span>
+            </div>
             </div>
         </Card>
     );

@@ -8,6 +8,7 @@
 // Deliberately NOT built (brief §3 skip-list, data can't support): segmentation overlays on the
 // B-scan, thickness/en-face heatmaps, ETDRS 9-sector grids, slice-scrolling through a volume —
 // each scan is a single 2D JPEG, so the filmstrip scrubs *scans in the series*, not slices.
+import type { ReactNode } from 'react';
 import { ArrowLeft, ChevronLeft, ChevronRight, ScanEye, Sparkles } from 'lucide-react';
 import type { HcqProgressionAnalysis, ImageRecord } from '../types';
 import { Card, formatDate } from '../ui';
@@ -30,7 +31,7 @@ function LateralityTag({ laterality }: { laterality: string }) {
     );
 }
 
-function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
+function MetaRow({ label, children }: { label: string; children: ReactNode }) {
     return (
         <div className="flex items-baseline justify-between gap-2 py-1.5 border-b border-slate-100 last:border-0">
             <dt className="text-[11px] font-medium uppercase tracking-wide text-slate-400 flex-shrink-0">{label}</dt>
@@ -44,7 +45,8 @@ function AcquisitionMargin({ image }: { image: ImageRecord }) {
     const meta = image.image_metadata;
     const context = image.treatment_context;
     return (
-        <Card className="p-4" data-testid="acquisition-margin">
+        <Card className="p-4">
+            <div data-testid="acquisition-margin">
             <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Acquisition</h4>
             <dl>
                 <MetaRow label="Date">{formatDate(meta.capture_date)}</MetaRow>
@@ -68,6 +70,7 @@ function AcquisitionMargin({ image }: { image: ImageRecord }) {
                     </MetaRow>
                 )}
             </dl>
+            </div>
         </Card>
     );
 }

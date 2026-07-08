@@ -189,51 +189,205 @@ describe('ScanImage seam', () => {
     });
 });
 
-describe('Imaging combined scan view', () => {
-    // Failure mode (R6): selecting a scan goes nowhere (or opens a bare lightbox) —
-    // it must open the combined view: image left, record-authored analysis right
-    // (findings, measurements + reference ranges, delta vs the prior in the series,
-    // treatment context), with the Trends chart directly beneath.
-    it('opens the combined image + analysis view when a timeline scan is selected', () => {
+describe('Imaging workspace — scan open + fluid + deltas', () => {
+    // Failure mode: selecting a scan goes nowhere (or opens a bare lightbox) — it must open the
+    // image-first workspace: viewer center-stage, acquisition metadata in the left margin, the
+    // findings + measurements analysis in the right margin (fluid chip, delta vs prior AND vs
+    // baseline, reference band), with the Trends chart directly beneath.
+    it('opens the selected scan in the workspace from a timeline row, with margins + deltas', () => {
         renderImaging();
+        openTimeline();
         fireEvent.click(screen.getByRole('button', { name: 'Open OCT OD — Oct 22, 2025' }));
-        const detail = screen.getByTestId('scan-detail');
+        const workspace = screen.getByTestId('workspace');
 
+        // LEFT margin (acquisition) binds to the selected scan
+        expect(within(workspace).getByTestId('acquisition-margin')).toHaveTextContent('Oct 22, 2025');
         // Headline + overall-change badge from the record's own ai_analysis
-        expect(within(detail).getByText('Fluid recurrence at extended 10-week interval')).toBeInTheDocument();
-        expect(within(detail).getByText('worsened')).toBeInTheDocument();
+        expect(within(workspace).getByText('Fluid recurrence at extended 10-week interval')).toBeInTheDocument();
+        expect(within(workspace).getByText('worsened')).toBeInTheDocument();
+        // Fluid chip derives WET from the subretinal-fluid finding (must-have #1)
+        expect(within(workspace).getByTestId('fluid-chip')).toHaveAttribute('data-fluid-state', 'wet');
         // High alert row
-        expect(within(detail).getByText('Fluid recurrence — interval extension failed')).toBeInTheDocument();
+        expect(within(workspace).getByText('Fluid recurrence — interval extension failed')).toBeInTheDocument();
         // Findings: severity-styled one-line rows with confidence
-        const findings = within(detail).getAllByTestId('finding-row');
+        const findings = within(workspace).getAllByTestId('finding-row');
         expect(findings).toHaveLength(2);
         expect(findings[0]).toHaveTextContent('Subretinal Fluid');
         expect(findings[0]).toHaveTextContent('moderate');
         expect(findings[0]).toHaveTextContent('94%');
         expect(findings[1]).toHaveTextContent('Pigment Epithelial Detachment');
-        // Measurements: value + reference range + delta vs the prior in the series (264 -> 331)
-        const measurement = within(detail).getByTestId('measurement-row');
+        // Measurement: value + reference band + delta vs prior (264->331) AND vs baseline (385->331)
+        const measurement = within(workspace).getByTestId('measurement-row');
         expect(measurement).toHaveTextContent('Central Retinal Thickness');
         expect(measurement).toHaveTextContent('331');
         expect(measurement).toHaveTextContent('normal 240–280');
-        expect(within(detail).getByTestId('measurement-delta')).toHaveTextContent('+67 vs prior');
+        const priorDelta = within(workspace).getByTestId('measurement-delta');
+        expect(priorDelta).toHaveTextContent('+67 vs prior');
+        expect(priorDelta.className).toContain('text-red-700'); // CST rise = worse -> red
+        const baselineDelta = within(workspace).getByTestId('measurement-baseline-delta');
+        expect(baselineDelta).toHaveTextContent('-54 vs base');
+        expect(baselineDelta.className).toContain('text-emerald-700'); // below baseline = better -> emerald
         // Treatment context + treatment-response assessment
-        expect(within(detail).getByTestId('treatment-context-badge')).toHaveTextContent('71d post-Eylea');
-        expect(within(detail).getByText('Worsened')).toBeInTheDocument();
+        expect(within(workspace).getByTestId('treatment-context-badge')).toHaveTextContent('71d post-Eylea');
+        expect(within(workspace).getByText('Worsened')).toBeInTheDocument();
         // Trends chart rides directly beneath — no sub-tab hop
-        expect(within(detail).getByText('Central Retinal Thickness Over Time')).toBeInTheDocument();
+        expect(within(workspace).getByText('Central Retinal Thickness Over Time')).toBeInTheDocument();
 
         // Back returns to the timeline; Compare stays reachable throughout
         expect(screen.getByRole('tab', { name: /Compare/ })).toBeInTheDocument();
-        fireEvent.click(within(detail).getByRole('button', { name: /Back to timeline/i }));
+        fireEvent.click(within(workspace).getByRole('button', { name: /Back to timeline/i }));
         expect(screen.getAllByTestId('timeline-event')).toHaveLength(11);
+    });
+
+    // Failure mode: the filmstrip is decorative — clicking a thumbnail must actually swap the
+    // main scan AND every margin/analysis around it (the whole point of an image-first scrubber).
+    it('scrubs the series via the filmstrip, swapping the main scan and its margins', () => {
+        renderImaging(); // default workspace, latest scan (Dec 10) selected
+        const workspace = screen.getByTestId('workspace');
+        expect(within(workspace).getAllByTestId('filmstrip-thumb')).toHaveLength(7); // full OD series
+        expect(within(workspace).getByTestId('acquisition-margin')).toHaveTextContent('Dec 10, 2025');
+        expect(within(workspace).getByTestId('fluid-chip')).toHaveAttribute('data-fluid-state', 'dry');
+
+        // Select the baseline thumbnail (May 5) — main scan + margins + analysis all swap
+        fireEvent.click(within(workspace).getByRole('button', { name: 'Show OCT OD — May 5, 2025' }));
+        expect(within(workspace).getByTestId('acquisition-margin')).toHaveTextContent('May 5, 2025');
+        expect(within(workspace).getByTestId('fluid-chip')).toHaveAttribute('data-fluid-state', 'wet'); // baseline had SRF
+        expect(within(workspace).getByTestId('measurement-row')).toHaveTextContent('385');
+        // The baseline scan has no prior and no earlier baseline — no delta chips (never zero-filled)
+        expect(within(workspace).queryByTestId('measurement-delta')).not.toBeInTheDocument();
+        expect(within(workspace).queryByTestId('measurement-baseline-delta')).not.toBeInTheDocument();
+    });
+});
+
+describe('Fluid wet/dry derivation', () => {
+    // Failure mode: PED (which persists in a treated dry macula) flips the call to wet, or an
+    // unread scan is silently called dry.
+    it('derives wet from SRF, dry from a PED-only macula, and unknown without analysis', () => {
+        const leak = wtImages.find((image) => image.id === 'img-wt-005');
+        expect(deriveFluidStatus(leak?.ai_analysis).state).toBe('wet');
+
+        const dry = wtImages.find((image) => image.id === 'img-wt-007');
+        const dryStatus = deriveFluidStatus(dry?.ai_analysis);
+        expect(dryStatus.state).toBe('dry');
+        expect(dryStatus.pedPresent).toBe(true); // PED present but does not make it wet
+
+        // Margaret's parafoveal RPE/thinning is not fluid -> dry
+        expect(deriveFluidStatus(mcImages[mcImages.length - 1]?.ai_analysis).state).toBe('dry');
+        // No analysis -> unknown (never assert dry for an unread scan)
+        expect(deriveFluidStatus(null).state).toBe('unknown');
+    });
+});
+
+describe('Visit summary strip', () => {
+    // Failure mode: the strip stops computing baseline deltas, or renders a fixed card set that
+    // fabricates metrics a patient lacks (e.g. a GC card for William, an interval card for HCQ).
+    it('computes the baseline->latest CST delta and shows William interval (no GC card)', () => {
+        renderImaging();
+        const strip = screen.getByTestId('visit-summary-strip');
+        expect(strip).toHaveTextContent('Central Thickness');
+        expect(strip).toHaveTextContent('262'); // latest
+        expect(strip).toHaveTextContent('-123 vs base'); // 385 -> 262
+        expect(strip).toHaveTextContent('baseline 385');
+        expect(strip).toHaveTextContent('normal 240–280');
+        expect(within(strip).getByTestId('fluid-chip')).toHaveAttribute('data-fluid-state', 'dry');
+        expect(within(strip).getByTestId('summary-interval-outcome')).toHaveTextContent('Dry');
+        expect(strip).toHaveTextContent('Latest interval');
+        // Graceful omit: William has no ganglion-cell measurement, so no GC card
+        expect(within(strip).queryByText('Ganglion Cell (GC-IPL)')).not.toBeInTheDocument();
+        expect(within(strip).getByTestId('summary-alert-level')).toHaveAttribute('data-alert-level', 'low');
+    });
+
+    // Failure mode: the strip can't degrade for a non-injection patient — it shows an empty/zeroed
+    // interval card and drops the GC-IPL number that actually matters for HCQ.
+    it('degrades gracefully for Margaret: CST + GC cards, no interval card, medium HCQ alert', () => {
+        render(<Imaging imaging={mcImaging} images={mcImages} treatments={[]} />);
+        const strip = screen.getByTestId('visit-summary-strip');
+        expect(strip).toHaveTextContent('Central Thickness');
+        expect(within(strip).getByText('Ganglion Cell (GC-IPL)')).toBeInTheDocument();
+        expect(strip).toHaveTextContent('-12 vs base'); // GC 82 -> 70
+        // No injections -> no interval card
+        expect(within(strip).queryByTestId('summary-interval-outcome')).not.toBeInTheDocument();
+        expect(within(strip).queryByText('Latest interval')).not.toBeInTheDocument();
+        expect(within(strip).getByTestId('fluid-chip')).toHaveAttribute('data-fluid-state', 'dry');
+        expect(within(strip).getByTestId('summary-alert-level')).toHaveAttribute('data-alert-level', 'medium');
+    });
+});
+
+describe('Interval ladder', () => {
+    // Failure mode: the ladder mis-maps outcomes to colors, hiding the over-extension that the
+    // whole treat-and-extend view exists to surface.
+    it('maps each cycle to weeks + an outcome color, exposing the 49->71d over-extension', () => {
+        const data = buildLadderData(wtIntervalAnalysis);
+        expect(data.map((datum) => datum.weeks)).toEqual([7, 7, 7, 10, 4, 7]);
+        expect(data.map((datum) => OUTCOME_FILL[datum.outcome])).toEqual([
+            OUTCOME_FILL.good_response,
+            OUTCOME_FILL.good_response,
+            OUTCOME_FILL.good_response,
+            OUTCOME_FILL.worsened, // the 10-week over-extension leaked (red)
+            OUTCOME_FILL.good_response,
+            OUTCOME_FILL.good_response,
+        ]);
+        const overExtension = data.find((datum) => datum.weeks === 10);
+        expect(overExtension?.outcome).toBe('worsened');
+        expect(OUTCOME_FILL.worsened).toBe('#ef4444');
+        expect(overExtension!.weeks).toBeGreaterThan(wtIntervalAnalysis.optimal_interval ?? 0); // above the optimal line
+    });
+
+    it('renders the ladder card with an outcome legend on the Intervals tab', () => {
+        renderImaging();
+        fireEvent.click(screen.getByRole('tab', { name: /Intervals/ }));
+        const ladder = screen.getByTestId('interval-ladder');
+        expect(ladder).toHaveTextContent('Treat-and-Extend Interval Ladder');
+        expect(ladder).toHaveTextContent('Dry (extend)');
+        expect(ladder).toHaveTextContent('Leaked (shorten)');
+    });
+});
+
+describe('Trend selected-scan highlight', () => {
+    // Failure mode: the highlight marker floats free of the selected scan, so image + trend stop
+    // telling one story.
+    it('locates the selected scan on the CST series (and nothing when the date is absent)', () => {
+        const crt = extractMeasurementSeries(wtImages, 'central_retinal_thickness', 'day');
+        const point = selectedPoint(crt, '2025-10-22T11:30:00Z'); // the leak scan
+        expect(point?.value).toBe(331);
+        expect(point?.dateLabel).toBe('Oct 22');
+        expect(selectedPoint(crt, '2020-01-01T00:00:00Z')).toBeNull();
+        expect(selectedPoint(crt, undefined)).toBeNull();
+    });
+});
+
+describe('Imaging workspace — HCQ patient', () => {
+    // Failure mode: the workspace can't render an HCQ patient — it expects CRT-recurrence context
+    // and drops the GC-IPL deltas / toxicity card that are the whole point for Margaret.
+    it('renders GC-IPL deltas + the HCQ toxicity card, and omits absent injection context', () => {
+        render(<Imaging imaging={mcImaging} images={mcImages} treatments={[]} />);
+        const workspace = screen.getByTestId('workspace'); // default: latest scan (Dec 2024)
+        expect(within(workspace).getByTestId('fluid-chip')).toHaveAttribute('data-fluid-state', 'dry');
+
+        const gcRow = within(workspace)
+            .getAllByTestId('measurement-row')
+            .find((row) => row.textContent?.includes('Ganglion Cell Thickness'));
+        expect(gcRow).toBeDefined();
+        expect(within(gcRow!).getByTestId('measurement-delta')).toHaveTextContent('-2 vs prior'); // 72 -> 70
+        expect(within(gcRow!).getByTestId('measurement-baseline-delta')).toHaveTextContent('-12 vs base'); // 82 -> 70
+        expect(gcRow!).toHaveTextContent('normal 70–95');
+        // GC-IPL decline is bad for HCQ (lower_worse) -> red
+        expect(within(gcRow!).getByTestId('measurement-delta').className).toContain('text-red-700');
+
+        // Trends beneath: HCQ toxicity card present with the server-computed description
+        expect(within(workspace).getByText('HCQ Toxicity Monitoring')).toBeInTheDocument();
+        expect(
+            within(workspace).getByText('Ganglion cell layer declined 12µm across serial OCTs'),
+        ).toBeInTheDocument();
+        // No days-post-injection context for a non-injection patient
+        expect(within(workspace).queryByTestId('treatment-context-badge')).not.toBeInTheDocument();
     });
 });
 
 describe('App imaging tab', () => {
     // Failure mode: the tab bar regresses — Imaging must sit between Medical Background
     // and AI Insights (R2 order), still mounting the workstation from GET /api/overview.
-    it('keeps the Imaging tab in the R2 tab order and renders the timeline', async () => {
+    it('keeps the Imaging tab in the R2 tab order and lands on the workspace', async () => {
         vi.stubGlobal(
             'fetch',
             vi.fn(async (input: RequestInfo | URL) => {
@@ -263,6 +417,11 @@ describe('App imaging tab', () => {
         ]);
         fireEvent.click(screen.getByRole('tab', { name: 'Imaging' }));
         expect(screen.getByText('7 images · 4 treatments')).toBeInTheDocument();
+        // Lands on the image-first workspace with the summary strip across the top
+        expect(screen.getByTestId('visit-summary-strip')).toBeInTheDocument();
+        expect(screen.getByTestId('workspace')).toBeInTheDocument();
+        // Timeline (with its interval-recommendation banner) is one sub-tab away
+        fireEvent.click(screen.getByRole('tab', { name: /Timeline/ }));
         expect(screen.getAllByTestId('timeline-event')).toHaveLength(11);
         expect(screen.getByTestId('interval-banner')).toBeInTheDocument();
     });
