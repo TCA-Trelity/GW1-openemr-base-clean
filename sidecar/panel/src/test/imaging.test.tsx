@@ -32,10 +32,11 @@ describe('Imaging timeline', () => {
         expect(rows).toHaveLength(11);
         expect(within(rows[0]!).getByText('Dec 10, 2025')).toBeInTheDocument(); // newest: img-wt-007
         expect(within(rows[rows.length - 1]!).getByText('May 5, 2025')).toBeInTheDocument(); // oldest: img-wt-001
-        // Injection rows carry medication + dose + injection number
-        expect(within(rows[2]!).getByText('Eylea')).toBeInTheDocument(); // tx-wt-004 (Oct 22)
-        expect(within(rows[2]!).getByText(/· 2mg/)).toBeInTheDocument();
-        expect(within(rows[2]!).getByText(/Injection #4/)).toBeInTheDocument();
+        // Injection rows carry medication + dose + injection number; the Oct 22 scan
+        // (11:30Z) sorts above the same-day injection, so tx-wt-004 is row 3.
+        expect(within(rows[3]!).getByText('Eylea')).toBeInTheDocument();
+        expect(within(rows[3]!).getByText(/· 2mg/)).toBeInTheDocument();
+        expect(within(rows[3]!).getByText(/Injection #4/)).toBeInTheDocument();
     });
 
     // Failure mode: the days-post-injection badge drops treatment_context math and the
