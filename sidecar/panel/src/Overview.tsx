@@ -28,7 +28,8 @@ import type {
     StoredContradictionRow,
 } from './types';
 import { Card, SectionLabel, VisitTypeChip, asSourceType, computeAge, formatAppointmentTime, formatDate, titleCase } from './ui';
-import { CitationChips } from './CitationChip';
+import { CitationChip, CitationChips } from './CitationChip';
+import { OriginBadge, citationOrigin } from './OriginBadge';
 import { FactRow } from './MedicalBackground';
 import ScanImage, { modalityLabel } from './imaging/ScanImage';
 
@@ -135,6 +136,32 @@ function contradictionCitation(alertId: string, side: 'a' | 'b', source: Runtime
     };
 }
 
+/**
+ * The two sides of a conflict, each carrying its own origin marker (EHR vs External) beside
+ * its citation chip — so an EHR value pitted against an external document reads "your EHR
+ * says X, this source says Y". Rendered per-side (never grouped) so the distinct claims stay
+ * separate, with chip indices preserved.
+ */
+function ContradictionSides({ alert }: { alert: RuntimeContradiction }) {
+    const sides = [
+        alert.source_a !== null ? contradictionCitation(alert.id, 'a', alert.source_a) : null,
+        alert.source_b !== null ? contradictionCitation(alert.id, 'b', alert.source_b) : null,
+    ].filter((citation): citation is CitationRef => citation !== null);
+    if (sides.length === 0) {
+        return null;
+    }
+    return (
+        <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 ml-1 align-text-top">
+            {sides.map((citation, index) => (
+                <span key={citation.id} className="inline-flex items-center gap-1">
+                    <OriginBadge origin={citationOrigin(citation)} />
+                    <CitationChip citation={citation} index={index + 1} />
+                </span>
+            ))}
+        </span>
+    );
+}
+
 export function ContradictionAlerts({
     alerts,
     anchorPrefix,
@@ -173,14 +200,8 @@ export function ContradictionAlerts({
                                 {/* div, not p: the chip popover nests block elements */}
                                 <div className={`text-sm ${config.subText}`}>
                                     <span className="font-medium">{titleCase(alert.type)}:</span> {alert.description}
-                                    {/* group={false}: the two sides of a conflict are distinct claims — never collapse them into one ×2 chip */}
-                                    <CitationChips
-                                        group={false}
-                                        citations={[
-                                            ...(alert.source_a !== null ? [contradictionCitation(alert.id, 'a', alert.source_a)] : []),
-                                            ...(alert.source_b !== null ? [contradictionCitation(alert.id, 'b', alert.source_b)] : []),
-                                        ]}
-                                    />
+                                    {/* Per-side (never grouped): distinct claims, each with its own origin marker. */}
+                                    <ContradictionSides alert={alert} />
                                 </div>
                                 {alert.suggested_question !== null && alert.suggested_question !== '' && (
                                     <p className="text-sm text-slate-600 italic mt-0.5">→ {alert.suggested_question}</p>

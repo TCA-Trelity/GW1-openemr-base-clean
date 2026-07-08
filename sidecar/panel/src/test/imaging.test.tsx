@@ -408,6 +408,7 @@ describe('App imaging tab', () => {
         render(<App />);
         const tabs = await screen.findAllByRole('tab');
         expect(tabs.map((tab) => tab.textContent)).toEqual([
+            'EHR Record',
             'Overview',
             'Medical Background',
             'Imaging',

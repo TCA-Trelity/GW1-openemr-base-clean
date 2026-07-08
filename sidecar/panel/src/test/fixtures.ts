@@ -576,3 +576,134 @@ export const factBundle: FactBundle = {
     treatments: [],
     documents,
 };
+
+// ---- EHR sync (E3): the snapshot document + EHR-origin facts as GET /api/overview serves
+// them after a live FHIR pull (openemr/ehrSync.ts buildEhrSnapshot shape). ----
+
+export const EHR_SNAPSHOT_DOC_ID = 'ehr-snapshot-margaret-chen';
+
+/** An EHR-provenance citation: external_ehr_import, pointing at the ehr-snapshot document. */
+function ehrCitation(factId: string, excerpt: string): CitationRef {
+    return {
+        id: `${factId}-c1`,
+        fact_id: factId,
+        source_label: 'OpenEMR EHR',
+        source_type: 'external_ehr_import',
+        excerpt_text: excerpt,
+        excerpt_location: null,
+        attribution: { speaker_role: 'system' },
+        source_document_id: EHR_SNAPSHOT_DOC_ID,
+        document_date: '2026-07-08',
+    };
+}
+
+const ehrBase = {
+    patient_id: 'margaret-chen',
+    is_current: true,
+    created_date: '2026-07-08',
+    source_document_id: EHR_SNAPSHOT_DOC_ID,
+    verification: { status: 'unverified' as const },
+    laterality: null,
+};
+
+/** Facts projected from the FHIR pull, plus one external medication so origin filtering shows. */
+export const ehrFactsByType: Partial<Record<FactType, PatientFact[]>> = {
+    condition: [
+        {
+            ...ehrBase,
+            id: 'ehr-margaret-chen-1',
+            fact_type: 'condition',
+            content: { name: 'Rheumatoid arthritis', icd10: 'M06.9', status: 'active' },
+            sources: [ehrCitation('ehr-margaret-chen-1', 'Condition: Rheumatoid arthritis (ICD-10 M06.9) — active')],
+        },
+    ],
+    allergy: [
+        {
+            ...ehrBase,
+            id: 'ehr-margaret-chen-2',
+            fact_type: 'allergy',
+            content: { substance: 'Sulfonamides', reaction: 'Rash' },
+            sources: [ehrCitation('ehr-margaret-chen-2', 'Allergy: Sulfonamides — reaction: Rash')],
+        },
+    ],
+    medication: [
+        {
+            ...ehrBase,
+            id: 'ehr-margaret-chen-3',
+            fact_type: 'medication',
+            content: { name: 'Hydroxychloroquine', dose: '200 mg daily' },
+            sources: [ehrCitation('ehr-margaret-chen-3', 'Medication: Hydroxychloroquine — 200 mg daily')],
+        },
+        {
+            ...base,
+            id: 'fact-ext-med-001',
+            fact_type: 'medication',
+            content: { name: 'Aspirin', dose: '81mg' },
+            source_document_id: 'doc-mc-002',
+            sources: [bareCitation], // pharmacy_record -> external
+            verification: { status: 'verified' },
+            laterality: null,
+        },
+    ],
+    vital_sign: [
+        {
+            ...ehrBase,
+            id: 'ehr-margaret-chen-4',
+            fact_type: 'vital_sign',
+            content: { name: 'IOP', value: 24, units: 'mmHg' },
+            sources: [ehrCitation('ehr-margaret-chen-4', 'IOP: 24 mmHg')],
+        },
+    ],
+};
+
+export const ehrImportDoc: OverviewDocumentMeta = {
+    id: EHR_SNAPSHOT_DOC_ID,
+    document_type: 'ehr_import',
+    document_date: '2026-07-08',
+    metadata: { source_system: 'openemr_fhir', imported_at: '2026-07-08T13:55:00.000Z' },
+    extras: {},
+};
+
+/** A conflict pitting the live EHR value against an external pharmacy pull (E3 origin test). */
+export const ehrVsExternalContradiction: StoredContradictionRow = {
+    id: 'contra-ehr-001',
+    patient_id: 'margaret-chen',
+    status: 'active',
+    severity: 'high',
+    payload: {
+        type: 'medication_discrepancy',
+        description: 'OpenEMR lists Hydroxychloroquine 200mg; the pharmacy pull shows a 400mg fill',
+        suggested_question: 'Which hydroxychloroquine dose is current?',
+        source_a: {
+            type: 'external_ehr_import',
+            value: 'Hydroxychloroquine 200 mg daily',
+            document_id: EHR_SNAPSHOT_DOC_ID,
+            excerpt: 'Medication: Hydroxychloroquine — 200 mg daily',
+        },
+        source_b: {
+            type: 'pharmacy_record',
+            value: 'Hydroxychloroquine 400 mg',
+            document_id: 'doc-mc-002',
+            excerpt: '400 mg fill 2026-06-01',
+        },
+    },
+};
+
+/** Overview after a sync: EHR facts + the ehr_import doc, no contradictions (badge test). */
+export const ehrOverview: OverviewPayload = {
+    ...overviewNoBrief,
+    facts_by_type: ehrFactsByType,
+    medication_risk_flags: [],
+    contradictions: [],
+    documents: [ehrImportDoc, ...overviewDocuments],
+    images: [],
+    generated_at: '2026-07-08T14:00:00.000Z',
+};
+
+/** Minimal overview carrying only the mixed EHR-vs-external conflict (contradiction origin test). */
+export const ehrContradictionOverview: OverviewPayload = {
+    ...williamOverview,
+    patient: margaretChen,
+    contradictions: [ehrVsExternalContradiction],
+    generated_at: '2026-07-08T14:00:00.000Z',
+};

@@ -132,13 +132,14 @@ describe('App landing (deterministic overview)', () => {
         expect(briefCalls(mock)).toBe(0);
     });
 
-    // Failure mode: the tab bar regresses to the old IA — AI Insights must be its own
-    // top-level tab immediately right of Imaging (R2).
-    it('orders the tabs Overview, Medical Background, Imaging, AI Insights, Diagnosis & Care, Sources', async () => {
+    // Failure mode: the tab bar regresses to the old IA — EHR Record leads (system of
+    // record, E3), then AI Insights must be its own top-level tab right of Imaging (R2).
+    it('orders the tabs EHR Record, Overview, Medical Background, Imaging, AI Insights, Diagnosis & Care, Sources', async () => {
         stubApp({ overview: overviewNoBrief });
         render(<App />);
         const tabs = await screen.findAllByRole('tab');
         expect(tabs.map((tab) => tab.textContent)).toEqual([
+            'EHR Record',
             'Overview',
             'Medical Background',
             'Imaging',

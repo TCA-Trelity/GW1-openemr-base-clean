@@ -82,6 +82,46 @@ export async function fetchFacts(patientId: string): Promise<FactsFetchResult> {
     }
 }
 
+export type EhrSyncFetchResult =
+    | { kind: 'synced'; factCount: number; resourceCounts: Record<string, number>; syncedAt: string }
+    /** 409 not_linked_to_openemr — the patient has no OpenEMR chart to pull from yet. */
+    | { kind: 'not_linked' }
+    /** 409 patient_not_found — the sidecar has no such patient. */
+    | { kind: 'patient_not_found' }
+    /** 503 ehr_sync_not_configured — no read client on this deployment. */
+    | { kind: 'not_configured' }
+    | { kind: 'error'; message: string };
+
+/**
+ * POST /api/ehr-sync/:patientId — a live FHIR R4 pull that rewrites the EHR snapshot. Kept
+ * synchronous server-side (a handful of small reads). The caller refetches overview + facts
+ * on success; 409/503 map to explicit reasons the tab renders as small inline messages.
+ */
+export async function syncEhr(patientId: string): Promise<EhrSyncFetchResult> {
+    try {
+        const res = await fetch(`/api/ehr-sync/${encodeURIComponent(patientId)}`, { method: 'POST' });
+        if (res.status === 503) {
+            return { kind: 'not_configured' };
+        }
+        if (res.status === 409) {
+            const body = (await res.json().catch(() => ({}))) as { reason?: string };
+            return body.reason === 'patient_not_found' ? { kind: 'patient_not_found' } : { kind: 'not_linked' };
+        }
+        if (!res.ok) {
+            return { kind: 'error', message: `EHR sync failed (HTTP ${res.status}).` };
+        }
+        const body = (await res.json()) as { factCount?: number; resourceCounts?: Record<string, number>; syncedAt?: string };
+        return {
+            kind: 'synced',
+            factCount: typeof body.factCount === 'number' ? body.factCount : 0,
+            resourceCounts: body.resourceCounts ?? {},
+            syncedAt: typeof body.syncedAt === 'string' ? body.syncedAt : '',
+        };
+    } catch {
+        return { kind: 'error', message: UNREACHABLE };
+    }
+}
+
 export type PrepStartResult =
     | { kind: 'accepted' }
     | { kind: 'reused' }

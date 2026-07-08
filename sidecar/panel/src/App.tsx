@@ -20,14 +20,17 @@ import PatientSidebar, { sortByAppointment } from './PatientSidebar';
 import AiInsightsTab, { InsightsHeaderControl, useInsights } from './AiInsights';
 import CarePlan from './CarePlan';
 import ChatDrawer from './ChatDrawer';
+import EhrRecord from './EhrRecord';
 import Overview, { PatientHeaderBand } from './Overview';
 import MedicalBackground from './MedicalBackground';
 import Imaging from './imaging/Imaging';
 import SourcesTab, { type SourceFocus } from './SourcesTab';
 
-type TabId = 'overview' | 'background' | 'imaging' | 'insights' | 'careplan' | 'sources';
+type TabId = 'ehr' | 'overview' | 'background' | 'imaging' | 'insights' | 'careplan' | 'sources';
 
+// EHR Record sits FIRST — it represents the system of record the co-pilot layers on top of.
 const TABS: { id: TabId; label: string }[] = [
+    { id: 'ehr', label: 'EHR Record' },
     { id: 'overview', label: 'Overview' },
     { id: 'background', label: 'Medical Background' },
     { id: 'imaging', label: 'Imaging' },
@@ -227,6 +230,14 @@ export default function App() {
                                 </div>
 
                                 <div role="tabpanel">
+                                    {activeTab === 'ehr' && (
+                                        <EhrRecord
+                                            key={patientId}
+                                            overview={overview}
+                                            patientId={patientId}
+                                            onSynced={() => setReloadNonce((nonce) => nonce + 1)}
+                                        />
+                                    )}
                                     {activeTab === 'overview' && (
                                         <Overview key={patientId} overview={overview} onOpenImaging={() => setActiveTab('imaging')} />
                                     )}

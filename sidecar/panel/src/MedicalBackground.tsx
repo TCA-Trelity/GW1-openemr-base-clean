@@ -18,6 +18,7 @@ import type { ComponentType, ReactNode } from 'react';
 import type { FactType, PatientFact } from './types';
 import { Card, LateralityBadge, VerificationBadge, formatDate } from './ui';
 import { CitationChips } from './CitationChip';
+import { OriginBadge, factOrigin } from './OriginBadge';
 
 const GROUPS: { type: FactType; title: string; icon: ComponentType<{ className?: string }> }[] = [
     { type: 'medication', title: 'Medications', icon: Pill },
@@ -129,6 +130,7 @@ export function FactRow({ fact, badges }: { fact: PatientFact; badges?: ReactNod
             </div>
             <div className="flex items-center gap-1.5 flex-wrap justify-end flex-shrink-0">
                 {badges}
+                <OriginBadge origin={factOrigin(fact)} />
                 {fact.laterality !== null && <LateralityBadge laterality={fact.laterality} />}
                 <VerificationBadge status={fact.verification.status} />
             </div>
