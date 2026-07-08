@@ -62,6 +62,6 @@ export const CitationRefSchema = z.object({
     attribution: AttributionSchema.nullable(),
     source_document_id: z.string().nullable(),
     document_date: z.string().nullable(), // ISO date string; crosses JSON boundaries
-    deep_link_url: z.string().nullable(),
+    deep_link_url: z.string().nullable().optional(), // absent in seed corpus; panel derives links at render
 });
 export type CitationRef = z.infer<typeof CitationRefSchema>;

@@ -92,7 +92,7 @@ export const ComparisonToPriorSchema = z.object({
     interval_days: z.number().nullable().optional(),
     overall_change: z.enum(['improved', 'worsened', 'stable', 'mixed']).optional(),
     changes: z.array(ComparisonChangeSchema).default([]),
-    treatment_response: TreatmentResponseSchema.optional(),
+    treatment_response: TreatmentResponseSchema.nullable().optional(),
 });
 export type ComparisonToPrior = z.infer<typeof ComparisonToPriorSchema>;
 
@@ -121,7 +121,7 @@ export const TreatmentContextSchema = z.object({
         .object({ medication: z.string(), date: z.string(), dose: z.string().optional() })
         .nullable(),
     interval_from_prior_image: z.number().nullable(),
-    treatment_cycle_number: z.number().int(),
+    treatment_cycle_number: z.number().int().nullable(),
 });
 export type TreatmentContext = z.infer<typeof TreatmentContextSchema>;
 
@@ -144,6 +144,7 @@ export const ImageRecordSchema = z.object({
     image_url: z.string().optional(),
     thumbnail_url: z.string().optional(),
     storage_key: z.string().optional(), // sidecar ImageStore key (no prototype equivalent)
+    source_document_id: z.string().nullable().optional(),
     treatment_context: TreatmentContextSchema.optional(),
     ai_analysis: AiAnalysisSchema.optional(),
 });

@@ -98,12 +98,12 @@ describe('PatientFactSchema', () => {
     });
 
     // Guards: regressions in the inferred-from-source chief_complaint shape (factExtraction.jsx:121-127).
-    it('accepts a chief_complaint fact with the prototype extraction shape', () => {
+    it('accepts a chief_complaint fact with the corpus shape', () => {
         const fact = {
             ...validMedicationFact,
             id: 'fact-cc',
             fact_type: 'chief_complaint',
-            content: { raw_statement: 'Floaters in right eye x 3 weeks', category: 'visual_disturbance', onset: '3 weeks ago', duration: '3 weeks', severity: 'moderate' },
+            content: { statement: 'Floaters in right eye x 3 weeks', onset: '3 weeks ago', laterality: 'OD', progression: 'stable', pertinent_negatives: ['no pain'] },
         };
         expect(PatientFactSchema.safeParse(fact).success).toBe(true);
     });
@@ -301,7 +301,8 @@ describe('SourceDocumentSchema / SeedSourceDocumentSchema', () => {
         expect(SourceDocumentSchema.safeParse({ ...referralDocument, document_type: 'external_records' }).success).toBe(true);
         expect(SourceDocumentSchema.safeParse({ ...referralDocument, document_type: 'external_import' }).success).toBe(false);
         expect(SourceDocumentSchema.safeParse({ ...referralDocument, document_type: 'imaging_internal' }).success).toBe(true);
-        expect(SourceDocumentSchema.safeParse({ ...referralDocument, document_type: 'imaging' }).success).toBe(false);
+        expect(SourceDocumentSchema.safeParse({ ...referralDocument, document_type: 'imaging' }).success).toBe(true);
+        expect(SourceDocumentSchema.safeParse({ ...referralDocument, document_type: 'prior_visit_note' }).success).toBe(true);
     });
 });
 

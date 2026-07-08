@@ -48,9 +48,9 @@ export const MedicationContentSchema = z.object({
     dose: z.string().optional(),
     frequency: z.string().optional(),
     route: z.string().optional(),
-    start_date: z.string().optional(),
-    end_date: z.string().optional(),
-    prescriber: z.string().optional(),
+    start_date: z.string().nullable().optional(),
+    end_date: z.string().nullable().optional(),
+    prescriber: z.string().nullable().optional(),
     indication: z.string().optional(),
     risk_flags: z.array(z.string()).optional(),
 });
@@ -105,7 +105,7 @@ export type ClinicalFindingContent = z.infer<typeof ClinicalFindingContentSchema
 export const FamilyHistoryContentSchema = z.object({
     relative: z.string().min(1),
     condition: z.string().min(1),
-    age_at_diagnosis: z.union([z.number(), z.string()]).optional(),
+    age_at_diagnosis: z.union([z.number(), z.string()]).nullable().optional(),
     outcome: z.string().optional(),
 });
 export type FamilyHistoryContent = z.infer<typeof FamilyHistoryContentSchema>;
@@ -129,23 +129,29 @@ export const ProcedureHistoryContentSchema = z.object({
 });
 export type ProcedureHistoryContent = z.infer<typeof ProcedureHistoryContentSchema>;
 
-// From factExtraction.jsx:96-101 — not in manifest §6.10.
-export const PatientGoalContentSchema = z.object({
-    goal_text: z.string().min(1),
-    life_context: z.string().optional(),
-    verbatim_quote: z.string().optional(),
-    specific_concerns: z.array(z.string()).optional(),
-});
+// Corpus shape (sidecar/seed, consistent across both patients) — supersedes the
+// factExtraction.jsx field names; reconciled 2026-07-08 (see DECISIONS.md).
+export const PatientGoalContentSchema = z
+    .object({
+        goal: z.string().min(1),
+        specific_concerns: z.array(z.string()).optional(),
+        verbatim_quotes: z.array(z.string()).optional(),
+        emotional_state: z.string().optional(),
+    })
+    .passthrough();
 export type PatientGoalContent = z.infer<typeof PatientGoalContentSchema>;
 
-// From factExtraction.jsx:121-127 — not in manifest §6.10.
-export const ChiefComplaintContentSchema = z.object({
-    raw_statement: z.string().min(1),
-    category: z.string().optional(),
-    onset: z.string().optional(),
-    duration: z.string().optional(),
-    severity: z.string().optional(),
-});
+// Corpus shape (sidecar/seed) — supersedes factExtraction.jsx names; see DECISIONS.md.
+export const ChiefComplaintContentSchema = z
+    .object({
+        statement: z.string().min(1),
+        onset: z.string().optional(),
+        onset_context: z.string().optional(),
+        laterality: z.string().optional(),
+        progression: z.string().optional(),
+        pertinent_negatives: z.array(z.string()).optional(),
+    })
+    .passthrough();
 export type ChiefComplaintContent = z.infer<typeof ChiefComplaintContentSchema>;
 
 // ---- The fact entity ----

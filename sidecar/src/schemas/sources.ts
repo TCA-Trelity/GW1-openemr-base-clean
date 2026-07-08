@@ -14,6 +14,8 @@ export const DOCUMENT_TYPES = [
     'external_records',
     'tech_workup',
     'imaging_internal',
+    'imaging', // corpus spelling for OCT/fundus report docs
+    'prior_visit_note',
     'patient_portal_message',
     'patient_upload',
     'intake_transcript',
@@ -70,7 +72,7 @@ export const IntentionalIssueSchema = z
     .object({
         issue: z.string(),
         actual: z.string().optional(),
-        clinical_impact: z.string(),
+        clinical_impact: z.string().optional(),
     })
     .passthrough();
 export type IntentionalIssue = z.infer<typeof IntentionalIssueSchema>;

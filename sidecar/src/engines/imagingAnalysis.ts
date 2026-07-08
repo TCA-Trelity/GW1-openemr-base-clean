@@ -28,7 +28,7 @@ export interface AnalyzableImage {
               findings?: readonly ImagingFinding[] | undefined;
               measurements?: readonly ImagingMeasurement[] | undefined;
               comparison_to_prior?:
-                  | { treatment_response?: TreatmentResponse | undefined }
+                  | { treatment_response?: TreatmentResponse | null | undefined }
                   | null
                   | undefined;
           }
