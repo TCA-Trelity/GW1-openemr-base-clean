@@ -310,6 +310,89 @@ export interface BriefContent {
     correlation_id: string;
 }
 
+// ---- Imaging records (schemas/imaging.ts, wire shape from store getFactBundle) ----
+
+export interface ImagingMeasurement {
+    measurement_type: string;
+    value: number;
+    unit?: string;
+    location?: string;
+    reference_range?: { normal_min: number; normal_max: number };
+}
+
+export interface ImagingScanFinding {
+    finding_id?: string;
+    finding_type: string;
+    location?: string;
+    severity?: 'mild' | 'moderate' | 'severe';
+    confidence?: number;
+    description?: string;
+}
+
+export type OverallChange = 'improved' | 'worsened' | 'stable' | 'mixed';
+export type TreatmentResponseAssessment = IntervalPatternAnalysis['intervals'][number]['outcome'];
+
+export interface ComparisonToPrior {
+    prior_image_id?: string;
+    prior_image_date?: string;
+    interval_days?: number | null;
+    overall_change?: OverallChange;
+    treatment_response?: { assessment: TreatmentResponseAssessment; confidence?: number; rationale?: string } | null;
+}
+
+export interface ImagingAiAnalysis {
+    findings?: ImagingScanFinding[];
+    measurements?: ImagingMeasurement[];
+    comparison_to_prior?: ComparisonToPrior | null;
+    summary?: {
+        headline?: string;
+        key_findings?: string[];
+        alerts?: { level: 'low' | 'medium' | 'high'; message: string }[];
+        clinical_impression?: string;
+    };
+}
+
+export type ImageTreatmentContext = ImagingTimelineEntry['treatment_context'];
+
+export interface ImageRecord {
+    id: string;
+    patient_id?: string;
+    study_id?: string;
+    image_metadata: {
+        capture_date: string;
+        capture_device?: string;
+        modality: string;
+        laterality: string;
+        scan_type?: string;
+        scan_quality?: number;
+    };
+    /** Sidecar ImageStore key — absent/null until the pixels are sourced. The ScanImage seam keys on it. */
+    storage_key?: string | null;
+    /** Kermany dataset class (e.g. 'CNV', 'NORMAL') when the record's extras carry one. */
+    dataset_class?: string;
+    treatment_context?: ImageTreatmentContext | null;
+    ai_analysis?: ImagingAiAnalysis | null;
+}
+
+export interface InjectionDetails {
+    medication: string;
+    dose?: string;
+    laterality?: string;
+    injection_number?: number;
+    interval_from_prior?: number | null;
+}
+
+/** Wire shape of GET /api/facts treatments: the full TreatmentRecord rides in `payload`. */
+export interface TreatmentWireRecord {
+    id: string;
+    patient_id?: string;
+    treatment_date: string;
+    payload: {
+        treatment_type?: string;
+        injection_details?: InjectionDetails | null;
+    };
+}
+
 // ---- API responses (routes/prep.ts) ----
 
 export interface StoredBrief {
@@ -340,8 +423,8 @@ export interface FactBundle {
     patient: { id: string; openemr_patient_id: string | null; name: string; demographics: Record<string, unknown> };
     facts: unknown[];
     contradictions: unknown[];
-    images: unknown[];
-    treatments: unknown[];
+    images: ImageRecord[];
+    treatments: TreatmentWireRecord[];
     /** Not yet emitted by GET /api/facts (see S2.1 report) — the Sources tab renders these when present. */
     documents?: SourceDocumentRecord[];
 }

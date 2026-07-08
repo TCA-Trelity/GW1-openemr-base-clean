@@ -8,13 +8,15 @@ import { Card, formatDate } from './ui';
 import { SourceNavContext } from './CitationChip';
 import Overview from './Overview';
 import MedicalBackground from './MedicalBackground';
+import Imaging from './imaging/Imaging';
 import SourcesTab, { type SourceFocus } from './SourcesTab';
 
-type TabId = 'overview' | 'background' | 'careplan' | 'sources';
+type TabId = 'overview' | 'background' | 'imaging' | 'careplan' | 'sources';
 
 const TABS: { id: TabId; label: string }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'background', label: 'Medical Background' },
+    { id: 'imaging', label: 'Imaging' },
     { id: 'careplan', label: 'Diagnosis & Care' },
     { id: 'sources', label: 'Sources' },
 ];
@@ -221,6 +223,20 @@ export default function App() {
                             <div role="tabpanel">
                                 {activeTab === 'overview' && <Overview brief={brief.content} />}
                                 {activeTab === 'background' && <MedicalBackground factsByType={brief.content.facts_by_type} />}
+                                {activeTab === 'imaging' && (
+                                    <>
+                                        {factsState.kind === 'error' && (
+                                            <p className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800">
+                                                {factsState.message}
+                                            </p>
+                                        )}
+                                        <Imaging
+                                            imaging={brief.content.imaging}
+                                            images={factsState.kind === 'ready' ? factsState.bundle.images : []}
+                                            treatments={factsState.kind === 'ready' ? factsState.bundle.treatments : []}
+                                        />
+                                    </>
+                                )}
                                 {activeTab === 'careplan' && (
                                     <div className="text-center py-16 text-slate-400 border border-dashed border-slate-200 rounded-xl">
                                         <MessageSquare className="w-10 h-10 mx-auto mb-3 text-slate-300" />
