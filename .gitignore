@@ -54,3 +54,4 @@ tmp/
 
 # Sidecar build output (rebuilt in Docker)
 sidecar/dist/
+sidecar/panel/dist/
