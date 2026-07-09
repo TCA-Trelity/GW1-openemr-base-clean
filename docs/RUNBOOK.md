@@ -17,6 +17,10 @@ Live EHR: `https://gw1-openemr-base-clean-production.up.railway.app`
 pull them back over FHIR so the **EHR Record** tab and origin badges show real
 OpenEMR data.
 
+Project services (same Railway project): sidecar = **`enchanting-mercy`**, EHR =
+**`gw1-openemr-base-clean`**. Run `railway link` once first (pick the project +
+the `production` environment).
+
 1. **Enable OpenEMR connectors** (admin UI). Log into the EHR as `admin` →
    **Administration → Config → Connectors** → turn ON:
    - *OpenEMR Standard REST API*
@@ -24,37 +28,49 @@ OpenEMR data.
    Save.
 
 2. **Register the sidecar OAuth client** (mints credentials with both FHIR-read
-   and standard-API-write scopes). Target the sidecar service:
+   and standard-API-write scopes). `OPENEMR_BASE_URL` is passed inline so this
+   works before any sidecar variable is set:
    ```
-   railway ssh --service <sidecar-service> "node dist/scripts/register-oauth.js"
+   railway ssh --service enchanting-mercy \
+     "OPENEMR_BASE_URL=https://gw1-openemr-base-clean-production.up.railway.app node dist/scripts/register-oauth.js"
    ```
-   It prints `OPENEMR_CLIENT_ID=…` and `OPENEMR_CLIENT_KEY=…` (a one-lined PEM).
+   It prints `OPENEMR_CLIENT_ID=…` and `OPENEMR_CLIENT_KEY=…` (a one-lined PEM,
+   **shown once** — copy both now). The client registers as *Clinical Co-Pilot
+   Sidecar*.
 
-3. **Set sidecar env vars** (Railway → sidecar service → **Variables**), from
-   the printed values:
+3. **Set three sidecar variables** (Railway → **enchanting-mercy** → **Variables**):
    | Variable | Value |
    |---|---|
-   | `OPENEMR_BASE_URL` | the live EHR URL (above) |
-   | `OPENEMR_CLIENT_ID` | printed `OPENEMR_CLIENT_ID` |
-   | `OPENEMR_CLIENT_KEY` | printed `OPENEMR_CLIENT_KEY` (one-lined PEM, paste as-is) |
+   | `OPENEMR_BASE_URL` | `https://gw1-openemr-base-clean-production.up.railway.app` |
+   | `OPENEMR_CLIENT_ID` | the printed client id |
+   | `OPENEMR_CLIENT_KEY` | the printed one-lined PEM (paste exactly as printed) |
 
-   The variable names the sidecar reads match the script's output exactly —
-   copy both lines straight across.
+   The variable names match the script's output exactly. The service redeploys.
 
 4. **Enable the client** (system-scope clients start disabled). EHR admin →
-   **Administration → System → API Clients** → find the new client → **Enable**.
+   **Administration → System → API Clients** → row **Clinical Co-Pilot Sidecar**
+   → **Enable**. (An unenabled client fails token requests with `invalid_client`.)
 
-5. **Seed the EHR** (idempotent; creates/【re】finds the 5 patients + their
-   problems/allergies/medications):
+5. **Seed the EHR** (idempotent; creates/refinds the 5 patients + their
+   problems/allergies/medications). `<admin-password>` is your EHR admin login;
+   `OPENEMR_BASE_URL` / `OPENEMR_CLIENT_ID` / `DATABASE_URL` are read from the
+   vars set in step 3:
    ```
-   railway ssh --service <sidecar-service> \
-     "OPENEMR_SEED_USERNAME=admin OPENEMR_SEED_PASSWORD=<admin-pw> node dist/scripts/seed-ehr.js"
+   railway ssh --service enchanting-mercy \
+     "OPENEMR_SEED_USERNAME=admin OPENEMR_SEED_PASSWORD=<admin-password> node dist/scripts/seed-ehr.js"
    ```
-   Expect one log line per patient (`created` first run, `found` on re-runs).
+   Expect one log line per patient (`created` first run, `found` on re-runs),
+   ending `seed-ehr complete`. On failure the script names the gate that broke
+   (`invalid_client` → not enabled; `unsupported_grant_type` → password grant
+   off; `invalid_scope` → re-register).
 
-6. **Pull it into the sidecar.** After the sidecar redeploys (env change), open
-   the panel → **EHR Record** tab → **Sync now** (or `POST /api/ehr-sync/<id>`).
+6. **Pull it into the sidecar.** After the sidecar redeploys (step-3 env change),
+   open the panel → **EHR Record** tab → **Sync now** (or `POST /api/ehr-sync/<id>`).
    The tab fills with live OpenEMR data and origin badges flip to **EHR**.
+
+> If `railway ssh` is disabled on the service, run step 2 locally from `sidecar/`
+> instead: `OPENEMR_BASE_URL=https://gw1-openemr-base-clean-production.up.railway.app npx tsx src/scripts/register-oauth.ts`
+> (needs `npm ci` first). Step 5 also needs `DATABASE_URL`, so SSH is simpler there.
 
 > Re-run `seed-ehr.js` after any `seed.js` (fact-store) reseed — the wipe clears
 > the `openemr_patient_id` link.
