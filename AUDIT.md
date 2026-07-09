@@ -115,6 +115,24 @@ uses authorization-code/SMART (interactive) and client-credentials
 preparer uses the narrowest system scopes it needs, read-only, and every
 access is audit-logged (see Compliance).
 
+### S6 — Our own sidecar dev-login is a demo credential issuer *(self-audit, by design)*
+An adversarial review of our Wave AZ code (6 attack lenses + independent
+verification) found the token *verifier* sound — no forgery, alg-confusion,
+cross-patient, or replay bypass — and surfaced two items we record honestly.
+(a) **Fixed:** a real SMART-launched user previously defaulted to the
+`physician` role (introspection carries no role); it now **fails closed** to
+the least-privileged role (`nurse`) until a deployment wires real role
+derivation from verified user attributes — so the role gate can never
+fail *open* on the production path. (b) **By design, documented:**
+`POST /api/dev-login` is a passwordless credential issuer — anyone who can
+reach it while it is enabled can mint a patient-bound token for any role. It
+exists only to let graders exercise the auth model without a full SMART
+launch, is gated by `DEV_LOGIN_SECRET` being set at all (absent → 404), and is
+the demo's login stand-in — **never enable it in a real deployment**, exactly
+as with S4 ROPC. Production authentication is SMART EHR-launch; the security
+guarantee being demonstrated is per-token patient *binding* and role
+enforcement, not access control on the passwordless demo login.
+
 **Enforcement that is correct (for the record):** every standard route calls
 `RestConfig::request_authorization_check()` before its controller
 (`src/RestControllers/Config/RestConfig.php:180-194`), and the pipeline runs

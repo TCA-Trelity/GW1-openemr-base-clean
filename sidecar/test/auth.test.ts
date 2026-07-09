@@ -151,11 +151,31 @@ const validClaims = { iss: OAUTH_BASE, aud: CLIENT_ID, sub: 'user-1', exp: FIXED
 
 describe('SmartTokenVerifier', () => {
     // Failure mode: a genuine OpenEMR token doesn't verify, or the bound patient isn't resolved.
+    // Note the role FAILS CLOSED to nurse (least privilege) since introspection carries no role.
     it('verifies a valid RS256 token and binds the patient from introspection', async () => {
         const { privateKey, jwk } = makeRsa();
         const verifier = smartVerifier(jwk, { active: true, patient: 'uuid-x', sub: 'user-1', scope: 'patient/Patient.read' });
         const principal = await verifier.verify(signRs256(validClaims, privateKey));
-        expect(principal).toMatchObject({ user: 'user-1', patient: 'margaret-chen', role: 'physician', tokenType: 'smart' });
+        expect(principal).toMatchObject({ user: 'user-1', patient: 'margaret-chen', role: 'nurse', tokenType: 'smart' });
+    });
+
+    // Failure mode: a SMART user with no derivable role is handed provider capability (the
+    // adversarial-review finding). The default must be the least-privileged role, and an
+    // explicit resolveRole must be honored when a deployment wires real role derivation.
+    it('fails closed to nurse by default, and honors an explicit resolveRole', async () => {
+        const { privateKey, jwk } = makeRsa();
+        const failClosed = smartVerifier(jwk, { active: true, patient: 'uuid-x', sub: 'user-1' });
+        expect((await failClosed.verify(signRs256(validClaims, privateKey))).role).toBe('nurse');
+
+        const derived = new SmartTokenVerifier({
+            oauthBaseUrl: OAUTH_BASE,
+            clientId: CLIENT_ID,
+            resolvePatient: async () => 'margaret-chen',
+            resolveRole: () => 'physician',
+            fetchImpl: smartFetch(jwk, { active: true, patient: 'uuid-x', sub: 'user-1' }),
+            now,
+        });
+        expect((await derived.verify(signRs256(validClaims, privateKey))).role).toBe('physician');
     });
 
     // Failure mode: a token signed by a different key is accepted (the JWKS check is the gate).

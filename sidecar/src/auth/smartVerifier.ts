@@ -21,9 +21,14 @@ export type ResolvePatient = (openemrPatientUuid: string) => Promise<string | nu
 
 /**
  * Derives a clinical role from the introspection payload. OpenEMR has no single physician/
- * nurse/resident enum (research facet D: users.authorized + physician_type + gacl group), so
- * the default treats an EHR-launched clinician as a physician; the fine-grained split is
- * exercised via dev-login and can be refined here from the introspected user attributes.
+ * nurse/resident enum (research facet D: users.authorized + physician_type + gacl group) and
+ * RFC7662 introspection does not carry one, so the sidecar cannot learn the real role at this
+ * boundary. The default therefore FAILS CLOSED to the least-privileged role (`nurse`): an
+ * EHR-launched clinician gets read-only capability until a deployment supplies a real
+ * resolveRole that derives the role from verified user attributes (a separate authenticated
+ * lookup). Defaulting to `physician` would silently hand every SMART user provider capability —
+ * the escalation the adversarial review flagged. The dev-login path carries the real role in a
+ * signed claim, so the demo exercises all three roles without this default.
  */
 export type ResolveRole = (introspection: Record<string, unknown>) => Role;
 
@@ -66,7 +71,8 @@ export class SmartTokenVerifier {
         this.jwksUrl = options.jwksUrl ?? `${base}/jwk`;
         this.introspectUrl = options.introspectUrl ?? `${base}/introspect`;
         this.resolvePatient = options.resolvePatient;
-        this.resolveRole = options.resolveRole ?? (() => 'physician');
+        // Fail closed: least-privileged role when no real resolveRole is wired (see ResolveRole).
+        this.resolveRole = options.resolveRole ?? (() => 'nurse');
         this.fetchImpl = options.fetchImpl ?? globalThis.fetch;
         this.now = options.now ?? Date.now;
         this.jwksCacheMs = options.jwksCacheMs ?? 600_000;
