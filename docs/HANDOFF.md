@@ -81,6 +81,13 @@ content) and the AgentForge course PDF.
   from the dev session. GitHub Actions runners CAN reach the live URL —
   CI smoke is the arbiter of live behavior; seeding/OAuth registration run
   as scripts on the Railway sidecar service.
+- Railway builds from the GitHub **source archive**, which honors
+  `.gitattributes` `export-ignore` — `actions/checkout` does not, so a
+  tarball-only breakage is invisible to normal CI jobs. Reproduce locally
+  with `git archive HEAD sidecar | tar -t`. Never add unanchored
+  export-ignore patterns (they match at any depth); the
+  `sidecar/** -export-ignore` carve-out + the `export-parity` CI job
+  enforce this (see S3.7 in the execution plan).
 - Pushes to the branch rebuild the OpenEMR service (and reset its DB until
   P0.1's volume is attached); watch paths (P0.2) stop sidecar/docs pushes
   from triggering EHR rebuilds.

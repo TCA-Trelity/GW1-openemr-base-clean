@@ -9,22 +9,27 @@ see commits that have been proven stable and deliberately promoted.
   and the evaluated mirror track this branch. It advances *only* by a deliberate
   promotion of a proven commit — never a work-in-progress push. This is the
   "last stable version" at all times.
-- **`claude/ehr-architecture-defense-gg486o` — working / release branch.** All
-  active development lands here. In-flight and occasionally-broken states are
+- **`claude/sidecar-debug-redeploy-hwd66g` — working / release branch.** All
+  active development lands here (supersedes `claude/ehr-architecture-defense-gg486o`,
+  whose history it contains). In-flight and occasionally-broken states are
   expected and fine; nothing here reaches instructors until it is promoted.
 
 Rule of thumb: **commits are made on the working branch; `main` only moves on a
 promotion.**
 
-## Where things stand (2026-07-09)
+## Where things stand (2026-07-09, evening)
 
-- `main` @ `eb0a8b9` — pre-AZ, last known-good deploy: TC1/TC2 tool-use, the EHR
-  layer, imaging, the working app. Stable.
-- working @ current HEAD — adds TC3 (tool activity render), Wave AZ
-  (authorization: verifier + PEP + role switcher), the panel auth wiring, and
-  the fail-closed SMART-role fix. Fully unit-tested (sidecar 319, panel 72) and
-  builds clean; **not yet promoted** — pending a confirmed clean deploy (a bad
-  env var can still crash boot until the config-hardening lands; see below).
+- `main` @ `736b51a` — AZ/TC3, config-hardening, CI gate, ops docs, load probe.
+  **Note:** its sidecar cannot deploy — the tree predates the export-ignore fix,
+  so the archive Railway builds from drops `sidecar/src/chat/tools/` (TS2307).
+- working @ current HEAD — everything on `main` plus S3.3 (verify workflow),
+  the deploy hardening (DB-reinstall guard, REST 500 message fix), and the
+  **deploy-blocker root-cause fix**: `.gitattributes` unanchored
+  `tools/ export-ignore` was silently excluding `sidecar/src/chat/tools/` from
+  every GitHub source archive — the build context Railway deploys. Anchored to
+  `/tools/`, added a `sidecar/** -export-ignore` carve-out, reverted the
+  CACHEBUST workaround, and added an export-parity CI job so this class of
+  failure is caught on push. **Promote this once its deploy is confirmed clean.**
 
 ## Promotion (working → stable)
 
@@ -40,7 +45,7 @@ this never rewrites stable):
 
 ```
 git checkout main
-git merge --ff-only claude/ehr-architecture-defense-gg486o
+git merge --ff-only claude/sidecar-debug-redeploy-hwd66g
 git tag stable-$(date +%Y-%m-%d)
 git push origin main --tags
 ```

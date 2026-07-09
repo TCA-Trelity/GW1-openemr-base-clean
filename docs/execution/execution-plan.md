@@ -141,6 +141,7 @@ UI moves (avoids collisions in `sidecar/panel/`), corpus agent in parallel.**
 | S3.4 | Eval expansion: flagged-output→fixture loop wired (panel flag control → Langfuse annotation), regression run on every push | main | S2.5, S2.6 | ci-live | ☐ |
 | S3.5 | Production-thinking docs refresh: failure-mode drill results, rollback rehearsal (module disable + fact-store rebuild), interview prep sheet. *(`docs/OPERATIONS.md` written — deploy topology, the 5-layer stability model, rollback, auth posture, scaling path, honest gaps; live drill results still to capture.)* | main | S3.1–S3.4 | review | ◐ |
 | S3.6 | Final demo video + social post | user | all | — | ☐ |
+| S3.7 | **Deploy blocker root-caused + fixed:** every sidecar deploy since TC1/TC2 failed with `TS2307 ./tools/index.js`. Cause: `.gitattributes` had an *unanchored* `tools/ export-ignore` (gitignore semantics — matches at any depth), and Railway builds from the GitHub **source archive**, which honors export-ignore — so `sidecar/src/chat/tools/` was silently absent from every deploy build context while git checkouts (CI) stayed green. Fix: anchor `/tools/`, add `sidecar/** -export-ignore` carve-out, revert the CACHEBUST workaround, add an `export-parity` CI job (committed sidecar tree == `git archive` output) so any recurrence fails on push | main | — | ci + logs (next deploy) | ☑ |
 
 ## Wave AZ — Authorization (PDF hard-problem #1; user-approved 2026-07-09)
 
