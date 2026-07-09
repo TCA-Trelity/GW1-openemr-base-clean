@@ -1,5 +1,11 @@
 # Execution Plan — Clinical Co-Pilot build-out
 
+> **Live status dashboard** (browser, hand-refreshed at each milestone):
+> https://claude.ai/code/artifact/1233bba0-f8df-4b68-bf32-cef52531ffa6 — a
+> visual read of this file (phases, waves, per-ticket status, and the
+> "needs you" actions). This markdown remains the source of truth; the
+> dashboard renders from it.
+
 *Ticket-level execution tracker for Tier 1 (Early Submission, Thu 11:59 PM CT)
 and Tier 2 (Final, Sun 12:00 PM CT). This file is the **single source of
 truth** for scope and status — it survives context windows, sessions, and
