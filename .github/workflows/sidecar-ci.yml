@@ -1,0 +1,64 @@
+# Sidecar CI — the automated proving ground for the promotion gate (RELEASE.md).
+# Runs the full sidecar + panel suites, typecheck, and the production build (the same
+# tsc/vite paths the Docker image uses) on every push that touches sidecar/. A green run on
+# the working-branch HEAD is the precondition for promoting working -> main. Path-scoped so it
+# never runs for pure OpenEMR/PHP changes.
+name: Sidecar CI
+
+on:
+  push:
+    paths:
+      - 'sidecar/**'
+      - '.github/workflows/sidecar-ci.yml'
+  pull_request:
+    paths:
+      - 'sidecar/**'
+      - '.github/workflows/sidecar-ci.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: sidecar-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sidecar:
+    name: sidecar (test + typecheck + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sidecar
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: sidecar/package-lock.json
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Build (tsc — the Docker build path)
+        run: npm run build
+
+  panel:
+    name: panel (test + typecheck + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sidecar/panel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: sidecar/panel/package-lock.json
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Build (vite — the Docker build path)
+        run: npm run build
