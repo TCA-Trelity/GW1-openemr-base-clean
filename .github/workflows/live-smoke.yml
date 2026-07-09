@@ -112,7 +112,15 @@ jobs:
           echo "== POST /api/prep/margaret-chen =="
           code=$(curl -s -X POST -o /tmp/prep.json -w '%{http_code}' --max-time 30 "${AUTH[@]}" "$SIDECAR_URL/api/prep/margaret-chen")
           echo "HTTP $code"; cat /tmp/prep.json; echo
-          [ "$code" = "202" ] || { echo "prep trigger failed"; exit 1; }
+          # 202 = started / already running; 200 reused = a fresh-enough brief already exists
+          # (the reuse window is deliberate LLM-spend dedup, not a failure).
+          if [ "$code" = "202" ]; then
+            echo "prep started"
+          elif [ "$code" = "200" ] && grep -q '"status":"reused"' /tmp/prep.json; then
+            echo "prep reused a fresh brief (within the reuse window)"
+          else
+            echo "prep trigger failed"; exit 1
+          fi
 
           echo "== Poll GET /api/brief/margaret-chen (up to 8 min) =="
           for i in $(seq 1 48); do

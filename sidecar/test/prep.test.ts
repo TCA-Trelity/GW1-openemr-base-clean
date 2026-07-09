@@ -392,6 +392,32 @@ describe('FactExtractor', () => {
         expect(result.facts[0]!.sources[0]!.excerpt_location?.context_before).toBeNull();
     });
 
+    // Failure mode (live finding): prep re-extracted the sync-generated EHR snapshot through
+    // the model, duplicating deterministically-cited facts with estimated offsets — 5 blocked
+    // claims per prep, all from the snapshot. ehr_import documents never reach extraction.
+    it('excludes ehr_import documents from the extraction inputs', async () => {
+        const withSnapshot: SourceDocumentQuerier = {
+            query: async (text, values) => {
+                const base = await corpusDb.query(text, values);
+                return {
+                    rows: [
+                        ...base.rows,
+                        {
+                            id: 'ehr-snapshot-margaret-chen',
+                            document_type: 'ehr_import',
+                            document_date: '2026-07-09',
+                            content: { format: 'text', text_content: 'OpenEMR live record snapshot — synced now' },
+                        },
+                    ],
+                };
+            },
+        };
+        const source = new StoreDocumentSource(new FakeStore(corpusBundle()), withSnapshot);
+        const { documents } = await source.load(PATIENT_ID, 'corr-noehr');
+        expect(documents.some((doc) => doc.id === 'ehr-snapshot-margaret-chen')).toBe(false);
+        expect(documents.length).toBeGreaterThan(0);
+    });
+
     // Failure mode (live regression): the model emits explicit nulls for unknown optional
     // fields ("severity": null failed six facts and the whole prep run — .optional() accepts
     // absence, not null). The boundary strips nulls before validation; null and absent are

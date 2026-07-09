@@ -54,7 +54,12 @@ export class StoreDocumentSource implements DocumentSource {
              FROM source_documents WHERE patient_id = $1 ORDER BY document_date, id`,
             [patientId],
         );
-        const documents = result.rows.map((row): ExtractionDocument => {
+        // ehr_import never goes to extraction: the EHR snapshot is OUR generated text, and its
+        // facts are already written by the sync with deterministic, exact-offset citations.
+        // Re-extracting it through the model duplicates those facts with estimated offsets the
+        // citation gate then has to block (live finding: 5 blocked claims per prep, all from
+        // the snapshot). Filtered here, not in SQL, so the invariant is unit-testable.
+        const documents = result.rows.filter((row) => row.document_type !== 'ehr_import').map((row): ExtractionDocument => {
             const content = DocumentContentSchema.parse(row.content);
             return {
                 id: row.id,
