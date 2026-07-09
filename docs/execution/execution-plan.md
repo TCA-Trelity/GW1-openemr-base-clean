@@ -135,11 +135,11 @@ UI moves (avoids collisions in `sidecar/panel/`), corpus agent in parallel.**
 
 | ID | Ticket | Agent | Depends | Verify | Done |
 |---|---|---|---|---|---|
-| S3.1 | Load tests: 10 + 50 concurrent vs live (k6 in CI), p50/p95/p99 + error rate; baseline CPU/mem/latency/throughput captured to `docs/execution/baselines.md` | ci | Phase 2 | ci-live | ☐ |
+| S3.1 | Load tests: 10 + 50 concurrent vs live (k6 in CI), p50/p95/p99 + error rate; baseline CPU/mem/latency/throughput captured to `docs/execution/baselines.md`. *(Harness built — dependency-free `npm run load-test` over the deterministic read path + dispatchable Sidecar-load-probe CI at concurrency 10/50 with a p95 gate; real baselines land on the first live run.)* | ci | Phase 2 | ci-live | ◐ |
 | S3.2 | Hardening per PRD Tier 2: dispatch.php error-disclosure fix (S2), background_service route verification (F6/U2.4), secrets audit | main | Phase 2 | unit + review | ☐ |
-| S3.3 | Verification workflow polish: role-gated fact verification UI (physician vs delegated), disputed state, verify-audit trail | main | S2.1 | screenshot | ☐ |
+| S3.3 | Verification workflow polish: role-gated fact verification UI (physician vs delegated), disputed state, verify-audit trail. *(Delivered: capability-gated `POST /api/facts/:patientId/:factId/verify` — physician full, resident flagged needs-attending-sign-off, nurse 403, cross-patient blocked; panel Verify button gated by role; verification records who/role/when. Disputed-state UI still a nicety. +8 tests.)* | main | S2.1 | screenshot | ☑ |
 | S3.4 | Eval expansion: flagged-output→fixture loop wired (panel flag control → Langfuse annotation), regression run on every push | main | S2.5, S2.6 | ci-live | ☐ |
-| S3.5 | Production-thinking docs refresh: failure-mode drill results, rollback rehearsal (module disable + fact-store rebuild), interview prep sheet | main | S3.1–S3.4 | review | ☐ |
+| S3.5 | Production-thinking docs refresh: failure-mode drill results, rollback rehearsal (module disable + fact-store rebuild), interview prep sheet. *(`docs/OPERATIONS.md` written — deploy topology, the 5-layer stability model, rollback, auth posture, scaling path, honest gaps; live drill results still to capture.)* | main | S3.1–S3.4 | review | ◐ |
 | S3.6 | Final demo video + social post | user | all | — | ☐ |
 
 ## Wave AZ — Authorization (PDF hard-problem #1; user-approved 2026-07-09)
