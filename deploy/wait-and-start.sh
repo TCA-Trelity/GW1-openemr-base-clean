@@ -30,5 +30,12 @@ for i in $(seq 1 "${MAX_TRIES}"); do
     sleep 2
 done
 
+# Data-loss backstop: before handing off to the flex entrypoint, make sure a
+# boot with a missing or empty sites/ volume can't trigger the installer's
+# destructive reinstall (which DROPs every table). See restore-sqlconf.php for
+# the full rationale. Fail-open — any error here is ignored so it can never
+# block boot.
+php /restore-sqlconf.php || true
+
 cd /var/www/localhost/htdocs
 exec ./openemr.sh

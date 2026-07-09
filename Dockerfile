@@ -10,6 +10,7 @@
 FROM openemr/openemr:flex
 COPY . /openemr
 COPY deploy/wait-and-start.sh /wait-and-start.sh
+COPY deploy/restore-sqlconf.php /restore-sqlconf.php
 # EASY_DEV_MODE_NEW boot rsyncs /couchdb/data (a dev-stack volume) into
 # /couchdb/original for devtools snapshots; without the mount the rsync fails
 # and set -e kills the container (docker/flex/openemr.sh:1065). Pre-create it.
