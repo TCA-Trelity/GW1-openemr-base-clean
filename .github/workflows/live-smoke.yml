@@ -22,7 +22,7 @@ env:
   SIDECAR_URL: ${{ github.event_name == 'push' && 'https://enchanting-mercy-production-5d32.up.railway.app' || inputs.sidecar_url }}
 
 # One probe at a time — pushes land on several branches at once and the e2e run
-# triggers a real prep; queue instead of stampeding the live service (decisive).
+# triggers a real prep; queue instead of stampeding the live service (gate-fix).
 concurrency:
   group: live-smoke
   cancel-in-progress: false
