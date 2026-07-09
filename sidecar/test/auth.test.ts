@@ -310,6 +310,24 @@ describe('registerAuth middleware', () => {
         const app = miniApp({ mode: 'enforced', devTokens: devService() });
         expect((await app.inject({ method: 'GET', url: '/api/patients' })).statusCode).toBe(200);
     });
+
+    // Failure mode: an unexpected verifier/JWKS/introspection error 500s the request (or crashes
+    // it) instead of degrading. 'off' mode must ignore it; enforced must fail CLOSED (401), never 500.
+    it('never 500s on an unexpected verifier error — off ignores, enforced fails closed to 401', async () => {
+        const throwing = { verify: async () => Promise.reject(new Error('kaboom')) };
+        const build = (mode: AuthMode): FastifyInstance => {
+            const app = Fastify({ logger: false });
+            registerAuth(app, { verifier: throwing, mode });
+            app.get('/api/overview/:patientId', async () => ({ ok: true }));
+            return app;
+        };
+        const off = await build('off').inject({ method: 'GET', url: '/api/overview/margaret-chen', headers: bearer('x.y.z') });
+        expect(off.statusCode).toBe(200); // token ignored, request proceeds tokenless
+
+        const enforced = await build('enforced').inject({ method: 'GET', url: '/api/overview/margaret-chen', headers: bearer('x.y.z') });
+        expect(enforced.statusCode).toBe(401);
+        expect(enforced.json()).toMatchObject({ reason: 'verification_error' });
+    });
 });
 
 describe('auth routes (dev-login + me)', () => {

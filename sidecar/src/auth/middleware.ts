@@ -92,13 +92,19 @@ export function registerAuth(app: FastifyInstance, deps: AuthDeps | undefined): 
             try {
                 request.principal = await deps.verifier.verify(token);
             } catch (error) {
-                if (!(error instanceof AuthError)) {
-                    throw error; // unexpected failure — surface as 500, do not mask as 401
-                }
-                if (deps.mode === 'enforced') {
+                if (deps.mode !== 'enforced') {
+                    // 'off' mode never rejects and never 500s: a token that fails to verify (for
+                    // ANY reason, including an unexpected verifier/network error) is simply ignored
+                    // and the request proceeds tokenless — exactly as before auth existed.
+                    request.log.warn({ err: String(error) }, 'bearer token present but not verified (auth off)');
+                } else if (error instanceof AuthError) {
                     return reply.status(error.status).send({ error: 'unauthorized', reason: error.reason });
+                } else {
+                    // Enforced + an UNEXPECTED error (verifier bug, JWKS/introspection outage):
+                    // fail CLOSED with 401 rather than leak a 500 (and its stack) to the caller.
+                    request.log.error({ err: String(error) }, 'unexpected auth verification error — denying');
+                    return reply.status(401).send({ error: 'unauthorized', reason: 'verification_error' });
                 }
-                // 'off' mode: an invalid token is simply ignored (no principal attached).
             }
         }
 
