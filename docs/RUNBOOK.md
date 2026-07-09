@@ -56,17 +56,22 @@ the `production` environment).
    → **Enable**. (An unenabled client fails token requests with `invalid_client`.)
 
 5. **Seed the EHR** (idempotent; creates/refinds the 5 patients + their
-   problems/allergies/medications). `<admin-password>` is your EHR admin login;
-   `OPENEMR_BASE_URL` / `OPENEMR_CLIENT_ID` / `DATABASE_URL` are read from the
-   vars set in step 3:
+   problems/allergies/medications). `<admin-password>` is your EHR admin login.
+   `OPENEMR_CLIENT_ID` is passed inline here so this does not depend on the
+   step-3 redeploy having finished (SSH hits the *running* container, so a
+   variable added seconds earlier isn't visible yet — `OPENEMR_CLIENT_ID is
+   required` means exactly that). seed-ehr needs the client id but not the
+   private key; `DATABASE_URL` is already a core sidecar variable:
    ```
    railway ssh --service enchanting-mercy \
-     "OPENEMR_SEED_USERNAME=admin OPENEMR_SEED_PASSWORD=<admin-password> node dist/scripts/seed-ehr.js"
+     "OPENEMR_BASE_URL=https://gw1-openemr-base-clean-production.up.railway.app OPENEMR_CLIENT_ID=<client-id-from-step-2> OPENEMR_SEED_USERNAME=admin OPENEMR_SEED_PASSWORD=<admin-password> node dist/scripts/seed-ehr.js"
    ```
    Expect one log line per patient (`created` first run, `found` on re-runs),
    ending `seed-ehr complete`. On failure the script names the gate that broke
    (`invalid_client` → not enabled; `unsupported_grant_type` → password grant
-   off; `invalid_scope` → re-register).
+   off; `invalid_scope` → re-register). Once the step-3 variables are live you
+   can drop the inline `OPENEMR_BASE_URL`/`OPENEMR_CLIENT_ID` and they'll be
+   read from the environment.
 
 6. **Pull it into the sidecar.** After the sidecar redeploys (step-3 env change),
    open the panel → **EHR Record** tab → **Sync now** (or `POST /api/ehr-sync/<id>`).
