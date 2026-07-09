@@ -22,15 +22,25 @@ This is a fork of [OpenEMR](https://github.com/openemr/openemr) used for the
 AgentForge Clinical Co-Pilot project: an AI co-pilot for ophthalmology
 embedded in a brownfield EHR.
 
-- **Live deployment:** https://gw1-openemr-base-clean-production.up.railway.app
+- **Live EHR:** https://gw1-openemr-base-clean-production.up.railway.app
   (demo instance, synthetic data only)
-- **Development branch:** `claude/ehr-architecture-defense-gg486o`
+- **Live agent (sidecar API + panel):** https://enchanting-mercy-production-5d32.up.railway.app
+  (auth enforced: the panel signs in via the dev-login role switcher; API calls
+  need a patient-bound bearer — see `docs/RUNBOOK.md` §D)
+- **Branches:** `main` is stable/instructor-facing and drives the deploys;
+  active development lands on the working branch (see [`RELEASE.md`](RELEASE.md))
 
 | Deliverable | Location |
 |---|---|
 | Security & architecture audit | [`AUDIT.md`](AUDIT.md) |
 | Users & use cases | [`USERS.md`](USERS.md) |
 | Agent integration architecture | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
+| Early-submission readiness trace | [`docs/defense/early-submission-readiness.md`](docs/defense/early-submission-readiness.md) |
+| Activation runbook (EHR link, Langfuse, auth) | [`docs/RUNBOOK.md`](docs/RUNBOOK.md) |
+| Operations & production readiness | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) |
+| Eval suite & results | [`sidecar/eval/`](sidecar/eval/), [`docs/execution/eval-results.md`](docs/execution/eval-results.md) |
+| AI cost analysis | [`docs/COSTS.md`](docs/COSTS.md) |
+| Runnable API collection (Bruno) | [`sidecar/api-collection/`](sidecar/api-collection/) |
 | Architecture defense (full) | [`docs/defense/architecture-defense.md`](docs/defense/architecture-defense.md) |
 | Pre-search checklist (appendix Q1–16) | [`docs/defense/presearch.md`](docs/defense/presearch.md) |
 | Tiered PRD | [`docs/defense/PRD-clinical-copilot.md`](docs/defense/PRD-clinical-copilot.md) |
