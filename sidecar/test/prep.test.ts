@@ -392,6 +392,25 @@ describe('FactExtractor', () => {
         expect(result.facts[0]!.sources[0]!.excerpt_location?.context_before).toBeNull();
     });
 
+    // Failure mode (live regression): the model emits explicit nulls for unknown optional
+    // fields ("severity": null failed six facts and the whole prep run — .optional() accepts
+    // absence, not null). The boundary strips nulls before validation; null and absent are
+    // the same statement of "not known" and neither may fail a run.
+    it('accepts facts whose optional fields are explicit nulls', async () => {
+        const facts = corpusFacts().slice(0, 1) as any[];
+        facts[0].content.severity = null;
+        facts[0].sources[0].excerpt_text = null;
+        const { extractor } = extractorWith(llmResponse({ facts }));
+        const result = await extractor.extract(
+            { patientId: PATIENT_ID, patientName: null, documents: ONE_DOC },
+            'corr-nulls',
+            silentLogger,
+        );
+        expect(result.facts).toHaveLength(1);
+        expect(result.facts[0]!.content['severity']).toBeUndefined();
+        expect(result.facts[0]!.sources[0]!.excerpt_text).toBeNull();
+    });
+
     // Guards: common model formatting drift — fenced JSON must still parse.
     it('accepts a markdown-fenced JSON response', async () => {
         const fenced = '```json\n' + JSON.stringify({ facts: [] }) + '\n```';

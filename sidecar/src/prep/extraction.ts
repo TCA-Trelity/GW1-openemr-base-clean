@@ -167,10 +167,29 @@ function stripFences(text: string): string {
 
 type Validation<T> = { ok: true; result: T } | { ok: false; issues: string[] };
 
+// Models emit explicit nulls for unknown optional fields despite instructions (live
+// failure: "severity": null on six facts failed the whole prep run — .optional()
+// accepts absence, not null). Absent and null mean the same thing at this boundary,
+// so drop null-valued keys before validation; the contracts stay strict and a null
+// never reaches the store. Required-but-nulled fields still fail as 'Required'.
+function stripNullsDeep(value: unknown): unknown {
+    if (Array.isArray(value)) {
+        return value.map(stripNullsDeep);
+    }
+    if (typeof value === 'object' && value !== null) {
+        return Object.fromEntries(
+            Object.entries(value as Record<string, unknown>)
+                .filter(([, entry]) => entry !== null)
+                .map(([key, entry]) => [key, stripNullsDeep(entry)]),
+        );
+    }
+    return value;
+}
+
 function parseAndCheck<T>(text: string, schema: z.ZodType<T, z.ZodTypeDef, unknown>): Validation<T> {
     let parsed: unknown;
     try {
-        parsed = JSON.parse(stripFences(text));
+        parsed = stripNullsDeep(JSON.parse(stripFences(text)));
     } catch (error) {
         return { ok: false, issues: [`response is not valid JSON: ${error instanceof Error ? error.message : 'parse error'}`] };
     }

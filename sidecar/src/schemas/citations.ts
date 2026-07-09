@@ -59,11 +59,13 @@ export const CitationRefSchema = z.object({
     fact_id: z.string().nullable().optional(),
     source_label: z.string(),
     source_type: SourceTypeSchema,
-    excerpt_text: z.string().nullable(),
-    excerpt_location: ExcerptLocationSchema.nullable(),
-    attribution: AttributionSchema.nullable(),
-    source_document_id: z.string().nullable(),
-    document_date: z.string().nullable(), // ISO date string; crosses JSON boundaries
+    // null ≡ absent for every nullable field at the extraction boundary (the parser strips
+    // model-emitted nulls before validation), so nullable fields must also accept omission.
+    excerpt_text: z.string().nullable().default(null),
+    excerpt_location: ExcerptLocationSchema.nullable().default(null),
+    attribution: AttributionSchema.nullable().default(null),
+    source_document_id: z.string().nullable().default(null),
+    document_date: z.string().nullable().default(null), // ISO date string; crosses JSON boundaries
     deep_link_url: z.string().nullable().optional(), // absent in seed corpus; panel derives links at render
 });
 export type CitationRef = z.infer<typeof CitationRefSchema>;

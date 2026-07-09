@@ -86,9 +86,10 @@ export const RuntimeContradictionSchema = z.object({
     severity: RuntimeContradictionSeveritySchema,
     type: z.string().min(1),
     description: z.string(),
-    suggested_question: z.string().nullable(),
-    source_a: RuntimeContradictionSourceSchema.nullable(),
-    source_b: RuntimeContradictionSourceSchema.nullable(),
+    // null ≡ absent at the extraction boundary (nulls are stripped pre-validation).
+    suggested_question: z.string().nullable().default(null),
+    source_a: RuntimeContradictionSourceSchema.nullable().default(null),
+    source_b: RuntimeContradictionSourceSchema.nullable().default(null),
     clinical_implication: z.string().optional(),
     detection_method: z.string().default('rule_based'),
     confidence: z.number().min(0).max(1).optional(),
