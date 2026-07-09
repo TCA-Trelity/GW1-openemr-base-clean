@@ -10,10 +10,12 @@ on:
     paths:
       - 'sidecar/**'
       - '.github/workflows/sidecar-ci.yml'
+      - '.gitattributes'
   pull_request:
     paths:
       - 'sidecar/**'
       - '.github/workflows/sidecar-ci.yml'
+      - '.gitattributes'
   workflow_dispatch:
 
 concurrency:
@@ -21,6 +23,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Railway builds from the GitHub source archive, which honors .gitattributes
+  # export-ignore — actions/checkout does not, so a build broken only in the
+  # exported tarball stays invisible to the jobs below. An unanchored `tools/`
+  # pattern once dropped sidecar/src/chat/tools/ from every deploy context
+  # (phantom TS2307 with green CI). Fail loudly if any committed sidecar file
+  # would be missing from the export Railway actually builds.
+  export-parity:
+    name: export parity (deploy archive == committed tree)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: git archive ships every committed sidecar file
+        run: |
+          diff <(git ls-files sidecar | sort) \
+               <(git archive HEAD sidecar | tar -t | grep -v '/$' | sort)
+
   sidecar:
     name: sidecar (test + typecheck + build)
     runs-on: ubuntu-latest

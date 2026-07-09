@@ -4,12 +4,14 @@
 # Exclude dev-only infrastructure from release archives and Composer installs.
 # GitHub uses these rules when generating source downloads for tagged releases.
 # Keep anything needed to install, configure, or run OpenEMR.
+# NOTE: unanchored dir patterns use gitignore semantics and match at ANY
+# depth; anchor root-only excludes with a leading slash.
 .github/                       export-ignore
 .phpstan/                      export-ignore
 ci/                            export-ignore
 docker/                        export-ignore
 tests/                         export-ignore
-tools/                         export-ignore
+/tools/                        export-ignore
 .gitattributes                 export-ignore
 .gitignore                     export-ignore
 .gitmodules                    export-ignore
@@ -50,3 +52,12 @@ Documentation/EHI_Export/schemaspy/schemas/* export-ignore
 Documentation/EHI_Export/schemaspy/schemas/openemr.meta.xml -export-ignore
 .phpstan/**/*.* text eol=lf
 .phpstan/*.* text eol=lf
+
+# The Clinical Co-Pilot sidecar must survive source exports intact: Railway
+# builds from the GitHub source archive, which honors export-ignore — and the
+# unanchored `tools/` pattern above silently dropped sidecar/src/chat/tools/
+# from every deploy build context (phantom TS2307 while git checkouts,
+# including CI, stayed green). Last match wins in gitattributes: keep this
+# carve-out below every export-ignore rule so nothing under sidecar/ is ever
+# excluded from an export. Guarded by the export-parity job in sidecar-ci.yml.
+sidecar/** -export-ignore
