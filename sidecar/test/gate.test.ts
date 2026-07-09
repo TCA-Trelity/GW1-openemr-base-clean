@@ -64,6 +64,31 @@ describe('checkCitation', () => {
             'excerpt_mismatch',
         );
     });
+
+    // Failure mode (live regression): the corpus carries OCR-style double spaces; models
+    // collapse them when quoting, and 5-6 citations per prep died on invisible spacing.
+    // Whitespace runs are equivalent; every non-whitespace character must still match.
+    it('resolves an excerpt whose whitespace the model collapsed', () => {
+        const spaced = 'Visual acuity  OD (right):  20/40.  Plaquenil continued.';
+        const spacedResolver: DocumentTextResolver = (id) => (id === 'doc-1' ? spaced : undefined);
+        const collapsed = citation({
+            excerpt_text: 'Visual acuity OD (right): 20/40. Plaquenil continued.',
+            excerpt_location: null,
+        });
+        const check = checkCitation(collapsed, spacedResolver);
+        expect(check.result).toBe('ok_search');
+        if (check.result === 'ok_search') {
+            expect(spaced.slice(check.correctedRange.start_char, check.correctedRange.end_char)).toBe(spaced);
+        }
+    });
+
+    // Guards: whitespace flexibility must not admit paraphrase — reworded text still fails.
+    it('still rejects a paraphrased excerpt despite whitespace flexibility', () => {
+        const spaced = 'Patient reports taking  hydroxychloroquine 200mg daily.';
+        const spacedResolver: DocumentTextResolver = (id) => (id === 'doc-1' ? spaced : undefined);
+        const paraphrase = citation({ excerpt_text: 'takes hydroxychloroquine 200 mg every day', excerpt_location: null });
+        expect(checkCitation(paraphrase, spacedResolver).result).toBe('excerpt_mismatch');
+    });
 });
 
 describe('runCitationGate', () => {

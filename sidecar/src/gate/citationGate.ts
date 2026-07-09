@@ -61,7 +61,30 @@ export function checkCitation(citation: CitationRef, resolve: DocumentTextResolv
     if (at >= 0) {
         return { result: 'ok_search', correctedRange: { start_char: at, end_char: at + excerpt.length } };
     }
+    // Whitespace-flexible fallback (live finding: the corpus carries 138 OCR-style
+    // double-space runs; models collapse them when quoting, so 5-6 citations per
+    // prep died on invisible spacing). Every non-whitespace character must still
+    // occur, in order — only whitespace RUNS are treated as equivalent, so this
+    // admits no paraphrase. The corrected range comes from the actual match.
+    const flexible = whitespaceFlexibleFind(text, excerpt);
+    if (flexible !== null) {
+        return { result: 'ok_search', correctedRange: flexible };
+    }
     return { result: 'excerpt_mismatch' };
+}
+
+/** Locate `excerpt` in `text` treating any whitespace run as equivalent; null if absent. */
+function whitespaceFlexibleFind(text: string, excerpt: string): { start_char: number; end_char: number } | null {
+    const tokens = excerpt.split(/\s+/).filter((token) => token.length > 0);
+    if (tokens.length === 0) {
+        return null;
+    }
+    const pattern = tokens.map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+');
+    const match = new RegExp(pattern).exec(text);
+    if (match === null) {
+        return null;
+    }
+    return { start_char: match.index, end_char: match.index + match[0].length };
 }
 
 /**
