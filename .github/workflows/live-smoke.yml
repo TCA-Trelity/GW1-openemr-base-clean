@@ -21,7 +21,7 @@ env:
   # On push there are no inputs; fall back to the production sidecar.
   SIDECAR_URL: ${{ github.event_name == 'push' && 'https://enchanting-mercy-production-5d32.up.railway.app' || inputs.sidecar_url }}
 
-# One probe at a time — pushes land on several branches at once and the e2e
+# One probe at a time — pushes land on several branches at once and the e2e run
 # triggers a real prep; queue instead of stampeding the live service.
 concurrency:
   group: live-smoke
