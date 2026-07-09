@@ -228,6 +228,17 @@ if (process.argv[1]?.endsWith('server.js') || process.argv[1]?.endsWith('server.
     const config = loadConfig();
     const deps = buildDeps(config);
     const app = buildServer(config, deps);
+    // Startup signal for EHR sync wiring: the panel's "not configured" state is exactly
+    // deps.ehr being absent, so name the reason at boot instead of leaving it a mystery.
+    const missingEhrConfig = [
+        config.OPENEMR_BASE_URL === undefined ? 'OPENEMR_BASE_URL' : undefined,
+        config.OPENEMR_CLIENT_ID === undefined ? 'OPENEMR_CLIENT_ID' : undefined,
+        config.OPENEMR_CLIENT_KEY === undefined ? 'OPENEMR_CLIENT_KEY' : undefined,
+    ].filter((name): name is string => name !== undefined);
+    app.log.info(
+        { ehrSyncConfigured: deps?.ehr !== undefined, missingEhrConfig },
+        deps?.ehr !== undefined ? 'EHR sync configured' : 'EHR sync not configured',
+    );
     // Migrations run at boot when the store is wired: idempotent + advisory-locked,
     // so concurrent replicas serialize and a no-op boot costs one SELECT.
     const boot = async (): Promise<void> => {
