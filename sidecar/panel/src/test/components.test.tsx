@@ -1,6 +1,6 @@
 // Component tests: citation chip/source card behavior (R8 source labels + same-source
 // grouping), Medical Background badges, and the Sources tab list + highlight rendering.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { CitationChip, CitationChips } from '../CitationChip';
 import MedicalBackground from '../MedicalBackground';
@@ -115,6 +115,26 @@ describe('MedicalBackground', () => {
         expect(screen.getAllByText('Verified').length).toBeGreaterThanOrEqual(1);
         expect(screen.getAllByText('Unverified').length).toBeGreaterThanOrEqual(1);
         expect(screen.getAllByText('Patient reported').length).toBeGreaterThanOrEqual(1);
+    });
+
+    // Failure mode (S3.3): a role that can verify sees no Verify affordance, an already-verified
+    // fact still offers one, or clicking it doesn't fire the verify callback with the fact id.
+    it('shows role-gated Verify buttons only on not-yet-verified facts and calls onVerify', () => {
+        const onVerify = vi.fn();
+        render(<MedicalBackground factsByType={briefContent.facts_by_type} canVerify onVerify={onVerify} />);
+        const buttons = screen.getAllByRole('button', { name: /^Verify / });
+        expect(buttons.length).toBeGreaterThanOrEqual(1);
+        const first = buttons[0];
+        expect(first).toBeDefined();
+        fireEvent.click(first as HTMLElement);
+        expect(onVerify).toHaveBeenCalledTimes(1);
+        expect(String(onVerify.mock.calls[0]?.[0])).toMatch(/^fact-/);
+    });
+
+    // Failure mode: a read-only role (nurse) is shown a Verify button it can't use.
+    it('hides Verify buttons when the role cannot verify', () => {
+        render(<MedicalBackground factsByType={briefContent.facts_by_type} canVerify={false} onVerify={() => undefined} />);
+        expect(screen.queryByRole('button', { name: /^Verify / })).not.toBeInTheDocument();
     });
 });
 

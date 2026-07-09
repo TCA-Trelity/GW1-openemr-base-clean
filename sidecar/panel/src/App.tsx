@@ -13,6 +13,7 @@ import {
     fetchOverview,
     fetchPatients,
     setAuthToken,
+    verifyFact,
     type AuthCapabilities,
     type ClinicalRole,
     type FactsFetchResult,
@@ -153,6 +154,22 @@ export default function App() {
         setActiveTab('sources');
     }, []);
 
+    // Role-gated fact verification (S3.3): a physician/resident can verify; the write is
+    // authorized + attributed server-side, then the overview is refetched to show the new status.
+    const canVerify = capabilities !== null && capabilities.verify !== false;
+    const handleVerify = useCallback(
+        async (factId: string) => {
+            if (patientId === null) {
+                return;
+            }
+            const result = await verifyFact(patientId, factId);
+            if (result.ok) {
+                setReloadNonce((nonce) => nonce + 1);
+            }
+        },
+        [patientId],
+    );
+
     const overview = overviewState.kind === 'ready' ? overviewState.overview : null;
     // The insights state machine is shared by the header control and the AI Insights tab.
     const insights = useInsights(patientId, overview?.latest_brief ?? null);
@@ -280,7 +297,9 @@ export default function App() {
                                     {activeTab === 'overview' && (
                                         <Overview key={patientId} overview={overview} onOpenImaging={() => setActiveTab('imaging')} />
                                     )}
-                                    {activeTab === 'background' && <MedicalBackground factsByType={overview.facts_by_type} />}
+                                    {activeTab === 'background' && (
+                                        <MedicalBackground factsByType={overview.facts_by_type} canVerify={canVerify} onVerify={handleVerify} />
+                                    )}
                                     {activeTab === 'imaging' && (
                                         <>
                                             {factsState.kind === 'error' && (

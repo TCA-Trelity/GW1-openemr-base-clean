@@ -83,6 +83,24 @@ export async function fetchMe(): Promise<MeResult | null> {
     }
 }
 
+export type VerifyFactResult = { ok: true; needsAttending: boolean } | { ok: false; status: number };
+
+/** Record a clinician's verification of a fact (S3.3). Role/patient-binding is enforced server-side. */
+export async function verifyFact(patientId: string, factId: string): Promise<VerifyFactResult> {
+    try {
+        const res = await apiFetch(`/api/facts/${encodeURIComponent(patientId)}/${encodeURIComponent(factId)}/verify`, {
+            method: 'POST',
+        });
+        if (!res.ok) {
+            return { ok: false, status: res.status };
+        }
+        const body = (await res.json()) as { needs_attending_sign_off?: boolean };
+        return { ok: true, needsAttending: body.needs_attending_sign_off === true };
+    } catch {
+        return { ok: false, status: 0 };
+    }
+}
+
 export type PatientsFetchResult =
     | { kind: 'ready'; patients: PatientRecord[] }
     | { kind: 'error'; message: string };

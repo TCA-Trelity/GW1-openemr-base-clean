@@ -13,6 +13,7 @@ import {
     Home,
     Target,
     MessageSquare,
+    Check,
 } from 'lucide-react';
 import type { ComponentType, ReactNode } from 'react';
 import type { FactType, PatientFact } from './types';
@@ -115,9 +116,22 @@ export function factSummary(fact: PatientFact): { primary: string; secondary: st
     }
 }
 
-/** Shared fact row (Overview cards reuse it); `badges` prepends extra chips, e.g. med risk flags. */
-export function FactRow({ fact, badges }: { fact: PatientFact; badges?: ReactNode }) {
+/** Shared fact row (Overview cards reuse it); `badges` prepends extra chips, e.g. med risk flags.
+ * When `canVerify` is set and the fact is not already verified, a role-gated Verify button appears
+ * (S3.3) — only the Medical Background tab passes it, so Overview stays read-only. */
+export function FactRow({
+    fact,
+    badges,
+    canVerify,
+    onVerify,
+}: {
+    fact: PatientFact;
+    badges?: ReactNode;
+    canVerify?: boolean;
+    onVerify?: (factId: string) => void;
+}) {
     const { primary, secondary } = factSummary(fact);
+    const showVerify = canVerify === true && onVerify !== undefined && fact.verification.status !== 'verified';
     return (
         <div className="flex items-start justify-between gap-3 py-3 border-b border-slate-100 last:border-0">
             <div className="min-w-0">
@@ -133,12 +147,32 @@ export function FactRow({ fact, badges }: { fact: PatientFact; badges?: ReactNod
                 <OriginBadge origin={factOrigin(fact)} />
                 {fact.laterality !== null && <LateralityBadge laterality={fact.laterality} />}
                 <VerificationBadge status={fact.verification.status} />
+                {showVerify && (
+                    <button
+                        type="button"
+                        aria-label={`Verify ${primary}`}
+                        onClick={() => onVerify(fact.id)}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-emerald-300 text-[11px] font-medium text-emerald-700 hover:bg-emerald-50 transition-colors"
+                    >
+                        <Check className="w-3 h-3" />
+                        Verify
+                    </button>
+                )}
             </div>
         </div>
     );
 }
 
-export default function MedicalBackground({ factsByType }: { factsByType: Partial<Record<FactType, PatientFact[]>> }) {
+export default function MedicalBackground({
+    factsByType,
+    canVerify,
+    onVerify,
+}: {
+    factsByType: Partial<Record<FactType, PatientFact[]>>;
+    /** True when the current clinician's role may verify facts (physician / resident) — S3.3. */
+    canVerify?: boolean;
+    onVerify?: (factId: string) => void;
+}) {
     const groups = GROUPS.map(({ type, title, icon }) => ({ type, title, icon, facts: factsByType[type] ?? [] })).filter(
         ({ facts }) => facts.length > 0,
     );
@@ -156,7 +190,7 @@ export default function MedicalBackground({ factsByType }: { factsByType: Partia
                     </h3>
                     <div>
                         {facts.map((fact) => (
-                            <FactRow key={fact.id} fact={fact} />
+                            <FactRow key={fact.id} fact={fact} canVerify={canVerify} onVerify={onVerify} />
                         ))}
                     </div>
                 </Card>
