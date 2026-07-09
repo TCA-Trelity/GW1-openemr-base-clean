@@ -204,6 +204,18 @@ export async function syncEhr(patientId: string): Promise<EhrSyncFetchResult> {
             return body.reason === 'patient_not_found' ? { kind: 'patient_not_found' } : { kind: 'not_linked' };
         }
         if (!res.ok) {
+            // 502 carries the sidecar's upstream envelope — name the failing dependency so the
+            // operator acts on the cause, not a bare status code.
+            const body = (await res.json().catch(() => ({}))) as { error?: string; upstream_status?: number };
+            if (body.error === 'ehr_upstream_auth') {
+                return { kind: 'error', message: 'EHR sync failed: OpenEMR rejected the sidecar credentials — re-run OAuth registration (RUNBOOK §A).' };
+            }
+            if (body.error === 'ehr_upstream_fhir') {
+                return {
+                    kind: 'error',
+                    message: `EHR sync failed: OpenEMR's FHIR API answered HTTP ${body.upstream_status ?? 'error'} — check the EHR service and patient linkage.`,
+                };
+            }
             return { kind: 'error', message: `EHR sync failed (HTTP ${res.status}).` };
         }
         const body = (await res.json()) as { factCount?: number; resourceCounts?: Record<string, number>; syncedAt?: string };

@@ -205,6 +205,16 @@ describe('EHR Record tab', () => {
         fireEvent.click(screen.getByRole('button', { name: /Sync now/i }));
         expect(await screen.findByText(/configured on this deployment/)).toBeInTheDocument();
     });
+
+    // Failure mode: an upstream OpenEMR rejection shown as a bare "HTTP 502" tells the operator
+    // nothing — the envelope's cause (here: broken OAuth registration) must reach the message.
+    it('names the upstream cause when sync fails with a 502 envelope', async () => {
+        stubEhr({ overview: overviewNoBrief, sync: { status: 502, body: { error: 'ehr_upstream_auth', upstream_status: 400 } } });
+        render(<App />);
+        await openEhrTab();
+        fireEvent.click(screen.getByRole('button', { name: /Sync now/i }));
+        expect(await screen.findByText(/OAuth registration/)).toBeInTheDocument();
+    });
 });
 
 // ---- Origin badges elsewhere ----
