@@ -126,15 +126,15 @@ jobs:
             echo "prep trigger failed"; exit 1
           fi
 
-          echo "== Poll GET /api/brief/margaret-chen (up to 8 min) =="
-          for i in $(seq 1 48); do
+          echo "== Poll GET /api/brief/margaret-chen (up to 13 min; provenance retries slow prep) =="
+          for i in $(seq 1 78); do
             code=$(curl -s -o /tmp/brief.json -w '%{http_code}' --max-time 30 "${AUTH[@]}" "$SIDECAR_URL/api/brief/margaret-chen")
             if [ "$code" = "200" ] && [ "$(jq -r '.prepared_at // empty' /tmp/brief.json)" != "$before" ]; then break; fi
             echo "attempt $i: HTTP $code — waiting 10s (LLM extraction in flight)"; sleep 10
           done
-          [ "$code" = "200" ] && [ "$(jq -r '.prepared_at // empty' /tmp/brief.json)" = "$before" ] && { echo "brief never refreshed past the pre-prep artifact"; exit 1; }
           echo "== Prep run status (stage shows where a failed run died) =="
           curl -s --max-time 30 "${AUTH[@]}" "$SIDECAR_URL/api/prep-runs/margaret-chen" | jq '.runs[:3]' || true
+          [ "$code" = "200" ] && [ "$(jq -r '.prepared_at // empty' /tmp/brief.json)" = "$before" ] && { echo "brief never refreshed past the pre-prep artifact"; exit 1; }
           [ "$code" = "200" ] || { echo "brief never appeared"; exit 1; }
 
           echo "== Brief assertions =="
