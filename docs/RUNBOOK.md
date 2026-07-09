@@ -22,10 +22,14 @@ Project services (same Railway project): sidecar = **`enchanting-mercy`**, EHR =
 the `production` environment).
 
 1. **Enable OpenEMR connectors** (admin UI). Log into the EHR as `admin` →
-   **Administration → Config → Connectors** → turn ON:
-   - *OpenEMR Standard REST API*
-   - *OAuth2 Password Grant*
-   Save.
+   **Administration → Config → Connectors** → turn ON all four (Save after):
+   - *Enable OpenEMR Standard REST API* (`rest_api`) — `api:oemr` + `user/*` seed writes
+   - *Enable OpenEMR Standard FHIR REST API* (`rest_fhir_api`) — `api:fhir` + FHIR reads
+   - *Enable OpenEMR FHIR System Scopes* (`rest_system_scopes_api`) — the `system/*.read`
+     scopes the client-credentials FHIR reader uses. **Registration 400s with
+     `invalid_scope` if this is off** — `system/*` only enters the accepted-scope
+     list when it is enabled (`ServerScopeListEntity.php:62,115`).
+   - *OAuth2 Password Grant* — the user-role seed token
 
 2. **Register the sidecar OAuth client** (mints credentials with both FHIR-read
    and standard-API-write scopes). `OPENEMR_BASE_URL` is passed inline so this
