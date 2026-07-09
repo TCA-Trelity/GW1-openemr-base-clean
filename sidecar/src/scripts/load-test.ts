@@ -21,6 +21,9 @@ const concurrency = Math.max(1, Number(process.env['LOAD_CONCURRENCY'] ?? 10));
 const durationSec = Math.max(1, Number(process.env['LOAD_DURATION_SEC'] ?? 20));
 const p95MaxMs = Math.max(1, Number(process.env['LOAD_P95_MAX_MS'] ?? 1500));
 const patient = process.env['LOAD_PATIENT'] ?? 'margaret-chen';
+// Bearer for AUTH_MODE=enforced deployments (the overview read is patient-bound there);
+// empty = tokenless, which is correct while auth is off.
+const bearer = process.env['LOAD_BEARER'] ?? '';
 
 // The deterministic landing path: readiness + the two reads that render the whole overview.
 // No prep/chat here — those cost model tokens and are budget-gated by design.
@@ -41,7 +44,10 @@ async function worker(deadlineMs: number, startOffset: number): Promise<void> {
         const start = performance.now();
         let ok = false;
         try {
-            const response = await fetch(`${baseUrl}${path}`, { signal: AbortSignal.timeout(30_000) });
+            const response = await fetch(`${baseUrl}${path}`, {
+                signal: AbortSignal.timeout(30_000),
+                headers: bearer === '' ? {} : { authorization: `Bearer ${bearer}` },
+            });
             ok = response.ok;
             await response.arrayBuffer(); // fully drain the body so the timing includes transfer
         } catch {

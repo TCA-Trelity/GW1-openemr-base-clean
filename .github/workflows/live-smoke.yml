@@ -68,8 +68,26 @@ jobs:
           echo "HTTP $code"; cat /tmp/ready.json | head -c 600; echo
           [ "$code" = "200" ] || { echo "sidecar not ready"; exit 1; }
 
+          echo "== Auth posture probe + token bootstrap =="
+          # Adaptive: with AUTH_MODE=enforced the smoke PROVES the 401/403/200 chain;
+          # with auth off it runs tokenless exactly as before.
+          unauth=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$SIDECAR_URL/api/overview/margaret-chen")
+          TOKEN=$(curl -s -X POST "$SIDECAR_URL/api/dev-login" -H 'content-type: application/json' \
+            -d '{"role":"physician","patient":"margaret-chen"}' | jq -r '.access_token // empty')
+          AUTH=()
+          if [ -n "$TOKEN" ]; then AUTH=(-H "Authorization: Bearer $TOKEN"); echo "dev-login token minted (physician @ margaret-chen)"; else echo "dev-login disabled — tokenless"; fi
+          if [ "$unauth" = "401" ]; then
+            echo "enforcement ON: unauthenticated overview -> 401 OK"
+            [ -n "$TOKEN" ] || { echo "AUTH_MODE enforced but dev-login disabled — smoke cannot authenticate"; exit 1; }
+            cross=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "${AUTH[@]}" "$SIDECAR_URL/api/overview/william-thompson")
+            [ "$cross" = "403" ] && echo "cross-patient block: margaret-bound token vs william -> 403 OK" \
+              || { echo "cross-patient expected 403, got $cross"; exit 1; }
+          else
+            echo "enforcement OFF: unauthenticated overview -> $unauth (operator choice; not a failure)"
+          fi
+
           echo "== POST /api/ehr-sync/margaret-chen (live EHR link) =="
-          code=$(curl -s -X POST -o /tmp/sync.json -w '%{http_code}' --max-time 60 "$SIDECAR_URL/api/ehr-sync/margaret-chen")
+          code=$(curl -s -X POST -o /tmp/sync.json -w '%{http_code}' --max-time 60 "${AUTH[@]}" "$SIDECAR_URL/api/ehr-sync/margaret-chen")
           echo "HTTP $code"; head -c 600 /tmp/sync.json; echo
           case "$code" in
             200) echo "ehr-sync OK" ;;
@@ -81,7 +99,7 @@ jobs:
           curl -s --max-time 30 "$SIDECAR_URL/api/patients" -o /tmp/patients.json
           jq -e '.patients | length >= 2' /tmp/patients.json >/dev/null \
             && echo "patients: $(jq '.patients | length' /tmp/patients.json) OK" || { echo "patients FAILED"; cat /tmp/patients.json; exit 1; }
-          curl -s --max-time 30 "$SIDECAR_URL/api/overview/margaret-chen" -o /tmp/overview.json
+          curl -s --max-time 30 "${AUTH[@]}" "$SIDECAR_URL/api/overview/margaret-chen" -o /tmp/overview.json
           jq -e '.medication_risk_flags | length > 0' /tmp/overview.json >/dev/null \
             && echo "overview med-risk flags OK" || { echo "overview med-risk FAILED"; exit 1; }
           jq -e '.contradictions | length > 0' /tmp/overview.json >/dev/null \
@@ -92,18 +110,18 @@ jobs:
           case "$ctype" in image/*) echo "scan bytes OK ($key, $ctype)";; *) echo "scan fetch FAILED ($ctype)"; exit 1;; esac
 
           echo "== POST /api/prep/margaret-chen =="
-          code=$(curl -s -X POST -o /tmp/prep.json -w '%{http_code}' --max-time 30 "$SIDECAR_URL/api/prep/margaret-chen")
+          code=$(curl -s -X POST -o /tmp/prep.json -w '%{http_code}' --max-time 30 "${AUTH[@]}" "$SIDECAR_URL/api/prep/margaret-chen")
           echo "HTTP $code"; cat /tmp/prep.json; echo
           [ "$code" = "202" ] || { echo "prep trigger failed"; exit 1; }
 
           echo "== Poll GET /api/brief/margaret-chen (up to 8 min) =="
           for i in $(seq 1 48); do
-            code=$(curl -s -o /tmp/brief.json -w '%{http_code}' --max-time 30 "$SIDECAR_URL/api/brief/margaret-chen")
+            code=$(curl -s -o /tmp/brief.json -w '%{http_code}' --max-time 30 "${AUTH[@]}" "$SIDECAR_URL/api/brief/margaret-chen")
             if [ "$code" = "200" ]; then break; fi
             echo "attempt $i: HTTP $code — waiting 10s (LLM extraction in flight)"; sleep 10
           done
           echo "== Prep run status (stage shows where a failed run died) =="
-          curl -s --max-time 30 "$SIDECAR_URL/api/prep-runs/margaret-chen" | jq '.runs[:3]' || true
+          curl -s --max-time 30 "${AUTH[@]}" "$SIDECAR_URL/api/prep-runs/margaret-chen" | jq '.runs[:3]' || true
           [ "$code" = "200" ] || { echo "brief never appeared"; exit 1; }
 
           echo "== Brief assertions =="

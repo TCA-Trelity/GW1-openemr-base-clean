@@ -18,6 +18,21 @@ on:
         description: 'p95 SLO in ms (fail above this)'
         required: false
         default: '1500'
+  # Editing this workflow runs it against production defaults (the session cannot
+  # call workflow_dispatch — the GitHub App token lacks actions:write — but it can push).
+  push:
+    paths:
+      - '.github/workflows/sidecar-load.yml'
+
+env:
+  SIDECAR_URL: ${{ github.event_name == 'push' && 'https://enchanting-mercy-production-5d32.up.railway.app' || inputs.sidecar_url }}
+  DURATION_SEC: ${{ github.event_name == 'push' && '20' || inputs.duration_sec }}
+  P95_MAX_MS: ${{ github.event_name == 'push' && '1500' || inputs.p95_max_ms }}
+
+# One probe at a time — overlapping load runs would distort each other's numbers.
+concurrency:
+  group: sidecar-load
+  cancel-in-progress: false
 
 jobs:
   load:
@@ -37,10 +52,21 @@ jobs:
           cache: npm
           cache-dependency-path: sidecar/package-lock.json
       - run: npm ci
+      - name: Mint a patient-bound bearer when dev-login is enabled
+        id: auth
+        run: |
+          # AUTH_MODE=enforced gates the overview read; dev-login (the grading token
+          # path) mints a bound token. Empty/404 = auth off, probe runs tokenless.
+          token=$(curl -s -X POST "$SIDECAR_URL/api/dev-login" \
+            -H 'content-type: application/json' \
+            -d '{"role":"physician","patient":"margaret-chen"}' | jq -r '.access_token // empty')
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+          if [ -n "$token" ]; then echo "dev-login token minted"; else echo "dev-login disabled — tokenless probe"; fi
       - name: Load probe @ ${{ matrix.concurrency }} concurrent
         env:
-          LOAD_BASE_URL: ${{ inputs.sidecar_url }}
+          LOAD_BASE_URL: ${{ env.SIDECAR_URL }}
           LOAD_CONCURRENCY: ${{ matrix.concurrency }}
-          LOAD_DURATION_SEC: ${{ inputs.duration_sec }}
-          LOAD_P95_MAX_MS: ${{ inputs.p95_max_ms }}
+          LOAD_DURATION_SEC: ${{ env.DURATION_SEC }}
+          LOAD_P95_MAX_MS: ${{ env.P95_MAX_MS }}
+          LOAD_BEARER: ${{ steps.auth.outputs.token }}
         run: npm run load-test
