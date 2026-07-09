@@ -387,6 +387,16 @@ verification status. Low-confidence extractions render as flagged/uncertain
 language, never as clean assertions; human verification (role-gated)
 upgrades status explicitly and auditably.
 
+**Build-status honesty (2026-07-09).** The verification gate (source
+attribution) and domain-constraint enforcement (AAO dosage/duration engine)
+are implemented and eval-covered; EHR-origin facts pass the same gate. The
+*authorization* half of "verification & trust" — patient-bound SMART
+enforcement + physician/nurse/resident roles — is the one designed-but-not-yet
+-enforced piece, tracked as Wave AZ (`docs/execution/execution-plan.md`); the
+sidecar API is unauthenticated at the demo boundary until it lands. Chat tool
+invocation (item 7) is moving from bundle-preloaded to a real Haiku tool-use
+loop (Wave TC), each tool read-only, patient-scoped, and Zod-contracted.
+
 **Escalation triggers?** Contradictions are *surfaced, never auto-resolved*
 (UC-3) — the physician adjudicates. Gate failure → claim becomes a stated
 absence. Repeated tool failure → degrade per the ladder in item 11 and say

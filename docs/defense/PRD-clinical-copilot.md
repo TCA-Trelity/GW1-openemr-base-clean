@@ -43,6 +43,17 @@ Argued in full in the architecture defense; verdicts recorded here. **In scope:*
 
 > **TIER CUTOFF RULE:** a tier is *done* when all its units pass acceptance; nothing from a higher tier may block a lower tier's submission.
 
+> **Requirements traceability (2026-07-09, verbatim-PDF pass).** A line-by-line
+> re-read of the AgentForge Week-1 requirements PDF confirmed the tier
+> deliverables map, and surfaced three build items now tracked as waves in
+> `docs/execution/execution-plan.md`: **Wave AZ** (authorization — full SMART
+> EHR-launch patient-bound enforcement + physician/nurse/resident roles,
+> closing the doc-vs-code gap the audit flagged as S1), **Wave TC** (tool-calling
+> chat — six read-only patient-scoped tools that satisfy "invoke tools to
+> retrieve and reason," each traced to a USERS.md use case), and **Wave G**
+> (observability dashboard live + 3 alerts per `docs/execution/observability.md`,
+> demo video). These extend Tier 1/2; they do not change the committed design.
+
 ### ─── TIER 0 — MVP hard gates (tonight, Tue 11:59 PM CT) ───
 
 **Unit 0.1: Public deploy of the OpenEMR fork (Railway)**
