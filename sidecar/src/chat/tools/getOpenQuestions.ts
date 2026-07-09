@@ -74,5 +74,3 @@ export const getOpenQuestions = defineTool<Input, Output>({
         return { count: openQuestions.length, open_questions: openQuestions, derived: true };
     },
 });
-
-// (committed member of the chat tool registry — re-sync marker for the build context)

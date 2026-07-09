@@ -110,5 +110,3 @@ export const getMeasurementTrend = defineTool<Input, Output>({
         return { metric: resolved, laterality: eyeFilter, series, derived: true };
     },
 });
-
-// (committed member of the chat tool registry — re-sync marker for the build context)

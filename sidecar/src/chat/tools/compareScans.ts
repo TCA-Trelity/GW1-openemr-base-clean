@@ -100,5 +100,3 @@ export const compareScans = defineTool<Input, Output>({
         };
     },
 });
-
-// (committed member of the chat tool registry — re-sync marker for the build context)

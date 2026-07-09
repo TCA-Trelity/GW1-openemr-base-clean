@@ -85,5 +85,3 @@ export function defineTool<TInput, TOutput extends object>(spec: ToolSpec<TInput
 export function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
-
-// (committed member of the chat tool registry — re-sync marker for the build context)

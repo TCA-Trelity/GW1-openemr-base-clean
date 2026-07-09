@@ -1,10 +1,6 @@
 # Sidecar image for Railway: build panel + TS, run the compiled server.
 # Railway service root directory = sidecar/, so paths are relative to it.
 FROM node:22-slim AS panel
-# CACHEBUST: bump this to force a fully fresh, no-reuse build. Railway's layer cache
-# has intermittently served stale/poisoned layers (phantom TS2307, cancelled builds);
-# changing this invalidates every layer below it in the stage.
-ARG CACHEBUST=3
 WORKDIR /panel
 COPY panel/package.json panel/package-lock.json ./
 RUN npm ci
@@ -12,7 +8,6 @@ COPY panel/ ./
 RUN npm run build
 
 FROM node:22-slim AS build
-ARG CACHEBUST=3
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
