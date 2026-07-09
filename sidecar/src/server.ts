@@ -29,6 +29,7 @@ import { registerEhrRoutes, type EhrRouteDeps } from './routes/ehr.js';
 import { registerHealthRoutes } from './routes/health.js';
 import { registerOverviewRoutes, type OverviewRouteDeps } from './routes/overview.js';
 import { registerPrepRoutes, type PrepRouteDeps } from './routes/prep.js';
+import { registerVerifyRoutes, type VerifyRouteDeps } from './routes/verify.js';
 import { createPool, FactStore } from './store/index.js';
 import { migrate } from './store/migrate.js';
 
@@ -48,6 +49,8 @@ export interface AppDeps {
     auth?: AuthDeps;
     /** Dev-login + /api/me (AZ4). */
     authRoutes?: AuthRouteDeps;
+    /** Role-gated fact verification (S3.3). */
+    verify?: VerifyRouteDeps;
 }
 
 // Store-backed dependencies exist only when DATABASE_URL is configured; without it the
@@ -164,6 +167,7 @@ export function buildDeps(config: Config): AppDeps | undefined {
             patientExists: async (patientId) => (await store.getPatient(patientId)) !== null,
             mode: authMode,
         },
+        verify: { store },
     };
 }
 
@@ -186,6 +190,7 @@ export function buildServer(config: Config, deps?: AppDeps): FastifyInstance {
     registerHealthRoutes(app, config, deps === undefined ? undefined : { checkPostgres: deps.checkPostgres });
     registerAuthRoutes(app, deps?.authRoutes);
     registerPrepRoutes(app, deps?.prep);
+    registerVerifyRoutes(app, deps?.verify);
     registerOverviewRoutes(app, deps?.overview);
     registerChatRoutes(app, deps?.chat);
     registerEhrRoutes(app, deps?.ehr);

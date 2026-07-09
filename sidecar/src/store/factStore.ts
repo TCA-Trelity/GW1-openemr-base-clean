@@ -260,6 +260,19 @@ export class FactStore {
         return result.rows[0]?.id ?? null;
     }
 
+    /**
+     * Record a clinician's verification of a fact (S3.3). The `AND patient_id = $2` is
+     * defense-in-depth on top of the route's patient-bound authorization: the update only
+     * touches a fact that belongs to the bound patient. Returns false when no such fact exists.
+     */
+    public async verifyFact(patientId: string, factId: string, verification: FactVerification): Promise<boolean> {
+        const result = await this.pool.query(
+            'UPDATE patient_facts SET verification = $3::jsonb, updated_date = now() WHERE id = $1 AND patient_id = $2',
+            [factId, patientId, toJsonb(FactVerificationSchema.parse(verification))],
+        );
+        return (result.rowCount ?? 0) > 0;
+    }
+
     /** Refresh lever for EHR sync: drop the prior snapshot's facts then the snapshot doc. */
     public async wipeEhrSnapshot(patientId: string, snapshotDocumentId: string): Promise<void> {
         await this.withTransaction(async (client) => {
