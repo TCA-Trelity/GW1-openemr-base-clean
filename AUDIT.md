@@ -76,7 +76,11 @@ patient-context binding that *does* exist applies only to the `patient` role
 **Impact on our design:** we cannot rely on OpenEMR for patient-scope
 authorization for staff. We construct it — SMART EHR-launch tokens bound to
 one patient (interactive surface) and a read-only, pipeline-scoped credential
-(background preparer). See `ARCHITECTURE.md` §Authorization.
+(background preparer). See `ARCHITECTURE.md` §Authorization. **Build status
+(2026-07-09):** the background-preparer credential is implemented; the
+interactive patient-bound enforcement + physician/nurse/resident roles are in
+progress as Wave AZ (`docs/execution/execution-plan.md`) — until then the
+sidecar API is unauthenticated at the demo boundary, tracked, not silent.
 
 ### S2 — Exception-message disclosure in API 500s *(Medium)*
 `apis/dispatch.php:41-44` returns `$e->getMessage()` in the JSON body of a

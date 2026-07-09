@@ -113,6 +113,16 @@ Multi-user clinical settings are the norm, and the audit's central finding
 inherit patient-level control. We construct it — two tasks, two credentials,
 each minimally scoped:
 
+> **Implementation status (2026-07-09).** This dual-credential model is the
+> committed architecture. In code today: the **background preparer** credential
+> is built (read-only `client_credentials` SMART Backend Services, RS384 JWT).
+> The **interactive patient-bound SMART enforcement** — the sidecar validating
+> the launch token and rejecting any request whose bound patient ≠ the
+> requested patient (403), plus physician/nurse/resident capability roles — is
+> landing in **Wave AZ** (`docs/execution/execution-plan.md`). Until AZ lands,
+> the sidecar API is unauthenticated at the demo boundary; a known, tracked
+> gap, not a silent one.
+
 1. **Interactive surface** (brief + chat + scans): a SMART-on-FHIR EHR-launch
    token bound to **one patient and one logged-in user**. If the agent is ever
    manipulated — a crafted question, malicious text inside a referral
