@@ -422,10 +422,9 @@ describe('FactExtractor', () => {
     // fields ("severity": null failed six facts and the whole prep run — .optional() accepts
     // absence, not null). The boundary strips nulls before validation; null and absent are
     // the same statement of "not known" and neither may fail a run.
-    it('accepts facts whose optional fields are explicit nulls', async () => {
+    it('accepts facts whose descriptive optional fields are explicit nulls', async () => {
         const facts = corpusFacts().slice(0, 1) as any[];
         facts[0].content.severity = null;
-        facts[0].sources[0].excerpt_text = null;
         const { extractor } = extractorWith(llmResponse({ facts }));
         const result = await extractor.extract(
             { patientId: PATIENT_ID, patientName: null, documents: ONE_DOC },
@@ -434,7 +433,29 @@ describe('FactExtractor', () => {
         );
         expect(result.facts).toHaveLength(1);
         expect(result.facts[0]!.content['severity']).toBeUndefined();
-        expect(result.facts[0]!.sources[0]!.excerpt_text).toBeNull();
+    });
+
+    // Failure mode (live regression): null-tolerance removed the retry pressure that made the
+    // model quote sources — excerpt-less citations sailed through validation and the citation
+    // gate then blocked 5 claims per prep. Provenance fields must fail validation (and trigger
+    // the feedback retry), not default to null.
+    it('rejects a citation without a verbatim excerpt, then succeeds on the fed-back retry', async () => {
+        const weak = corpusFacts().slice(0, 2) as any[];
+        weak[0].sources[0].excerpt_text = null;
+        const { extractor, fetchMock } = extractorWith(
+            llmResponse({ facts: weak }),
+            llmResponse({ facts: corpusFacts() }),
+            llmResponse({ contradictions: [] }),
+        );
+        const result = await extractor.extract(
+            { patientId: PATIENT_ID, patientName: null, documents: ONE_DOC },
+            'corr-weakcite',
+            silentLogger,
+        );
+        expect(result.facts).toHaveLength(12);
+        const secondBody = JSON.parse(String(fetchMock.mock.calls[1]![1]?.body)) as Record<string, unknown>;
+        const messages = secondBody['messages'] as { role: string; content: string }[];
+        expect(messages[2]!.content).toContain('excerpt_text');
     });
 
     // Guards: common model formatting drift — fenced JSON must still parse.

@@ -210,6 +210,33 @@ function strayPatients(items: { id: string; patient_id: string }[], patientId: s
         .map((item) => `${kind} id=${item.id}: patient_id must be '${patientId}'`);
 }
 
+// Provenance guard: every extracted fact must carry a RESOLVABLE citation — a non-empty
+// verbatim excerpt plus its character range. Absent/null excerpts are not tolerated the
+// way descriptive optionals are (stripNullsDeep): letting them through only moves the
+// failure to the citation gate, which then has to block the fact (live regression: 5
+// blocked claims per prep once null-stripping relaxed the retry pressure). Failing HERE
+// feeds the issue back through the retry, which reliably makes the model quote the source.
+function weakCitations(
+    facts: { id: string; sources: { excerpt_text?: string | null; excerpt_location?: unknown }[] }[],
+): string[] {
+    const issues: string[] = [];
+    facts.forEach((fact, factIndex) => {
+        if (fact.sources.length === 0) {
+            issues.push(`facts.${factIndex} (id=${fact.id}): at least one source citation is required`);
+            return;
+        }
+        fact.sources.forEach((source, sourceIndex) => {
+            if (typeof source.excerpt_text !== 'string' || source.excerpt_text.length === 0) {
+                issues.push(`facts.${factIndex}.sources.${sourceIndex}.excerpt_text: the exact verbatim quote from the document is required`);
+            }
+            if (source.excerpt_location === null || source.excerpt_location === undefined) {
+                issues.push(`facts.${factIndex}.sources.${sourceIndex}.excerpt_location: start_char/end_char of the quote is required`);
+            }
+        });
+    });
+    return issues;
+}
+
 export class FactExtractor {
     constructor(private readonly client: AnthropicClient) {}
 
@@ -233,8 +260,11 @@ export class FactExtractor {
                     if (!parsed.ok) {
                         return parsed;
                     }
-                    const strays = strayPatients(parsed.result.facts, input.patientId, 'facts');
-                    return strays.length > 0 ? { ok: false, issues: strays } : parsed;
+                    const issues = [
+                        ...strayPatients(parsed.result.facts, input.patientId, 'facts'),
+                        ...weakCitations(parsed.result.facts),
+                    ];
+                    return issues.length > 0 ? { ok: false, issues } : parsed;
                 },
                 correlationId,
                 logger,
