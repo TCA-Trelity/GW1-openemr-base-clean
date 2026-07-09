@@ -15,6 +15,7 @@ import { BudgetExceededError, type LlmCallRecord } from '../src/prep/budget.js';
 import type { PrepLogger } from '../src/prep/extraction.js';
 import { registerChatRoutes, type ChatRouteDeps } from '../src/routes/chat.js';
 import { buildServer } from '../src/server.js';
+import type { RegisteredTool } from '../src/chat/tools/index.js';
 import type { FactBundle } from '../src/store/index.js';
 import Fastify from 'fastify';
 
@@ -149,6 +150,54 @@ function chatService(store: FakeChatStore, spendGuard?: FakeSpendGuard, ...respo
     return { service: new ChatService(client, store, spendGuard), fetchMock };
 }
 
+// A ChatService wired with an injected (deterministic) tool set for tool-loop tests.
+function chatServiceWithTools(
+    store: FakeChatStore,
+    spendGuard: FakeSpendGuard | undefined,
+    tools: RegisteredTool[],
+    ...responses: Response[]
+) {
+    const fetchMock = vi.fn<FetchLike>();
+    for (const response of responses) {
+        fetchMock.mockResolvedValueOnce(response);
+    }
+    const client = new AnthropicClient({ apiKey: 'test-key', model: 'claude-haiku-4-5', fetchImpl: fetchMock });
+    return { service: new ChatService(client, store, spendGuard, tools), fetchMock };
+}
+
+// A stand-in tool with a fixed result — decouples loop tests from real tool logic.
+function fakeTool(name: string, output: Record<string, unknown>, provenance: { source_document_id: string; excerpt: string }[] = []): RegisteredTool {
+    return {
+        name,
+        description: `fake ${name}`,
+        inputJsonSchema: { type: 'object', properties: {}, additionalProperties: true },
+        invoke: () => ({ ok: !('error' in output), output, provenance }),
+    };
+}
+
+// A streamed assistant turn that asks for one tool: optional leading text, then a tool_use
+// block whose input arrives as an input_json_delta, ending with stop_reason 'tool_use'.
+function toolUseResponse(toolName: string, input: Record<string, unknown>, text = ''): Response {
+    const events: Record<string, unknown>[] = [
+        { type: 'message_start', message: { model: 'claude-haiku-4-5', usage: { input_tokens: 500, output_tokens: 1 } } },
+    ];
+    if (text.length > 0) {
+        events.push(
+            { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+            { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } },
+            { type: 'content_block_stop', index: 0 },
+        );
+    }
+    events.push(
+        { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: `toolu-${toolName}`, name: toolName } },
+        { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: JSON.stringify(input) } },
+        { type: 'content_block_stop', index: 1 },
+        { type: 'message_delta', delta: { stop_reason: 'tool_use' }, usage: { output_tokens: 10 } },
+        { type: 'message_stop' },
+    );
+    return new Response(sse(events), { status: 200 });
+}
+
 function chatApp(deps?: ChatRouteDeps) {
     const app = Fastify({ logger: false });
     registerChatRoutes(app, deps);
@@ -257,6 +306,107 @@ describe('ChatService.turn', () => {
     });
 });
 
+describe('ChatService tool-use loop', () => {
+    // Guards: the loop contract — the model asks for a tool, the tool executes, its result is
+    // fed back, and a second call produces the final answer; tools_used is populated and the
+    // second call carries the assistant tool_use turn + the tool_result turn.
+    it('executes a requested tool then produces a final answer', async () => {
+        const store = new FakeChatStore();
+        const spendGuard = new FakeSpendGuard();
+        const tool = fakeTool('get_open_questions', { count: 1, open_questions: [{ contradiction_id: 'c1' }], derived: true });
+        const { service, fetchMock } = chatServiceWithTools(
+            store,
+            spendGuard,
+            [tool],
+            toolUseResponse('get_open_questions', {}),
+            chatResponse('Ask about Plaquenil duration.'),
+        );
+        const toolEvents: { name: string; ok?: boolean }[] = [];
+        const result = await service.turn(
+            { bundle: tinyBundle(), conversationId: 'conv-t', message: 'What should I ask?', correlationId: 'corr-t' },
+            silentLogger,
+            {
+                onToolUse: (event) => toolEvents.push({ name: event.name }),
+                onToolResult: (event) => toolEvents.push({ name: event.name, ok: event.ok }),
+            },
+        );
+
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(result.tools_used).toEqual(['get_open_questions']);
+        expect(result.reply).toBe('Ask about Plaquenil duration.');
+        expect(store.messages.map((m) => m.content)).toEqual(['What should I ask?', 'Ask about Plaquenil duration.']);
+        expect(spendGuard.recorded).toHaveLength(2); // one per LLM call
+        expect(toolEvents).toContainEqual({ name: 'get_open_questions' });
+        expect(toolEvents).toContainEqual({ name: 'get_open_questions', ok: true });
+
+        // The second call replays the assistant tool_use turn and the tool_result turn.
+        const secondBody = JSON.parse(String(fetchMock.mock.calls[1]![1]?.body)) as {
+            messages: { role: string; content: unknown }[];
+        };
+        expect(secondBody.messages.map((m) => m.role)).toEqual(['user', 'assistant', 'user']);
+        const assistantBlocks = secondBody.messages[1]!.content as Record<string, unknown>[];
+        expect(assistantBlocks.some((block) => block['type'] === 'tool_use')).toBe(true);
+        const toolResultBlocks = secondBody.messages[2]!.content as Record<string, unknown>[];
+        expect(toolResultBlocks[0]).toMatchObject({ type: 'tool_result', tool_use_id: 'toolu-get_open_questions' });
+    });
+
+    // Guards: a document-quoting tool's provenance is verified server-side and surfaced as a
+    // citation (the gate philosophy carried through the tool path).
+    it('attaches a verified citation from a document-quoting tool result', async () => {
+        const store = new FakeChatStore();
+        const excerpt = 'Plaquenil 200 mg daily';
+        const tool = fakeTool('search_record', { query: 'Plaquenil', match_count: 1, matches: [], derived: false }, [
+            { source_document_id: 'doc-mc-004', excerpt },
+        ]);
+        const { service } = chatServiceWithTools(
+            store,
+            undefined,
+            [tool],
+            toolUseResponse('search_record', { query: 'Plaquenil' }),
+            chatResponse('On Plaquenil since 2019.'),
+        );
+        const streamed: unknown[] = [];
+        const result = await service.turn(
+            { bundle: tinyBundle(), conversationId: 'c', message: 'search', correlationId: 'x' },
+            silentLogger,
+            { onCitation: (citation) => streamed.push(citation) },
+        );
+        const toolCitation = result.citations.find((c) => c.cited_text === excerpt);
+        expect(toolCitation).toBeDefined();
+        expect(toolCitation!.verified).toBe(true);
+        expect(toolCitation!.document_id).toBe('doc-mc-004');
+        expect(streamed).toContainEqual(toolCitation);
+    });
+
+    // Guards: the round cap — a model that keeps asking for tools is stopped after 4 tool
+    // rounds and a final, tool-free call forces an answer.
+    it('caps at 4 tool rounds then forces a tool-free final answer', async () => {
+        const store = new FakeChatStore();
+        const tool = fakeTool('search_record', { query: 'x', match_count: 0, matches: [], derived: false });
+        const { service, fetchMock } = chatServiceWithTools(
+            store,
+            undefined,
+            [tool],
+            toolUseResponse('search_record', { query: 'x' }),
+            toolUseResponse('search_record', { query: 'x' }),
+            toolUseResponse('search_record', { query: 'x' }),
+            toolUseResponse('search_record', { query: 'x' }),
+            chatResponse('Final answer after the cap.'),
+        );
+        const result = await service.turn(
+            { bundle: tinyBundle(), conversationId: 'c', message: 'loop forever', correlationId: 'x' },
+            silentLogger,
+        );
+
+        expect(fetchMock).toHaveBeenCalledTimes(5); // 4 tool rounds + 1 forced final
+        expect(result.tools_used).toHaveLength(4);
+        expect(result.reply).toBe('Final answer after the cap.');
+        // The first call offers tools; the forced-final (5th) call does not.
+        expect('tools' in (JSON.parse(String(fetchMock.mock.calls[0]![1]?.body)) as Record<string, unknown>)).toBe(true);
+        expect('tools' in (JSON.parse(String(fetchMock.mock.calls[4]![1]?.body)) as Record<string, unknown>)).toBe(false);
+    });
+});
+
 describe('chat routes', () => {
     function routeDeps(overrides: Partial<{ spendGuard: FakeSpendGuard; responses: Response[] }> = {}) {
         const store = new FakeChatStore();
@@ -290,6 +440,37 @@ describe('chat routes', () => {
         expect(done['citations']).toHaveLength(2);
         expect(done['unverified_count']).toBe(0);
         expect(typeof done['conversation_id']).toBe('string');
+    });
+
+    // Guards: the tool-activity wire contract — tool_use + tool_result events stream and the
+    // done event carries tools_used, so the panel (TC3) can render tool activity.
+    it('POST streams tool_use and tool_result events and tools_used in done', async () => {
+        const store = new FakeChatStore();
+        const spendGuard = new FakeSpendGuard();
+        const tool = fakeTool('get_open_questions', { count: 0, open_questions: [], derived: true });
+        const { service } = chatServiceWithTools(
+            store,
+            spendGuard,
+            [tool],
+            toolUseResponse('get_open_questions', {}),
+            chatResponse(REPLY),
+        );
+        const deps: ChatRouteDeps = { store, service, spendGuard };
+        const res = await chatApp(deps).inject({
+            method: 'POST',
+            url: '/api/chat/margaret-chen',
+            payload: { message: 'What should I ask?' },
+        });
+        expect(res.statusCode).toBe(200);
+        const events = res.body
+            .split('\n\n')
+            .filter((chunk) => chunk.startsWith('data: '))
+            .map((chunk) => JSON.parse(chunk.slice(6)) as Record<string, unknown>);
+        expect(events.some((e) => e['type'] === 'tool_use' && e['name'] === 'get_open_questions')).toBe(true);
+        expect(events.some((e) => e['type'] === 'tool_result' && e['name'] === 'get_open_questions' && e['ok'] === true)).toBe(true);
+        const done = events.at(-1)!;
+        expect(done['type']).toBe('done');
+        expect(done['tools_used']).toEqual(['get_open_questions']);
     });
 
     // Guards: guard responses arriving mid-stream — they must be plain JSON status codes.

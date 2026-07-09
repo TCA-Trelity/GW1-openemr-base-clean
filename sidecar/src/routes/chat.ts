@@ -78,6 +78,9 @@ export function registerChatRoutes(app: FastifyInstance, deps: ChatRouteDeps | u
                     onTextDelta: (text) => writeEvent({ type: 'delta', text }),
                     // Verified citations stream live so chips render as the text arrives.
                     onCitation: (citation) => writeEvent({ type: 'citation', citation }),
+                    // Tool activity streams so the panel can show what the model is doing (TC3).
+                    onToolUse: (event) => writeEvent({ type: 'tool_use', name: event.name, input: event.input }),
+                    onToolResult: (event) => writeEvent({ type: 'tool_result', name: event.name, ok: event.ok }),
                 },
             );
             writeEvent({
@@ -85,6 +88,7 @@ export function registerChatRoutes(app: FastifyInstance, deps: ChatRouteDeps | u
                 conversation_id: result.conversation_id,
                 citations: result.citations,
                 unverified_count: result.unverified_count,
+                tools_used: result.tools_used,
             });
         } catch (error) {
             request.log.error({ correlationId: request.id, err: String(error) }, 'chat turn failed');

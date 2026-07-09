@@ -4,10 +4,11 @@
 // verbatim against the stored document server-side (gate philosophy: unverifiable
 // citations are reported, never rendered as provenance). Brevity is a hard prompt
 // contract: physicians read replies in seconds.
-import type { AnthropicClient, AnthropicContentBlock } from '../prep/anthropic.js';
+import type { AnthropicClient, AnthropicContentBlock, AnthropicMessage, AnthropicTool } from '../prep/anthropic.js';
 import type { PrepLogger } from '../prep/extraction.js';
 import type { PrepSpendGuard } from '../prep/pipeline.js';
 import type { FactBundle } from '../store/index.js';
+import { ALL_CHAT_TOOLS, type RegisteredTool } from './tools/index.js';
 
 export interface ChatMessageInput {
     patient_id: string;
@@ -55,13 +56,23 @@ export interface ChatTurnResult {
     reply: string;
     citations: ChatCitation[];
     unverified_count: number;
+    /** Names of the tools the model invoked this turn, in call order (may repeat). */
+    tools_used: string[];
 }
 
 export interface ChatTurnHooks {
     onTextDelta?: (text: string) => void;
     /** Fired per citation as it streams, already mapped + verified. */
     onCitation?: (citation: ChatCitation) => void;
+    /** Fired when the model invokes a tool (before it runs) — the panel shows tool activity. */
+    onToolUse?: (event: { name: string; input: Record<string, unknown> }) => void;
+    /** Fired when a tool returns; `ok` is false for a structured-error result. */
+    onToolResult?: (event: { name: string; ok: boolean }) => void;
 }
+
+// Cap on tool-execution rounds before a final, tool-free call is forced (guards against a
+// model that loops asking for tools forever).
+const MAX_TOOL_ROUNDS = 4;
 
 /** Documents the model may cite, in the exact order sent (document_index maps back). */
 export function citableDocuments(bundle: FactBundle): { id: string; title: string; text: string }[] {
@@ -85,7 +96,11 @@ never estimate, never use outside medical knowledge to fill gaps.
 2. BE BRIEF. Default to at most 3 short bullets or 2 sentences (under ~50 words total). Expand only when the \
 physician explicitly asks for more detail. No preamble, no restating the question, no closing offers.
 3. Ground every clinical claim in the documents so it carries a citation. When documents disagree, surface the \
-conflict in one line — do not pick a winner.`;
+conflict in one line — do not pick a winner.
+4. You have read-only tools that fetch more from THIS patient's record — full documents, OCT measurement trends, \
+scan comparisons, medication-risk checks, keyword search, and open questions. They ARE the record, so rule 1 \
+still holds. Call a tool when the attached documents are insufficient rather than guessing; never invent data a \
+tool could supply. A tool may return an error (e.g. unknown id) — recover and try another approach.`;
 }
 
 const NULLISH_WS = /\s+/g;
@@ -131,12 +146,55 @@ export function verifyCitation(
     };
 }
 
+/**
+ * Verify a tool's document-quoting excerpt against OUR stored copy (same gate philosophy as
+ * verifyCitation, keyed by source_document_id instead of a document_index). A document-quoting
+ * tool result becomes a citation only when its excerpt exists verbatim in the named document.
+ */
+export function verifyDocumentExcerpt(
+    sourceDocumentId: string,
+    excerpt: string,
+    documents: { id: string; title: string; text: string }[],
+): ChatCitation | null {
+    if (excerpt.length === 0) {
+        return null;
+    }
+    const doc = documents.find((candidate) => candidate.id === sourceDocumentId);
+    if (doc === undefined) {
+        return null;
+    }
+    const at = doc.text.indexOf(excerpt);
+    if (at >= 0) {
+        return {
+            document_id: doc.id,
+            document_title: doc.title,
+            cited_text: excerpt,
+            start_char: at,
+            end_char: at + excerpt.length,
+            verified: true,
+        };
+    }
+    const verified = doc.text.replace(NULLISH_WS, ' ').includes(excerpt.replace(NULLISH_WS, ' ').trim());
+    return { document_id: doc.id, document_title: doc.title, cited_text: excerpt, start_char: -1, end_char: -1, verified };
+}
+
 export class ChatService {
+    private readonly toolByName: Map<string, RegisteredTool>;
+    private readonly toolDefs: AnthropicTool[];
+
     constructor(
         private readonly client: AnthropicClient,
         private readonly store: ChatStore,
         private readonly spendGuard?: PrepSpendGuard,
-    ) {}
+        private readonly tools: readonly RegisteredTool[] = ALL_CHAT_TOOLS,
+    ) {
+        this.toolByName = new Map(this.tools.map((tool) => [tool.name, tool]));
+        this.toolDefs = this.tools.map((tool) => ({
+            name: tool.name,
+            description: tool.description,
+            input_schema: tool.inputJsonSchema,
+        }));
+    }
 
     async turn(input: ChatTurnInput, logger: PrepLogger, hooks?: ChatTurnHooks): Promise<ChatTurnResult> {
         const { bundle, conversationId, message, correlationId } = input;
@@ -155,40 +213,111 @@ export class ChatService {
             })),
             { type: 'text', text: message },
         ];
-        const messages = [
+        const messages: AnthropicMessage[] = [
             ...history.map((turn) => ({ role: turn.role, content: turn.content })),
             { role: 'user' as const, content: latestContent },
         ];
 
         const citations: ChatCitation[] = [];
-        const completion = await this.client.complete(buildChatSystemPrompt(bundle), messages, correlationId, {
+        const toolsUsed: string[] = [];
+        // Native Citations-API citations stream across every round (document blocks stay in context).
+        const completeHooks = {
             ...(hooks?.onTextDelta === undefined ? {} : { onTextDelta: hooks.onTextDelta }),
-            onCitation: (raw) => {
+            onCitation: (raw: Record<string, unknown>) => {
                 const mapped = verifyCitation(raw, documents);
                 if (mapped !== null) {
                     citations.push(mapped);
                     hooks?.onCitation?.(mapped);
                 }
             },
-        });
-        logger.info(
-            {
+        };
+
+        let reply = '';
+        // Tool-use loop: offer tools for up to MAX_TOOL_ROUNDS rounds; the final round runs
+        // WITHOUT tools to force an answer. The instant common case (no tool needed) breaks
+        // after round 0 with a single call — identical shape to the pre-loop one-shot.
+        for (let round = 0; ; round++) {
+            const offerTools = round < MAX_TOOL_ROUNDS;
+            const completion = await this.client.complete(
+                buildChatSystemPrompt(bundle),
+                messages,
                 correlationId,
-                conversationId,
+                completeHooks,
+                offerTools ? this.toolDefs : undefined,
+            );
+            reply += completion.text;
+            logger.info(
+                {
+                    correlationId,
+                    conversationId,
+                    round,
+                    model: completion.model,
+                    input_tokens: completion.usage.input_tokens,
+                    output_tokens: completion.usage.output_tokens,
+                    stop_reason: completion.stop_reason,
+                    tool_uses: completion.tool_uses.length,
+                },
+                'chat llm call complete',
+            );
+            await this.spendGuard?.recordCall({
                 model: completion.model,
-                input_tokens: completion.usage.input_tokens,
-                output_tokens: completion.usage.output_tokens,
-                citations: citations.length,
-            },
-            'chat llm call complete',
-        );
-        await this.spendGuard?.recordCall({
-            model: completion.model,
-            inputTokens: completion.usage.input_tokens,
-            outputTokens: completion.usage.output_tokens,
-            correlationId,
-            purpose: 'chat_turn',
-        });
+                inputTokens: completion.usage.input_tokens,
+                outputTokens: completion.usage.output_tokens,
+                correlationId,
+                purpose: 'chat_turn',
+            });
+
+            // Forced-final round, or the model produced a final answer: stop looping.
+            if (!offerTools || completion.stop_reason !== 'tool_use' || completion.tool_uses.length === 0) {
+                break;
+            }
+
+            // Append the assistant's turn (its text + tool_use blocks) verbatim — the API
+            // requires the tool_use blocks to precede their tool_result blocks.
+            const assistantBlocks: AnthropicContentBlock[] = [];
+            if (completion.text.length > 0) {
+                assistantBlocks.push({ type: 'text', text: completion.text });
+            }
+            for (const call of completion.tool_uses) {
+                assistantBlocks.push({ type: 'tool_use', id: call.id, name: call.name, input: call.input });
+            }
+            messages.push({ role: 'assistant', content: assistantBlocks });
+
+            // Execute each requested tool and answer with tool_result blocks.
+            const resultBlocks: AnthropicContentBlock[] = [];
+            for (const call of completion.tool_uses) {
+                hooks?.onToolUse?.({ name: call.name, input: call.input });
+                const tool = this.toolByName.get(call.name);
+                if (tool === undefined) {
+                    resultBlocks.push({
+                        type: 'tool_result',
+                        tool_use_id: call.id,
+                        is_error: true,
+                        content: JSON.stringify({ error: `unknown tool "${call.name}"` }),
+                    });
+                    hooks?.onToolResult?.({ name: call.name, ok: false });
+                    continue;
+                }
+                const invocation = tool.invoke(bundle, call.input);
+                toolsUsed.push(call.name);
+                // Attach any verifiable document-quoting provenance as citations.
+                for (const provenance of invocation.provenance) {
+                    const mapped = verifyDocumentExcerpt(provenance.source_document_id, provenance.excerpt, documents);
+                    if (mapped !== null) {
+                        citations.push(mapped);
+                        hooks?.onCitation?.(mapped);
+                    }
+                }
+                resultBlocks.push({
+                    type: 'tool_result',
+                    tool_use_id: call.id,
+                    content: JSON.stringify(invocation.output),
+                    ...(invocation.ok ? {} : { is_error: true }),
+                });
+                hooks?.onToolResult?.({ name: call.name, ok: invocation.ok });
+            }
+            messages.push({ role: 'user', content: resultBlocks });
+        }
 
         // Persist AFTER a successful completion so a failed call leaves no half-turn.
         await this.store.saveChatMessage({
@@ -202,7 +331,7 @@ export class ChatService {
             patient_id: patientId,
             conversation_id: conversationId,
             role: 'assistant',
-            content: completion.text,
+            content: reply,
             correlation_id: correlationId,
         });
 
@@ -211,6 +340,6 @@ export class ChatService {
             // The chat verification metric: unverifiable spans are surfaced, never provenance.
             logger.warn({ correlationId, conversationId, unverified }, 'chat citations failed verbatim verification');
         }
-        return { conversation_id: conversationId, reply: completion.text, citations, unverified_count: unverified };
+        return { conversation_id: conversationId, reply, citations, unverified_count: unverified, tools_used: toolsUsed };
     }
 }

@@ -19,11 +19,27 @@ export interface AnthropicUsage {
     output_tokens: number;
 }
 
+/** A tool definition offered to the model — one entry of the Messages API `tools` array. */
+export interface AnthropicTool {
+    name: string;
+    description: string;
+    input_schema: Record<string, unknown>;
+}
+
+/** A finalized tool call the model requested, accumulated from the stream. */
+export interface AnthropicToolUse {
+    id: string;
+    name: string;
+    input: Record<string, unknown>;
+}
+
 export interface AnthropicCompletion {
     /** Concatenated text deltas (thinking deltas are skipped). */
     text: string;
     /** Citations API objects (char_location) in arrival order, when documents enable them. */
     citations: Record<string, unknown>[];
+    /** Tool calls the model requested, in arrival order — empty unless `tools` was passed. */
+    tool_uses: AnthropicToolUse[];
     usage: AnthropicUsage;
     stop_reason: string | null;
     model: string;
@@ -117,6 +133,7 @@ export class AnthropicClient {
         messages: AnthropicMessage[],
         correlationId: string,
         hooks?: CompleteHooks,
+        tools?: AnthropicTool[],
     ): Promise<AnthropicCompletion> {
         const onProgress = hooks?.onProgress;
         if (this.apiKey === '') {
@@ -149,6 +166,8 @@ export class AnthropicClient {
         const state: StreamState = {
             text: '',
             citations: [],
+            toolUses: [],
+            toolBuffers: new Map(),
             inputTokens: 0,
             outputTokens: 0,
             stopReason: null,
@@ -178,6 +197,9 @@ export class AnthropicClient {
                         stream: true,
                         system,
                         messages,
+                        // Additive: only serialize `tools` when the caller passes them, so the
+                        // no-tools body (all prep extraction calls) stays byte-identical.
+                        ...(tools === undefined ? {} : { tools }),
                     }),
                     signal: controller.signal,
                 }),
@@ -217,6 +239,7 @@ export class AnthropicClient {
             return {
                 text: state.text,
                 citations: state.citations,
+                tool_uses: state.toolUses,
                 usage: { input_tokens: state.inputTokens, output_tokens: state.outputTokens },
                 stop_reason: state.stopReason,
                 model: state.model,
@@ -237,9 +260,20 @@ export class AnthropicClient {
     }
 }
 
+/** In-flight tool_use block: its id/name plus the partial JSON string being accumulated. */
+interface ToolUseBuffer {
+    id: string;
+    name: string;
+    json: string;
+}
+
 interface StreamState {
     text: string;
     citations: Record<string, unknown>[];
+    /** Finalized tool calls (one per content_block_stop of a tool_use block). */
+    toolUses: AnthropicToolUse[];
+    /** Open tool_use blocks keyed by content-block index while their input streams in. */
+    toolBuffers: Map<number, ToolUseBuffer>;
     inputTokens: number;
     outputTokens: number;
     stopReason: string | null;
@@ -280,6 +314,21 @@ function handleSseLine(line: string, state: StreamState): SseEmission {
             state.inputTokens = asNumber(usage?.['input_tokens']) ?? state.inputTokens;
             return undefined;
         }
+        case 'content_block_start': {
+            // Only tool_use blocks need capture; text-block starts stay no-ops (byte-identical
+            // to the prior default handling). Record id + name; input arrives via input_json_delta.
+            const block = isRecord(event['content_block']) ? event['content_block'] : undefined;
+            if (block?.['type'] !== 'tool_use') {
+                return undefined;
+            }
+            const index = asNumber(event['index']);
+            const id = asString(block['id']);
+            const name = asString(block['name']);
+            if (index !== undefined && id !== undefined && name !== undefined) {
+                state.toolBuffers.set(index, { id, name, json: '' });
+            }
+            return undefined;
+        }
         case 'content_block_delta': {
             const delta = isRecord(event['delta']) ? event['delta'] : undefined;
             if (delta?.['type'] === 'text_delta' && typeof delta['text'] === 'string') {
@@ -291,6 +340,24 @@ function handleSseLine(line: string, state: StreamState): SseEmission {
             if (delta?.['type'] === 'citations_delta' && isRecord(delta['citation'])) {
                 state.citations.push(delta['citation']);
                 return { citation: delta['citation'] };
+            }
+            // Tool input streams as partial JSON fragments appended to the open block.
+            if (delta?.['type'] === 'input_json_delta' && typeof delta['partial_json'] === 'string') {
+                const index = asNumber(event['index']);
+                const buffer = index === undefined ? undefined : state.toolBuffers.get(index);
+                if (buffer !== undefined) {
+                    buffer.json += delta['partial_json'];
+                }
+            }
+            return undefined;
+        }
+        case 'content_block_stop': {
+            // Finalize a tool_use block: parse its accumulated input JSON (empty -> {}).
+            const index = asNumber(event['index']);
+            const buffer = index === undefined ? undefined : state.toolBuffers.get(index);
+            if (index !== undefined && buffer !== undefined) {
+                state.toolBuffers.delete(index);
+                state.toolUses.push({ id: buffer.id, name: buffer.name, input: parseToolInput(buffer.json) });
             }
             return undefined;
         }
@@ -306,7 +373,23 @@ function handleSseLine(line: string, state: StreamState): SseEmission {
             throw new AnthropicApiError(0, asString(error?.['type']) ?? 'stream_error', asString(error?.['message']));
         }
         default:
-            return undefined; // ping, content_block_start/stop, message_stop
+            return undefined; // ping, message_stop
+    }
+}
+
+// Finalize a tool_use block's streamed input. Empty (no input_json_delta arrived, i.e. a
+// no-argument tool) parses to {}; malformed JSON degrades to {} so the tool sees empty input
+// and returns its own structured error rather than the whole stream throwing.
+function parseToolInput(json: string): Record<string, unknown> {
+    const trimmed = json.trim();
+    if (trimmed === '') {
+        return {};
+    }
+    try {
+        const parsed: unknown = JSON.parse(trimmed);
+        return isRecord(parsed) ? parsed : {};
+    } catch {
+        return {};
     }
 }
 
