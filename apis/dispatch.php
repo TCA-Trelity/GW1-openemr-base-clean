@@ -38,8 +38,10 @@ try {
         header('Content-Type: application/json');
         http_response_code(Response::HTTP_INTERNAL_SERVER_ERROR);
     }
+    // The exception detail is logged above; never return it in the response body —
+    // it can leak SQL fragments or file paths (CLAUDE.md: no $e->getMessage() to users).
     die(json_encode([
         'error' => 'An error occurred while processing the request.',
-        'message' => $e->getMessage(),
+        'message' => 'An unexpected error occurred. See server logs for details.',
     ]));
 }

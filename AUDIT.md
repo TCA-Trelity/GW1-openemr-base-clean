@@ -87,13 +87,15 @@ and HS256 dev tokens, under unit test. Enforcement is gated by `AUTH_MODE`
 (default `off`; `enforced` turns it on — runbook §D); the live browser SMART
 EHR-launch is the remaining wiring step, which dev-login stands in for.
 
-### S2 — Exception-message disclosure in API 500s *(Medium)*
-`apis/dispatch.php:41-44` returns `$e->getMessage()` in the JSON body of a
-500. This can leak SQL fragments or file paths, and directly contradicts the
+### S2 — Exception-message disclosure in API 500s *(Medium)* — **FIXED (S3.2)**
+`apis/dispatch.php` previously returned `$e->getMessage()` in the JSON body of a
+500. This could leak SQL fragments or file paths, and directly contradicted the
 repo's own rule ("Never expose `$e->getMessage()` in user-facing output",
-`CLAUDE.md`). Deeper handlers (`HttpRestRouteHandler`) correctly return
-generic messages, so the exposure is confined to unhandled top-level errors.
-**Disposition:** upstreamable fix; scheduled Tier 2 (PRD U2.4).
+`CLAUDE.md`). Deeper handlers (`HttpRestRouteHandler`) already returned generic
+messages, so the exposure was confined to unhandled top-level errors.
+**Disposition:** **Fixed** — the top-level handler now returns a generic message;
+the exception detail is logged server-side only (`error_log`), matching the
+repo standard.
 
 ### S3 — Unauthenticated background-service route *(Medium, by design)*
 `POST /api/background_service/$run` has no `request_authorization_check`

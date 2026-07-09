@@ -62,8 +62,8 @@ deploy logs).
 | S1.6 | Fact store: Postgres schema + migrations (facts, citations, contradictions, source docs, briefs, image records, treatments); derived-view wipe/rebuild command | main | S1.2 | unit | ☑ |
 | S1.7 | Prep pipeline: BullMQ job → FHIR fetch → Sonnet 5 extraction to typed facts (schema-validated, retry on invalid) → contradiction detection → med-risk arithmetic → imaging analytics over authored metadata → brief assembly → store | main | S1.3, S1.5, S1.6 | unit (recorded LLM fixtures) + logs | ☑ |
 | S1.8 | Citation gate: deterministic resolver (every claim's CitationRef must resolve to stored source excerpt; failures rewritten as absence + logged as verification-fail metric) | main | S1.6 | unit (invariant tests) | ☑ |
-| S1.9 | Railway topology: sidecar + Postgres + Redis + Langfuse services in existing project; sidecar volume for scans; user adds `ANTHROPIC_API_KEY` in Variables; seed job (`sidecar/scripts/seed.ts`) runs on Railway against live EHR | main + user + railway | S1.1, S1.4 | logs + ci-live | ☐ |
-| S1.10 | CI: sidecar unit tests on PR; live smoke workflow (hits `/ready`, triggers prep for seed patient, asserts brief exists + citations valid) — this is the session's eyes on prod | main | S1.9 | ci-live | ☐ |
+| S1.9 | Railway topology: sidecar + Postgres + Redis + Langfuse services in existing project; sidecar volume for scans; user adds `ANTHROPIC_API_KEY` in Variables; seed job (`sidecar/scripts/seed.ts`) runs on Railway against live EHR | main + user + railway | S1.1, S1.4 | logs + ci-live | ☑ |
+| S1.10 | CI: sidecar unit tests on PR; live smoke workflow (hits `/ready`, triggers prep for seed patient, asserts brief exists + citations valid) — this is the session's eyes on prod | main | S1.9 | ci-live | ☑ |
 
 **Phase 1 exit criteria:** smoke workflow green — a prepared brief for Margaret Chen exists on the live deployment, every fact cited, gate passing.
 
@@ -85,8 +85,8 @@ LLM output is an async enhancement card, never a gate. Priority stack confirmed:
 | S2.1 | React panel shell: Vite + Tailwind/shadcn (ported design system), brief tabs per manifest §4 (Overview / Medical Background / Diagnosis & Care / Sources), citation chips → source cards (verbatim excerpt highlight, attribution, deep link) | sub/wt | S1.2 | screenshot | ☑ |
 | S2.2 | Imaging spine + all four features: ImagingTimeline (+days-post-injection badges), TrendAnalysis (CRT/GC w/ thresholds), IntervalAnalysis (treat-and-extend recommendation), ImageComparison (≤4 side-by-side); images served from sidecar `ImageStore` | sub/wt | S1.4, S2.1 | screenshot | ☑ |
 | S2.3 | Chat loop: Haiku 4.5 over prepared fact bundle, strict inline citation token contract + parse-back to chips (manifest §5), streaming, conversation persistence, quick prompts | main | S1.7, S1.8 | ci-live + screenshot | ☑ |
-| S2.4 | **Embed (committed for Thu):** `oe-module-clinical-copilot` — brief card into patient chart via `SectionEvent`/`CardRenderEvent`, iframe → SMART-launched panel, patient-bound token. Timeboxed to Thu AM; fallback = chart link to standalone panel (decision point 1 PM CT) | main | S2.1, S1.5 | screenshot | ☐ |
-| S2.5 | Eval suite as deliverable: fixtures from corpus ground truth (planted contradictions found; citation validity 100%; calculator goldens; empty/missing-record boundaries; cross-patient denial; injection corpus in a seeded referral letter); runs in CI; results exported to `docs/execution/eval-results.md` | sub/wt | S1.7, S1.8 | unit + ci-live | ☐ |
+| S2.4 | **Embed (committed for Thu):** `oe-module-clinical-copilot` — brief card into patient chart via `SectionEvent`/`CardRenderEvent`, iframe → SMART-launched panel, patient-bound token. Timeboxed to Thu AM; fallback = chart link to standalone panel (decision point 1 PM CT) | main | S2.1, S1.5 | screenshot | ☑ |
+| S2.5 | Eval suite as deliverable: fixtures from corpus ground truth (planted contradictions found; citation validity 100%; calculator goldens; empty/missing-record boundaries; cross-patient denial; injection corpus in a seeded referral letter); runs in CI; results exported to `docs/execution/eval-results.md` | sub/wt | S1.7, S1.8 | unit + ci-live | ☑ |
 | S2.6 | Observability deliverable: Langfuse dashboard (requests, error rate, p50/p95 per surface, tool calls, retries, verification pass/fail, token spend) + 3 alerts documented w/ on-call response in `docs/execution/observability.md` | main | S1.9, S2.3 | screenshot | ☐ |
 | S2.7 | Bruno collection (`sidecar/api-collection/`): health/ready, register, trigger prep, get brief, chat turn, verify fact — runnable by graders without source | main | S2.3 | ci-live | ☑ |
 | S2.8 | `COSTS.md`: actual dev spend (Anthropic console + Langfuse tokens) + 100/1K/10K/100K projections w/ architecture inflections (from ARCHITECTURE §11) | main | S2.6 | review | ☑ |
@@ -136,7 +136,7 @@ UI moves (avoids collisions in `sidecar/panel/`), corpus agent in parallel.**
 | ID | Ticket | Agent | Depends | Verify | Done |
 |---|---|---|---|---|---|
 | S3.1 | Load tests: 10 + 50 concurrent vs live (k6 in CI), p50/p95/p99 + error rate; baseline CPU/mem/latency/throughput captured to `docs/execution/baselines.md`. *(Harness built — dependency-free `npm run load-test` over the deterministic read path + dispatchable Sidecar-load-probe CI at concurrency 10/50 with a p95 gate; real baselines land on the first live run.)* | ci | Phase 2 | ci-live | ◐ |
-| S3.2 | Hardening per PRD Tier 2: dispatch.php error-disclosure fix (S2), background_service route verification (F6/U2.4), secrets audit | main | Phase 2 | unit + review | ☐ |
+| S3.2 | Hardening per PRD Tier 2: dispatch.php error-disclosure fix (S2), background_service route verification (F6/U2.4), secrets audit. *(dispatch.php 500-handler no longer returns `$e->getMessage()` — generic body, detail logged only; AUDIT S2 marked Fixed. background_service verification + secrets audit still open.)* | main | Phase 2 | unit + review | ◐ |
 | S3.3 | Verification workflow polish: role-gated fact verification UI (physician vs delegated), disputed state, verify-audit trail. *(Delivered: capability-gated `POST /api/facts/:patientId/:factId/verify` — physician full, resident flagged needs-attending-sign-off, nurse 403, cross-patient blocked; panel Verify button gated by role; verification records who/role/when. Disputed-state UI still a nicety. +8 tests.)* | main | S2.1 | screenshot | ☑ |
 | S3.4 | Eval expansion: flagged-output→fixture loop wired (panel flag control → Langfuse annotation), regression run on every push | main | S2.5, S2.6 | ci-live | ☐ |
 | S3.5 | Production-thinking docs refresh: failure-mode drill results, rollback rehearsal (module disable + fact-store rebuild), interview prep sheet. *(`docs/OPERATIONS.md` written — deploy topology, the 5-layer stability model, rollback, auth posture, scaling path, honest gaps; live drill results still to capture.)* | main | S3.1–S3.4 | review | ◐ |
@@ -177,9 +177,9 @@ still passes the citation contract. All six approved.*
 
 | ID | Ticket | Agent | Depends | Verify | Done |
 |---|---|---|---|---|---|
-| G1 | `docs/execution/observability.md`: dashboard metric spec (mapped to emitted Langfuse traces) + the 3 required alerts (p95 latency, error rate, tool-failure) with thresholds + on-call response | main | S2.6 | review | ☐ |
+| G1 | `docs/execution/observability.md`: dashboard metric spec (mapped to emitted Langfuse traces) + the 3 required alerts (p95 latency, error rate, tool-failure) with thresholds + on-call response | main | S2.6 | review | ☑ |
 | G2 | Langfuse deployed live on Railway + 3 alerts configured; `/ready` langfuse check flips to required | user + main | G1 | screenshot | ☐ |
-| G3 | Doc alignment to verbatim PDF: PRD tiers, `presearch.md`, `ARCHITECTURE.md`/`AUDIT.md` authz sections reflect the honest built status (no overclaim) | main | AZ2 | review | ☐ |
+| G3 | Doc alignment to verbatim PDF: PRD tiers, `presearch.md`, `ARCHITECTURE.md`/`AUDIT.md` authz sections reflect the honest built status (no overclaim) | main | AZ2 | review | ☑ |
 | G4 | Demo video (Early: brief → cited chat with tool use → imaging → EHR Record + origin badges → cross-patient 403) | user | AZ,TC | — | ☐ |
 
 ## Standing rules
