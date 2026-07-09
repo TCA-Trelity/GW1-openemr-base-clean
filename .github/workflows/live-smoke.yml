@@ -110,14 +110,18 @@ jobs:
           case "$ctype" in image/*) echo "scan bytes OK ($key, $ctype)";; *) echo "scan fetch FAILED ($ctype)"; exit 1;; esac
 
           echo "== POST /api/prep/margaret-chen =="
+          # A prior brief may exist; when we start a FRESH prep the poll below must not
+          # grade that stale artifact (live gotcha: the old brief 200s immediately).
+          before=$(curl -s --max-time 30 "${AUTH[@]}" "$SIDECAR_URL/api/brief/margaret-chen" | jq -r '.prepared_at // empty')
           code=$(curl -s -X POST -o /tmp/prep.json -w '%{http_code}' --max-time 30 "${AUTH[@]}" "$SIDECAR_URL/api/prep/margaret-chen")
           echo "HTTP $code"; cat /tmp/prep.json; echo
           # 202 = started / already running; 200 reused = a fresh-enough brief already exists
           # (the reuse window is deliberate LLM-spend dedup, not a failure).
           if [ "$code" = "202" ]; then
-            echo "prep started"
+            echo "prep started (will wait for a brief newer than '${before:-none}')"
           elif [ "$code" = "200" ] && grep -q '"status":"reused"' /tmp/prep.json; then
             echo "prep reused a fresh brief (within the reuse window)"
+            before=""
           else
             echo "prep trigger failed"; exit 1
           fi
@@ -125,9 +129,10 @@ jobs:
           echo "== Poll GET /api/brief/margaret-chen (up to 8 min) =="
           for i in $(seq 1 48); do
             code=$(curl -s -o /tmp/brief.json -w '%{http_code}' --max-time 30 "${AUTH[@]}" "$SIDECAR_URL/api/brief/margaret-chen")
-            if [ "$code" = "200" ]; then break; fi
+            if [ "$code" = "200" ] && [ "$(jq -r '.prepared_at // empty' /tmp/brief.json)" != "$before" ]; then break; fi
             echo "attempt $i: HTTP $code — waiting 10s (LLM extraction in flight)"; sleep 10
           done
+          [ "$code" = "200" ] && [ "$(jq -r '.prepared_at // empty' /tmp/brief.json)" = "$before" ] && { echo "brief never refreshed past the pre-prep artifact"; exit 1; }
           echo "== Prep run status (stage shows where a failed run died) =="
           curl -s --max-time 30 "${AUTH[@]}" "$SIDECAR_URL/api/prep-runs/margaret-chen" | jq '.runs[:3]' || true
           [ "$code" = "200" ] || { echo "brief never appeared"; exit 1; }
