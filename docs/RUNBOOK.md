@@ -140,3 +140,55 @@ demographics screen, opening/embedding the panel for that patient.
 > Until Langfuse is live, the same signals are queryable now:
 > `GET /api/usage` (spend), `GET /api/prep-runs/<id>` (run status/stage/error),
 > and Railway logs by correlation ID.
+
+---
+
+## D. Turn on authorization (Wave AZ) — the patient-bound demo
+
+**Goal:** flip the sidecar from open (demo default) to enforcing the patient-bound,
+role-aware access model — 401 unauthenticated, 403 cross-patient, 403 role-gated
+— so the demo can show the boundary is structural, not cosmetic. Order matters:
+enable the token path *before* enforcement, or the panel 401s itself.
+
+1. **Enable dev-login** (the demo/grading token path). Railway → **enchanting-mercy**
+   → **Variables** → add a strong random secret:
+   | Variable | Value |
+   |---|---|
+   | `DEV_LOGIN_SECRET` | a 32+ char random string (e.g. `openssl rand -hex 24`) |
+   Its presence turns on `POST /api/dev-login` and the panel's role switcher. The
+   panel now mints a patient-bound token on every patient/role switch. (Still no
+   rejection yet — `AUTH_MODE` is `off` by default.)
+
+2. **Flip enforcement on.** Add:
+   | Variable | Value |
+   |---|---|
+   | `AUTH_MODE` | `enforced` |
+   Sidecar redeploys. Now every per-patient route requires a valid, patient-bound
+   token; the schedule list (`/api/patients`) stays open by design.
+
+3. **Demo it.**
+   - Open the panel → the role switcher (top-right) shows **Physician / Nurse /
+     Resident**. Switch to **Nurse** → the AI-prep control disappears (read-only),
+     and a prep POST 403s server-side.
+   - **Cross-patient 403** (the headline): grab a bound token and aim it at another
+     patient. From the browser console on the panel, or:
+     ```
+     # 401 — no token:
+     curl -i https://enchanting-mercy-production-5d32.up.railway.app/api/overview/margaret-chen
+     # mint a token bound to margaret, then request tren -> 403:
+     TOK=$(curl -s -XPOST .../api/dev-login -H 'content-type: application/json' \
+       -d '{"role":"physician","patient":"margaret-chen"}' | jq -r .access_token)
+     curl -i -H "Authorization: Bearer $TOK" .../api/overview/tren-okafor   # 403 cross_patient
+     curl -i -H "Authorization: Bearer $TOK" .../api/overview/margaret-chen # 200
+     ```
+
+4. **(Production path) Real SMART EHR-launch.** When `OPENEMR_BASE_URL` +
+   `OPENEMR_CLIENT_ID` are set (from §A), the sidecar also verifies real
+   OpenEMR-issued SMART tokens (RS256 via the EHR's JWKS + `/introspect` for the
+   bound patient). Wiring the OpenEMR module to launch the panel with `launch/patient`
+   and completing the code exchange in the browser is the remaining live step —
+   dev-login covers the graded auth demo without it.
+
+> To turn enforcement back off (e.g. an open kiosk demo), set `AUTH_MODE=off` (or
+> remove it). The code still attaches a principal when a token is present; it just
+> never rejects.
