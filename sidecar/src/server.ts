@@ -97,7 +97,7 @@ export function buildDeps(config: Config): AppDeps | undefined {
         overview: { store },
         ...(config.OPENEMR_BASE_URL !== undefined &&
         config.OPENEMR_CLIENT_ID !== undefined &&
-        config.OPENEMR_PRIVATE_KEY !== undefined
+        config.OPENEMR_CLIENT_KEY !== undefined
             ? {
                   ehr: {
                       service: new EhrSyncService(
@@ -106,7 +106,7 @@ export function buildDeps(config: Config): AppDeps | undefined {
                               tokenProvider: new OpenEmrAuthClient({
                                   baseUrl: config.OPENEMR_BASE_URL,
                                   clientId: config.OPENEMR_CLIENT_ID,
-                                  privateKeyPem: config.OPENEMR_PRIVATE_KEY,
+                                  privateKeyPem: config.OPENEMR_CLIENT_KEY,
                               }),
                           }),
                           store,
