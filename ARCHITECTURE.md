@@ -114,14 +114,23 @@ inherit patient-level control. We construct it — two tasks, two credentials,
 each minimally scoped:
 
 > **Implementation status (2026-07-09).** This dual-credential model is the
-> committed architecture. In code today: the **background preparer** credential
-> is built (read-only `client_credentials` SMART Backend Services, RS384 JWT).
-> The **interactive patient-bound SMART enforcement** — the sidecar validating
-> the launch token and rejecting any request whose bound patient ≠ the
-> requested patient (403), plus physician/nurse/resident capability roles — is
-> landing in **Wave AZ** (`docs/execution/execution-plan.md`). Until AZ lands,
-> the sidecar API is unauthenticated at the demo boundary; a known, tracked
-> gap, not a silent one.
+> committed architecture, and the interactive half now exists in code. The
+> **background preparer** credential is built (read-only `client_credentials`
+> SMART Backend Services, RS384 JWT). The **interactive patient-bound
+> enforcement** landed in **Wave AZ** (`docs/execution/execution-plan.md`): the
+> sidecar is now a SMART resource server that verifies the caller's token and,
+> through one global policy-enforcement point, 401s the unauthenticated, **403s
+> any request whose bound patient ≠ the requested patient**, and gates provider
+> actions by role (physician / nurse / resident). Two token paths feed one
+> verifier that dispatches strictly on the JWT `alg` (the alg-confusion
+> defense): RS256 OpenEMR SMART tokens (signature verified against the EHR's
+> JWKS, then `/introspect` for the authoritative bound patient — it is not in
+> the JWT) and HS256 sidecar dev tokens (the standalone demo/grading path).
+> Enforcement is gated by `AUTH_MODE` (default `off` so the open demo keeps
+> working; `enforced` turns on 401/403 — activation runbook §D) and is covered
+> by unit tests. The remaining live step is the browser SMART EHR-launch itself
+> (OpenEMR module → `launch/patient` → code exchange); the dev-login path
+> exercises the full model — including the cross-patient 403 — without it.
 
 1. **Interactive surface** (brief + chat + scans): a SMART-on-FHIR EHR-launch
    token bound to **one patient and one logged-in user**. If the agent is ever

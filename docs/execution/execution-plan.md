@@ -153,10 +153,10 @@ resident roles with real capability differences**.*
 
 | ID | Ticket | Agent | Depends | Verify | Done |
 |---|---|---|---|---|---|
-| AZ1 | Sidecar becomes a SMART resource server: verify OpenEMR-issued patient-bound access tokens (JWKS signature verify + `aud`/`exp`), extract `{user, patient, role, scopes}`; typed `Principal`; 401 on missing/invalid | main | S1.5 | unit | ☐ |
-| AZ2 | Auth middleware on every patient route: 401 unauthenticated; **403 when token patient ≠ requested patient** (structural cross-patient block); role-capability gate (physician full; nurse read-only, no prep-trigger; resident verifications flagged needs-attending-sign-off) | main | AZ1 | unit + ci-live | ☐ |
-| AZ3 | Interactive SMART EHR-launch wired end-to-end: OpenEMR module launches the panel with `launch/patient`; panel completes the code exchange, stores the patient-bound token, sends it as Bearer on every sidecar call; system client_credentials path stays background-preparer-only | main + user | AZ2, S2.4 | ci-live + screenshot | ☐ |
-| AZ4 | Demo access without breaking review: dev-login that mints a scoped token for the standalone panel (clearly labeled), so graders can exercise auth without the full launch; role switcher for the physician/nurse/resident demo | main | AZ2 | screenshot | ☐ |
+| AZ1 | Sidecar becomes a SMART resource server: verify OpenEMR-issued patient-bound access tokens (JWKS signature verify + `aud`/`exp`), extract `{user, patient, role, scopes}`; typed `Principal`; 401 on missing/invalid | main | S1.5 | unit | ☑ |
+| AZ2 | Auth middleware on every patient route: 401 unauthenticated; **403 when token patient ≠ requested patient** (structural cross-patient block); role-capability gate (physician full; nurse read-only, no prep-trigger; resident verifications flagged needs-attending-sign-off) | main | AZ1 | unit + ci-live | ☑ |
+| AZ3 | Interactive SMART EHR-launch wired end-to-end: OpenEMR module launches the panel with `launch/patient`; panel completes the code exchange, stores the patient-bound token, sends it as Bearer on every sidecar call; system client_credentials path stays background-preparer-only. *(Sidecar RS256/JWKS+introspection verifier and panel Bearer plumbing built + tested; the live browser launch — module `launch/patient` → code exchange — is the remaining step, stood in for by dev-login.)* | main + user | AZ2, S2.4 | ci-live + screenshot | ◐ |
+| AZ4 | Demo access without breaking review: dev-login that mints a scoped token for the standalone panel (clearly labeled), so graders can exercise auth without the full launch; role switcher for the physician/nurse/resident demo | main | AZ2 | screenshot | ☑ |
 
 ## Wave TC — Tool-calling chat (PDF "invoke tools"; user-approved 2026-07-09)
 
@@ -169,9 +169,9 @@ still passes the citation contract. All six approved.*
 
 | ID | Ticket | Agent | Depends | Verify | Done |
 |---|---|---|---|---|---|
-| TC1 | Tool-use loop in the chat service (Haiku tool calls + results back into the stream), keeping the pre-loaded bundle for the instant common case; Zod schema per tool in/out (engineering-req: contracts are source of truth); per-tool error handling + trace | main | S2.3 | unit | ☐ |
-| TC2 | The six tools (read-only, patient-scoped): `get_full_document`, `get_measurement_trend`, `compare_scans` (reuses `computeComparison`), `check_med_risk` (AAO engine), `search_record`, `get_open_questions` | main | TC1 | unit | ☐ |
-| TC3 | Panel: render tool invocations in the chat drawer (which tool ran, cited result) so tool use is visible in the demo | sub | TC2 | screenshot | ☐ |
+| TC1 | Tool-use loop in the chat service (Haiku tool calls + results back into the stream), keeping the pre-loaded bundle for the instant common case; Zod schema per tool in/out (engineering-req: contracts are source of truth); per-tool error handling + trace | main | S2.3 | unit | ☑ |
+| TC2 | The six tools (read-only, patient-scoped): `get_full_document`, `get_measurement_trend`, `compare_scans` (reuses `computeComparison`), `check_med_risk` (AAO engine), `search_record`, `get_open_questions` | main | TC1 | unit | ☑ |
+| TC3 | Panel: render tool invocations in the chat drawer (which tool ran, cited result) so tool use is visible in the demo | sub | TC2 | screenshot | ☑ |
 
 ## Wave G — Early/Final gap closers (from the verbatim PDF requirements pass)
 

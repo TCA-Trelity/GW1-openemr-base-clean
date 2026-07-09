@@ -77,10 +77,15 @@ patient-context binding that *does* exist applies only to the `patient` role
 authorization for staff. We construct it — SMART EHR-launch tokens bound to
 one patient (interactive surface) and a read-only, pipeline-scoped credential
 (background preparer). See `ARCHITECTURE.md` §Authorization. **Build status
-(2026-07-09):** the background-preparer credential is implemented; the
-interactive patient-bound enforcement + physician/nurse/resident roles are in
-progress as Wave AZ (`docs/execution/execution-plan.md`) — until then the
-sidecar API is unauthenticated at the demo boundary, tracked, not silent.
+(2026-07-09):** both halves are now built. The background-preparer credential
+is implemented; the interactive patient-bound enforcement + physician/nurse/
+resident roles landed in Wave AZ (`docs/execution/execution-plan.md`) — the
+sidecar is a SMART resource server with one global policy-enforcement point
+that 401s the unauthenticated, 403s cross-patient requests, and gates provider
+actions by role, verifying RS256 OpenEMR SMART tokens (JWKS + introspection)
+and HS256 dev tokens, under unit test. Enforcement is gated by `AUTH_MODE`
+(default `off`; `enforced` turns it on — runbook §D); the live browser SMART
+EHR-launch is the remaining wiring step, which dev-login stands in for.
 
 ### S2 — Exception-message disclosure in API 500s *(Medium)*
 `apis/dispatch.php:41-44` returns `$e->getMessage()` in the JSON body of a
