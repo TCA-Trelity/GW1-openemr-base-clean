@@ -247,6 +247,19 @@ export class FactStore {
         return result.rows[0] ?? null;
     }
 
+    /**
+     * Reverse of the EHR link: map an OpenEMR patient UUID (from a SMART token's introspection)
+     * back to the sidecar patient id, so a patient-bound token resolves to the row it may read.
+     * Returns null when no seeded patient carries that uuid (AZ1 SmartTokenVerifier).
+     */
+    public async findPatientIdByOpenemrId(openemrPatientId: string): Promise<string | null> {
+        const result = await this.pool.query<{ id: string }>(
+            'SELECT id FROM patients WHERE openemr_patient_id = $1 LIMIT 1',
+            [openemrPatientId],
+        );
+        return result.rows[0]?.id ?? null;
+    }
+
     /** Refresh lever for EHR sync: drop the prior snapshot's facts then the snapshot doc. */
     public async wipeEhrSnapshot(patientId: string, snapshotDocumentId: string): Promise<void> {
         await this.withTransaction(async (client) => {

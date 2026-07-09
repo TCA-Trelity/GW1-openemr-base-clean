@@ -38,6 +38,19 @@ const EnvSchema = z.object({
     PREP_REUSE_WINDOW_MINUTES: z.coerce.number().int().nonnegative().default(10),
     LLM_INPUT_USD_PER_MTOK: z.coerce.number().positive().default(1),
     LLM_OUTPUT_USD_PER_MTOK: z.coerce.number().positive().default(5),
+    // Authorization (Wave AZ). 'off' attaches a Principal when a token is present but never
+    // rejects (preserves the live demo before the panel ships tokens); 'enforced' turns on the
+    // PEP: 401 unauthenticated, 403 cross-patient, 403 role-capability. Enforcement engages only
+    // when a token path below is also configured.
+    AUTH_MODE: z.enum(['off', 'enforced']).default('off'),
+    // Shared secret for sidecar-minted dev tokens (AZ4 demo/grading path). Its presence enables
+    // POST /api/dev-login + HS256 verification. Require a strong secret so demo tokens are not
+    // guessable; keep it out of the repo (Railway variable only).
+    DEV_LOGIN_SECRET: z.string().min(16).optional(),
+    DEV_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(3600),
+    // OAuth site under /oauth2/<site>/ (OpenEMR default is 'default'); shapes the SMART issuer,
+    // JWKS, and introspection URLs the resource-server verifier uses.
+    OPENEMR_OAUTH_SITE: z.string().min(1).default('default'),
 });
 
 export type Config = z.infer<typeof EnvSchema>;

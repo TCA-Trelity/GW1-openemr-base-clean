@@ -10,6 +10,11 @@ import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { Langfuse } from 'langfuse';
 import { ChatService } from './chat/chat.js';
+import { DevTokenService } from './auth/devToken.js';
+import { SmartTokenVerifier } from './auth/smartVerifier.js';
+import { CompositeVerifier } from './auth/verifier.js';
+import { registerAuth, type AuthDeps, type AuthMode } from './auth/middleware.js';
+import { registerAuthRoutes, type AuthRouteDeps } from './routes/auth.js';
 import { EhrSyncService } from './openemr/ehrSync.js';
 import { OpenEmrAuthClient } from './openemr/auth.js';
 import { FhirClient } from './openemr/fhir.js';
@@ -39,6 +44,10 @@ export interface AppDeps {
     chat: ChatRouteDeps;
     /** Live EHR FHIR sync (E2); absent until the OpenEMR read client is configured. */
     ehr?: EhrRouteDeps;
+    /** Authorization PEP (AZ2): the global preHandler's verifier + mode. */
+    auth?: AuthDeps;
+    /** Dev-login + /api/me (AZ4). */
+    authRoutes?: AuthRouteDeps;
 }
 
 // Store-backed dependencies exist only when DATABASE_URL is configured; without it the
@@ -78,6 +87,28 @@ export function buildDeps(config: Config): AppDeps | undefined {
                   console,
               )
             : undefined;
+
+    // Authorization (Wave AZ). Two token paths feed one verifier: sidecar-minted dev tokens
+    // (present when DEV_LOGIN_SECRET is set — the demo/grading path) and OpenEMR SMART tokens
+    // (present when the EHR base URL + our client id are set — the production path, patient
+    // resolved from the token's introspection back to a seeded sidecar patient). Enforcement
+    // engages only when AUTH_MODE=enforced AND at least one path is configured, so a bare or
+    // half-configured deploy keeps serving instead of 401-ing everything.
+    const devTokens =
+        config.DEV_LOGIN_SECRET !== undefined
+            ? new DevTokenService({ secret: config.DEV_LOGIN_SECRET, ttlSeconds: config.DEV_TOKEN_TTL_SECONDS })
+            : undefined;
+    const smartVerifier =
+        config.OPENEMR_BASE_URL !== undefined && config.OPENEMR_CLIENT_ID !== undefined
+            ? new SmartTokenVerifier({
+                  oauthBaseUrl: `${config.OPENEMR_BASE_URL.replace(/\/+$/, '')}/oauth2/${config.OPENEMR_OAUTH_SITE}`,
+                  clientId: config.OPENEMR_CLIENT_ID,
+                  resolvePatient: (openemrPatientUuid) => store.findPatientIdByOpenemrId(openemrPatientUuid),
+              })
+            : undefined;
+    const verifier = new CompositeVerifier(devTokens, smartVerifier);
+    const authMode: AuthMode = config.AUTH_MODE === 'enforced' && verifier.isConfigured ? 'enforced' : 'off';
+
     return {
         checkPostgres: async () => {
             await pool.query('SELECT 1');
@@ -127,6 +158,12 @@ export function buildDeps(config: Config): AppDeps | undefined {
             ),
             spendGuard,
         },
+        auth: { verifier, mode: authMode },
+        authRoutes: {
+            ...(devTokens !== undefined ? { devTokens } : {}),
+            patientExists: async (patientId) => (await store.getPatient(patientId)) !== null,
+            mode: authMode,
+        },
     };
 }
 
@@ -142,7 +179,12 @@ export function buildServer(config: Config, deps?: AppDeps): FastifyInstance {
         reply.header('x-correlation-id', request.id);
     });
 
+    // Authorization first: decorates request.principal and installs the global PEP preHandler
+    // (a no-op in 'off' mode) before any route is registered, so every /api route is guarded.
+    registerAuth(app, deps?.auth);
+
     registerHealthRoutes(app, config, deps === undefined ? undefined : { checkPostgres: deps.checkPostgres });
+    registerAuthRoutes(app, deps?.authRoutes);
     registerPrepRoutes(app, deps?.prep);
     registerOverviewRoutes(app, deps?.overview);
     registerChatRoutes(app, deps?.chat);
