@@ -8,9 +8,24 @@ on:
   workflow_dispatch:
     inputs:
       sidecar_url:
-        description: 'Sidecar base URL (e.g. https://sidecar-production-xxxx.up.railway.app); empty = EHR-only probe'
+        description: 'Sidecar base URL; clear this field to run the EHR-only probe'
         required: false
-        default: ''
+        default: 'https://enchanting-mercy-production-5d32.up.railway.app'
+  # Editing this workflow re-runs it (the session cannot call workflow_dispatch —
+  # the GitHub App token lacks actions:write — but it can push).
+  push:
+    paths:
+      - '.github/workflows/live-smoke.yml'
+
+env:
+  # On push there are no inputs; fall back to the production sidecar.
+  SIDECAR_URL: ${{ github.event_name == 'push' && 'https://enchanting-mercy-production-5d32.up.railway.app' || inputs.sidecar_url }}
+
+# One probe at a time — pushes land on several branches at once and the e2e
+# triggers a real prep; queue instead of stampeding the live service.
+concurrency:
+  group: live-smoke
+  cancel-in-progress: false
 
 jobs:
   probe:
@@ -44,9 +59,7 @@ jobs:
           exit $fail
 
       - name: Sidecar readiness and end-to-end prep
-        if: ${{ inputs.sidecar_url != '' }}
-        env:
-          SIDECAR_URL: ${{ inputs.sidecar_url }}
+        if: ${{ env.SIDECAR_URL != '' }}
         run: |
           set -uo pipefail
 
@@ -54,6 +67,15 @@ jobs:
           code=$(curl -s -o /tmp/ready.json -w '%{http_code}' --max-time 30 "$SIDECAR_URL/ready")
           echo "HTTP $code"; cat /tmp/ready.json | head -c 600; echo
           [ "$code" = "200" ] || { echo "sidecar not ready"; exit 1; }
+
+          echo "== POST /api/ehr-sync/margaret-chen (live EHR link) =="
+          code=$(curl -s -X POST -o /tmp/sync.json -w '%{http_code}' --max-time 60 "$SIDECAR_URL/api/ehr-sync/margaret-chen")
+          echo "HTTP $code"; head -c 600 /tmp/sync.json; echo
+          case "$code" in
+            200) echo "ehr-sync OK" ;;
+            409) echo "ehr-sync: clean no-op (patient not linked — reseed to restore linkage)" ;;
+            *) echo "ehr-sync FAILED — the body above names the failing dependency"; exit 1 ;;
+          esac
 
           echo "== Deterministic layer: patients, overview, scan bytes =="
           curl -s --max-time 30 "$SIDECAR_URL/api/patients" -o /tmp/patients.json
