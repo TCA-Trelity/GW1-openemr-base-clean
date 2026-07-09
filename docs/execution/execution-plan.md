@@ -136,6 +136,46 @@ UI moves (avoids collisions in `sidecar/panel/`), corpus agent in parallel.**
 | S3.5 | Production-thinking docs refresh: failure-mode drill results, rollback rehearsal (module disable + fact-store rebuild), interview prep sheet | main | S3.1–S3.4 | review | ☐ |
 | S3.6 | Final demo video + social post | user | all | — | ☐ |
 
+## Wave AZ — Authorization (PDF hard-problem #1; user-approved 2026-07-09)
+
+*Drift found in the requirements pass: `ARCHITECTURE.md` §authz documents the
+dual-credential, patient-bound SMART model as if enforced, but the sidecar API
+is unauthenticated — a doc-vs-code gap. This wave makes the code do what the
+doc already claims. Decisions locked with the user: **full SMART EHR-launch**
+(patient-binding is structural, not a runtime check); **physician / nurse /
+resident roles with real capability differences**.*
+
+| ID | Ticket | Agent | Depends | Verify | Done |
+|---|---|---|---|---|---|
+| AZ1 | Sidecar becomes a SMART resource server: verify OpenEMR-issued patient-bound access tokens (JWKS signature verify + `aud`/`exp`), extract `{user, patient, role, scopes}`; typed `Principal`; 401 on missing/invalid | main | S1.5 | unit | ☐ |
+| AZ2 | Auth middleware on every patient route: 401 unauthenticated; **403 when token patient ≠ requested patient** (structural cross-patient block); role-capability gate (physician full; nurse read-only, no prep-trigger; resident verifications flagged needs-attending-sign-off) | main | AZ1 | unit + ci-live | ☐ |
+| AZ3 | Interactive SMART EHR-launch wired end-to-end: OpenEMR module launches the panel with `launch/patient`; panel completes the code exchange, stores the patient-bound token, sends it as Bearer on every sidecar call; system client_credentials path stays background-preparer-only | main + user | AZ2, S2.4 | ci-live + screenshot | ☐ |
+| AZ4 | Demo access without breaking review: dev-login that mints a scoped token for the standalone panel (clearly labeled), so graders can exercise auth without the full launch; role switcher for the physician/nurse/resident demo | main | AZ2 | screenshot | ☐ |
+
+## Wave TC — Tool-calling chat (PDF "invoke tools"; user-approved 2026-07-09)
+
+*Chat reasons over a pre-loaded bundle today. This wave adds a Haiku tool-use
+loop so drill-downs pull data not in the summary — satisfying "invoke tools to
+retrieve and reason" honestly, each tool traced to a use case. Every tool is
+read-only, patient-scoped (inherits the AZ patient-bound token → a tool
+physically cannot cross patients), Zod-contracted in/out, and any surfaced fact
+still passes the citation contract. All six approved.*
+
+| ID | Ticket | Agent | Depends | Verify | Done |
+|---|---|---|---|---|---|
+| TC1 | Tool-use loop in the chat service (Haiku tool calls + results back into the stream), keeping the pre-loaded bundle for the instant common case; Zod schema per tool in/out (engineering-req: contracts are source of truth); per-tool error handling + trace | main | S2.3 | unit | ☐ |
+| TC2 | The six tools (read-only, patient-scoped): `get_full_document`, `get_measurement_trend`, `compare_scans` (reuses `computeComparison`), `check_med_risk` (AAO engine), `search_record`, `get_open_questions` | main | TC1 | unit | ☐ |
+| TC3 | Panel: render tool invocations in the chat drawer (which tool ran, cited result) so tool use is visible in the demo | sub | TC2 | screenshot | ☐ |
+
+## Wave G — Early/Final gap closers (from the verbatim PDF requirements pass)
+
+| ID | Ticket | Agent | Depends | Verify | Done |
+|---|---|---|---|---|---|
+| G1 | `docs/execution/observability.md`: dashboard metric spec (mapped to emitted Langfuse traces) + the 3 required alerts (p95 latency, error rate, tool-failure) with thresholds + on-call response | main | S2.6 | review | ☐ |
+| G2 | Langfuse deployed live on Railway + 3 alerts configured; `/ready` langfuse check flips to required | user + main | G1 | screenshot | ☐ |
+| G3 | Doc alignment to verbatim PDF: PRD tiers, `presearch.md`, `ARCHITECTURE.md`/`AUDIT.md` authz sections reflect the honest built status (no overclaim) | main | AZ2 | review | ☐ |
+| G4 | Demo video (Early: brief → cited chat with tool use → imaging → EHR Record + origin badges → cross-patient 403) | user | AZ,TC | — | ☐ |
+
 ## Standing rules
 
 - **Sequencing invariant:** platform (P0) before code; skeleton deployed before surface; the embed timebox decision falls at Phase-2 midpoint.
