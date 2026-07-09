@@ -1,0 +1,46 @@
+# Sidecar load probe (S3.1). Dispatch this against a live sidecar to produce REAL latency
+# baselines for the deterministic read path (no LLM cost). GitHub runners can reach the public
+# Railway URL; the dev session cannot. Runs the probe at two concurrency levels (10, then 50)
+# and fails if any request errored or p95 exceeds the SLO — so it doubles as a perf gate.
+name: Sidecar load probe
+
+on:
+  workflow_dispatch:
+    inputs:
+      sidecar_url:
+        description: 'Sidecar base URL (e.g. https://enchanting-mercy-production-5d32.up.railway.app)'
+        required: true
+      duration_sec:
+        description: 'Seconds per level'
+        required: false
+        default: '20'
+      p95_max_ms:
+        description: 'p95 SLO in ms (fail above this)'
+        required: false
+        default: '1500'
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sidecar
+    strategy:
+      fail-fast: false
+      matrix:
+        concurrency: [10, 50]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: sidecar/package-lock.json
+      - run: npm ci
+      - name: Load probe @ ${{ matrix.concurrency }} concurrent
+        env:
+          LOAD_BASE_URL: ${{ inputs.sidecar_url }}
+          LOAD_CONCURRENCY: ${{ matrix.concurrency }}
+          LOAD_DURATION_SEC: ${{ inputs.duration_sec }}
+          LOAD_P95_MAX_MS: ${{ inputs.p95_max_ms }}
+        run: npm run load-test

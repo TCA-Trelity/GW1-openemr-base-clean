@@ -113,6 +113,6 @@ clarity; the seams to scale are already in place:
 | Live browser SMART EHR-launch (module → `launch/patient` → code exchange) | Verifier + panel Bearer plumbing built + tested; live wiring is the remaining step (AZ3). Dev-login stands in for the graded demo. |
 | Role derivation for real SMART users | Fails closed to least-privilege today; real derivation from OpenEMR user attributes (`users.authorized` + `physician_type` + gacl) is the follow-up. |
 | Langfuse dashboard live | Signals emit; the self-hosted deploy + dashboard/alerts is a user activation (G2). |
-| Load tests + latency baselines (10/50 concurrent) | Not yet run (S3.1). |
+| Load tests + latency baselines (10/50 concurrent) | Harness built — `npm run load-test` (dependency-free, deterministic read path) + the dispatchable **Sidecar load probe** CI workflow at concurrency 10/50 with a p95 SLO gate. Real baselines are produced on the next run against the live URL (S3.1). |
 | `dev-login` openness | By design for grading; documented (`AUDIT.md` S6); disabled in production. |
 | EHR per-patient authz (upstream OpenEMR) | Unimplemented in core (`AUDIT.md` S1); we construct patient-scope control the platform doesn't provide, rather than patch core. |

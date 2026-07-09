@@ -13,6 +13,7 @@
     "start": "node dist/server.js",
     "test": "vitest run",
     "seed-ehr": "tsx src/scripts/seed-ehr.ts",
+    "load-test": "tsx src/scripts/load-test.ts",
     "eval": "tsx eval/run.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:eval": "tsc -p eval --noEmit"
