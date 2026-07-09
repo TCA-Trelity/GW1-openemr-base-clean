@@ -42,36 +42,45 @@ the `production` environment).
    **shown once** — copy both now). The client registers as *Clinical Co-Pilot
    Sidecar*.
 
-3. **Set three sidecar variables** (Railway → **enchanting-mercy** → **Variables**):
+3. **Set the sidecar variables** (Railway → **enchanting-mercy** → **Variables**).
+   Secrets live here — typed into the UI once — so every command below is clean
+   with nothing to fill in:
    | Variable | Value |
    |---|---|
    | `OPENEMR_BASE_URL` | `https://gw1-openemr-base-clean-production.up.railway.app` |
-   | `OPENEMR_CLIENT_ID` | the printed client id |
-   | `OPENEMR_CLIENT_KEY` | the printed one-lined PEM (paste exactly as printed) |
+   | `OPENEMR_CLIENT_ID` | the client id printed in step 2 |
+   | `OPENEMR_CLIENT_KEY` | the one-lined PEM printed in step 2 (paste exactly) |
+   | `OPENEMR_SEED_USERNAME` | `admin` |
+   | `OPENEMR_SEED_PASSWORD` | your EHR admin password |
 
-   The variable names match the script's output exactly. The service redeploys.
+   The variable names match the script's output exactly. Saving redeploys the
+   service — **wait for the deploy to go green** before the SSH steps, because
+   SSH connects to the currently-running container (a variable added seconds ago
+   isn't visible until the new deploy is live; that is what `OPENEMR_CLIENT_ID is
+   required` means).
 
 4. **Enable the client** (system-scope clients start disabled). EHR admin →
    **Administration → System → API Clients** → row **Clinical Co-Pilot Sidecar**
    → **Enable**. (An unenabled client fails token requests with `invalid_client`.)
 
 5. **Seed the EHR** (idempotent; creates/refinds the 5 patients + their
-   problems/allergies/medications). `<admin-password>` is your EHR admin login.
-   `OPENEMR_CLIENT_ID` is passed inline here so this does not depend on the
-   step-3 redeploy having finished (SSH hits the *running* container, so a
-   variable added seconds earlier isn't visible yet — `OPENEMR_CLIENT_ID is
-   required` means exactly that). seed-ehr needs the client id but not the
-   private key; `DATABASE_URL` is already a core sidecar variable:
+   problems/allergies/medications). With the step-3 variables live, every value
+   comes from the environment — nothing to fill in:
    ```
-   railway ssh --service enchanting-mercy \
-     "OPENEMR_BASE_URL=https://gw1-openemr-base-clean-production.up.railway.app OPENEMR_CLIENT_ID=<client-id-from-step-2> OPENEMR_SEED_USERNAME=admin OPENEMR_SEED_PASSWORD=<admin-password> node dist/scripts/seed-ehr.js"
+   railway ssh --service enchanting-mercy "node dist/scripts/seed-ehr.js"
    ```
    Expect one log line per patient (`created` first run, `found` on re-runs),
-   ending `seed-ehr complete`. On failure the script names the gate that broke
-   (`invalid_client` → not enabled; `unsupported_grant_type` → password grant
-   off; `invalid_scope` → re-register). Once the step-3 variables are live you
-   can drop the inline `OPENEMR_BASE_URL`/`OPENEMR_CLIENT_ID` and they'll be
-   read from the environment.
+   ending `seed-ehr complete`. On failure the script names the gate that broke:
+   `OPENEMR_CLIENT_ID is required` → the variable isn't live in the container yet
+   (wait for the green deploy, reconnect); `invalid_client` → client not enabled
+   (step 4); `unsupported_grant_type` → password grant off (step 1);
+   `invalid_scope` → re-register (step 2).
+
+   To confirm what the container actually has before seeding, list the set
+   variable names (no secret values printed):
+   ```
+   railway ssh --service enchanting-mercy "env | grep OPENEMR | cut -d= -f1"
+   ```
 
 6. **Pull it into the sidecar.** After the sidecar redeploys (step-3 env change),
    open the panel → **EHR Record** tab → **Sync now** (or `POST /api/ehr-sync/<id>`).
