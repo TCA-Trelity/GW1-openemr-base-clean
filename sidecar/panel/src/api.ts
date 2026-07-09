@@ -191,6 +191,20 @@ export interface ChatStreamDone {
     conversationId: string;
     citations: ChatCitation[];
     unverifiedCount: number;
+    /** Names of the tools the model invoked this turn (TC3) — [] when it answered from the bundle. */
+    toolsUsed: string[];
+}
+
+/** A `tool_use` stream event (TC3): the model invoked a read-only, patient-scoped tool. */
+export interface ChatToolUse {
+    name: string;
+    input: Record<string, unknown>;
+}
+
+/** A `tool_result` stream event (TC3): that tool returned; `ok` is false on a structured error. */
+export interface ChatToolResult {
+    name: string;
+    ok: boolean;
 }
 
 export type ChatSendResult =
@@ -262,6 +276,10 @@ function chatCitationArray(value: unknown): ChatCitation[] {
     });
 }
 
+function stringArray(value: unknown): string[] {
+    return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
 /**
  * POST /api/chat — the reply streams as SSE over fetch + getReader (the sidecar's own
  * client in src/prep/anthropic.ts is the parsing reference). Guards answer as plain
@@ -275,6 +293,8 @@ export async function sendChatMessage(
     conversationId: string | null,
     onDelta: (text: string) => void,
     onCitation: (citation: ChatCitation) => void,
+    onToolUse?: (tool: ChatToolUse) => void,
+    onToolResult?: (tool: ChatToolResult) => void,
 ): Promise<ChatSendResult> {
     let res: Response;
     try {
@@ -306,11 +326,22 @@ export async function sendChatMessage(
             if (citation !== null) {
                 onCitation(citation);
             }
+        } else if (event.type === 'tool_use' && typeof event.name === 'string') {
+            // A read-only, patient-scoped tool the model chose to run (TC3). input may be
+            // absent/malformed on the wire — normalize to an object the strip can read.
+            const input =
+                typeof event.input === 'object' && event.input !== null && !Array.isArray(event.input)
+                    ? (event.input as Record<string, unknown>)
+                    : {};
+            onToolUse?.({ name: event.name, input });
+        } else if (event.type === 'tool_result' && typeof event.name === 'string') {
+            onToolResult?.({ name: event.name, ok: event.ok === true });
         } else if (event.type === 'done' && typeof event.conversation_id === 'string') {
             done = {
                 conversationId: event.conversation_id,
                 citations: chatCitationArray(event.citations),
                 unverifiedCount: typeof event.unverified_count === 'number' ? event.unverified_count : 0,
+                toolsUsed: stringArray(event.tools_used),
             };
         } else if (event.type === 'error') {
             failed = true;

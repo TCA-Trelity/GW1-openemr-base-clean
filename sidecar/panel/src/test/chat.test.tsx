@@ -273,6 +273,79 @@ describe('ChatDrawer streaming', () => {
     });
 });
 
+describe('ChatDrawer tool activity (TC3)', () => {
+    // Failure mode: the model invokes tools but the drawer shows nothing — tool use must be
+    // visible in the demo, each chip labelled with a friendly name + input hint and marked
+    // done when its result arrives.
+    it('renders a chip per tool as it streams, with an input hint, and settles them to done', async () => {
+        stubFetch((url, init) => {
+            if (url.includes('/api/chat/') && init?.method === 'POST') {
+                return sseResponse([
+                    { type: 'tool_use', name: 'search_record', input: { query: 'sulfa allergy' } },
+                    { type: 'tool_result', name: 'search_record', ok: true },
+                    { type: 'tool_use', name: 'get_measurement_trend', input: { metric: 'IOP', laterality: 'OD' } },
+                    { type: 'tool_result', name: 'get_measurement_trend', ok: true },
+                    { type: 'delta', text: 'Sulfa allergy is documented at intake; IOP trending down OD.' },
+                    { type: 'citation', citation: intakeChatCitation },
+                    {
+                        type: 'done',
+                        conversation_id: 'conv-tc3',
+                        citations: [intakeChatCitation],
+                        unverified_count: 0,
+                        tools_used: ['search_record', 'get_measurement_trend'],
+                    },
+                ]);
+            }
+            return undefined;
+        });
+        render(<Harness />);
+        openDrawer();
+        sendMessage('Any allergies, and how is her pressure?');
+
+        const strip = await screen.findByTestId('tool-activity');
+        // Friendly labels, not raw tool names; the input hint rides alongside.
+        expect(within(strip).getByText('Searched the record')).toBeInTheDocument();
+        expect(within(strip).getByText('sulfa allergy')).toBeInTheDocument();
+        expect(within(strip).getByText('Traced measurement trend')).toBeInTheDocument();
+        expect(within(strip).queryByText('search_record')).not.toBeInTheDocument();
+
+        // Both chips settle to done (no spinner left) once the turn completes.
+        await waitFor(() => {
+            const chips = within(strip).getAllByTestId('tool-chip');
+            expect(chips).toHaveLength(2);
+            for (const chip of chips) {
+                expect(chip).toHaveAttribute('data-status', 'ok');
+            }
+        });
+        // The final answer + its citation still render normally beneath the strip.
+        expect(await screen.findByText(/Sulfa allergy is documented at intake/)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Citation 1: Intake Transcript' })).toBeInTheDocument();
+    });
+
+    // Failure mode: a tool that returned a structured error reads as success — graceful
+    // degradation must be visible, so a failed tool renders distinctly (amber + alert).
+    it('marks a tool that returned no result as failed', async () => {
+        stubFetch((url, init) => {
+            if (url.includes('/api/chat/') && init?.method === 'POST') {
+                return sseResponse([
+                    { type: 'tool_use', name: 'get_full_document', input: { document_id: 'doc-missing' } },
+                    { type: 'tool_result', name: 'get_full_document', ok: false },
+                    { type: 'delta', text: 'I could not find that document in the record.' },
+                    { type: 'done', conversation_id: 'conv-tc3b', citations: [], unverified_count: 0, tools_used: ['get_full_document'] },
+                ]);
+            }
+            return undefined;
+        });
+        render(<Harness />);
+        openDrawer();
+        sendMessage('Open document doc-missing');
+
+        const chip = await within(await screen.findByTestId('tool-activity')).findByTestId('tool-chip');
+        await waitFor(() => expect(chip).toHaveAttribute('data-status', 'error'));
+        expect(chip).toHaveTextContent('Read full document');
+    });
+});
+
 describe('ChatDrawer persistence', () => {
     // Failure mode: reopening the panel loses the conversation — the stored id must
     // replay its history via GET. Replayed messages carry no citations: text only.

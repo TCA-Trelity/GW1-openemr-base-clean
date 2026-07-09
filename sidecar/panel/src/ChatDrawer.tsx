@@ -5,7 +5,23 @@
 // chips appended to the bubble, deep-linking into the source viewer at the cited character
 // range; unverified ones are never rendered as chips, only counted in the amber footer.
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { AlertTriangle, MessageCircle, RefreshCw, Send, X } from 'lucide-react';
+import {
+    AlertTriangle,
+    Check,
+    FileText,
+    GitCompare,
+    HelpCircle,
+    Loader2,
+    MessageCircle,
+    RefreshCw,
+    Search,
+    Send,
+    ShieldAlert,
+    TrendingUp,
+    Wrench,
+    X,
+    type LucideIcon,
+} from 'lucide-react';
 import { fetchChatHistory, sendChatMessage } from './api';
 import type { ChatCitation, CitationRef } from './types';
 import { CitationChips } from './CitationChip';
@@ -51,6 +67,8 @@ interface ChatBubble {
     citations: ChatCitation[];
     /** From the done event; unverifiable spans are surfaced here, never as chips. */
     unverifiedCount: number;
+    /** Tools the model invoked this turn, in call order (TC3) — [] when it answered from the bundle. */
+    toolActivity: ToolActivity[];
     /** The user message that produced this assistant bubble — what Retry resends. */
     requestText: string;
     errorText: string | null;
@@ -115,6 +133,114 @@ export function chatCitationRef(citation: ChatCitation): CitationRef {
     };
 }
 
+// ---- Tool activity (TC3) ----
+
+/** One tool invocation shown in the assistant bubble: which tool, a short input hint, its state. */
+interface ToolActivity {
+    id: string;
+    /** Raw tool name from the stream (e.g. 'search_record'). */
+    name: string;
+    /** A short human hint pulled from the tool input (query/metric/document), else null. */
+    descriptor: string | null;
+    status: 'running' | 'ok' | 'error';
+}
+
+let nextToolSeq = 0;
+function toolActivityId(): string {
+    nextToolSeq += 1;
+    return `tool-${nextToolSeq}`;
+}
+
+// Friendly labels + icons for the six read-only tools; unknown names humanize gracefully.
+const TOOL_LABELS: Record<string, string> = {
+    get_full_document: 'Read full document',
+    get_measurement_trend: 'Traced measurement trend',
+    compare_scans: 'Compared scans',
+    check_med_risk: 'Checked medication risk',
+    search_record: 'Searched the record',
+    get_open_questions: 'Reviewed open questions',
+};
+
+const TOOL_ICONS: Record<string, LucideIcon> = {
+    get_full_document: FileText,
+    get_measurement_trend: TrendingUp,
+    compare_scans: GitCompare,
+    check_med_risk: ShieldAlert,
+    search_record: Search,
+    get_open_questions: HelpCircle,
+};
+
+function toolLabel(name: string): string {
+    return TOOL_LABELS[name] ?? name.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
+}
+
+// The most demo-legible field from a tool's input, truncated — never a whole object dump.
+function toolDescriptor(input: Record<string, unknown>): string | null {
+    for (const key of ['query', 'metric', 'medication', 'document_id', 'image_id', 'scan_id']) {
+        const value = input[key];
+        if (typeof value === 'string' && value.trim() !== '') {
+            return value.length > 40 ? `${value.slice(0, 39)}…` : value;
+        }
+    }
+    return null;
+}
+
+/** Mark the first still-running activity with this tool name as ok/error (tools can repeat). */
+function resolveFirstRunning(activity: ToolActivity[], name: string, status: 'ok' | 'error'): ToolActivity[] {
+    let resolved = false;
+    return activity.map((item) => {
+        if (!resolved && item.name === name && item.status === 'running') {
+            resolved = true;
+            return { ...item, status };
+        }
+        return item;
+    });
+}
+
+/** When a turn settles, no activity should still show as running. */
+function finalizeRunning(activity: ToolActivity[], status: 'ok' | 'error'): ToolActivity[] {
+    return activity.map((item) => (item.status === 'running' ? { ...item, status } : item));
+}
+
+function ToolActivityStrip({ activity }: { activity: ToolActivity[] }) {
+    if (activity.length === 0) {
+        return null;
+    }
+    return (
+        <div data-testid="tool-activity" className="mb-1.5 flex flex-wrap gap-1.5" aria-label="Tools consulted">
+            {activity.map((item) => {
+                const Icon = TOOL_ICONS[item.name] ?? Wrench;
+                const running = item.status === 'running';
+                const failed = item.status === 'error';
+                return (
+                    <span
+                        key={item.id}
+                        data-testid="tool-chip"
+                        data-status={item.status}
+                        title={running ? 'Running…' : failed ? 'Tool returned no result' : 'Done'}
+                        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] leading-none ${
+                            failed
+                                ? 'border-amber-200 bg-amber-50 text-amber-700'
+                                : 'border-slate-200 bg-slate-50 text-slate-600'
+                        }`}
+                    >
+                        <Icon className="w-3 h-3 flex-shrink-0" />
+                        <span className="font-medium">{toolLabel(item.name)}</span>
+                        {item.descriptor !== null && <span className="text-slate-400">{item.descriptor}</span>}
+                        {running ? (
+                            <Loader2 className="w-3 h-3 flex-shrink-0 animate-spin text-slate-400" />
+                        ) : failed ? (
+                            <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                        ) : (
+                            <Check className="w-3 h-3 flex-shrink-0 text-emerald-500" />
+                        )}
+                    </span>
+                );
+            })}
+        </div>
+    );
+}
+
 // ---- Bubbles ----
 
 function AssistantBubble({ bubble, onRetry }: { bubble: ChatBubble; onRetry: (bubble: ChatBubble) => void }) {
@@ -126,6 +252,7 @@ function AssistantBubble({ bubble, onRetry }: { bubble: ChatBubble; onRetry: (bu
     return (
         <div className="flex justify-start">
             <div className="max-w-[85%]">
+                <ToolActivityStrip activity={bubble.toolActivity} />
                 {(bubble.content !== '' || bubble.status === 'streaming' || chips.length > 0) && (
                     <div className="rounded-xl rounded-bl-sm bg-slate-100 px-3.5 py-2 text-[13px] text-slate-700 leading-snug whitespace-pre-wrap">
                         {bubble.content}
@@ -209,6 +336,7 @@ export default function ChatDrawer({
                                   status: 'complete',
                                   citations: [],
                                   unverifiedCount: 0,
+                                  toolActivity: [],
                                   requestText: '',
                                   errorText: null,
                               }),
@@ -253,6 +381,22 @@ export default function ChatDrawer({
                     // Verified chips render live as they stream; dedupe by document+start.
                     patch(assistantId, (bubble) => ({ ...bubble, citations: appendCitation(bubble.citations, citation) }));
                 },
+                (tool) => {
+                    // A tool started — show it running immediately (tools run before the text).
+                    patch(assistantId, (bubble) => ({
+                        ...bubble,
+                        toolActivity: [
+                            ...bubble.toolActivity,
+                            { id: toolActivityId(), name: tool.name, descriptor: toolDescriptor(tool.input), status: 'running' },
+                        ],
+                    }));
+                },
+                (tool) => {
+                    patch(assistantId, (bubble) => ({
+                        ...bubble,
+                        toolActivity: resolveFirstRunning(bubble.toolActivity, tool.name, tool.ok ? 'ok' : 'error'),
+                    }));
+                },
             );
             if (result.kind === 'done') {
                 conversationIdRef.current = result.done.conversationId;
@@ -262,11 +406,23 @@ export default function ChatDrawer({
                     status: 'complete',
                     citations: dedupeCitations(result.done.citations),
                     unverifiedCount: result.done.unverifiedCount,
+                    // A settled turn never shows a spinner: any unmatched tool_result finalizes to ok.
+                    toolActivity: finalizeRunning(bubble.toolActivity, 'ok'),
                 }));
             } else if (result.kind === 'stream_error') {
-                patch(assistantId, (bubble) => ({ ...bubble, status: 'error', errorText: 'The reply was interrupted.' }));
+                patch(assistantId, (bubble) => ({
+                    ...bubble,
+                    status: 'error',
+                    errorText: 'The reply was interrupted.',
+                    toolActivity: finalizeRunning(bubble.toolActivity, 'error'),
+                }));
             } else {
-                patch(assistantId, (bubble) => ({ ...bubble, status: 'error', errorText: result.message }));
+                patch(assistantId, (bubble) => ({
+                    ...bubble,
+                    status: 'error',
+                    errorText: result.message,
+                    toolActivity: finalizeRunning(bubble.toolActivity, 'error'),
+                }));
             }
             sendingRef.current = false;
             setSending(false);
@@ -290,6 +446,7 @@ export default function ChatDrawer({
                     status: 'complete',
                     citations: [],
                     unverifiedCount: 0,
+                    toolActivity: [],
                     requestText: '',
                     errorText: null,
                 },
@@ -300,6 +457,7 @@ export default function ChatDrawer({
                     status: 'streaming',
                     citations: [],
                     unverifiedCount: 0,
+                    toolActivity: [],
                     requestText: text,
                     errorText: null,
                 },
@@ -321,6 +479,7 @@ export default function ChatDrawer({
                 status: 'streaming',
                 citations: [],
                 unverifiedCount: 0,
+                toolActivity: [],
                 errorText: null,
             }));
             void run(bubble.requestText, bubble.id);
