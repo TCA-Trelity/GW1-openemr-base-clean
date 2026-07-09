@@ -8,6 +8,7 @@ import {
     EhrSyncService,
     type EhrSyncStore,
 } from '../src/openemr/ehrSync.js';
+import { DocumentContentSchema, DocumentMetadataSchema } from '../src/schemas/index.js';
 import type { FhirBundle, FhirClient, PatientResourceType } from '../src/openemr/fhir.js';
 
 function bundle(...resources: Record<string, unknown>[]): FhirBundle {
@@ -89,6 +90,17 @@ describe('buildEhrSnapshot', () => {
         const { facts, document } = buildEhrSnapshot({}, 'nobody', NOW);
         expect(facts).toHaveLength(0);
         expect((document.content as { text_content: string }).text_content).toContain('OpenEMR live record snapshot');
+    });
+
+    // Failure mode (live regression): the fact store validates document content with
+    // DocumentContentSchema on insert, but these tests fake the store — a snapshot missing the
+    // required 'format' passed the whole suite and 500'd the first real sync in production.
+    // Run the store's exact insert-time validators against the built document here.
+    it('builds a document that passes the fact store insert validators', () => {
+        const { document } = buildEhrSnapshot(BUNDLES, 'margaret-chen', NOW);
+        expect(() => DocumentContentSchema.parse(document.content)).not.toThrow();
+        expect(() => DocumentMetadataSchema.parse(document.metadata ?? {})).not.toThrow();
+        expect(DocumentContentSchema.parse(document.content).format).toBe('text');
     });
 });
 

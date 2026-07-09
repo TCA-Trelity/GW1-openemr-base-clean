@@ -270,7 +270,8 @@ export function buildEhrSnapshot(
         patient_id: patientId,
         document_type: 'ehr_import',
         document_date: date,
-        content: { text_content: text },
+        // format is required by DocumentContentSchema — the store rejects the insert without it.
+        content: { format: 'text', text_content: text },
         metadata: { source_system: 'openemr_fhir', imported_at: syncedAt },
     };
     return { document, facts, resourceCounts };
