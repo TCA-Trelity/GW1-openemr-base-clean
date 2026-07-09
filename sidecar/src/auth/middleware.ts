@@ -28,7 +28,11 @@ declare module 'fastify' {
     }
 }
 
-const OPEN_PATHS = new Set<string>(['/health', '/ready', '/api/dev-login']);
+// Open by design. /api/patients is the day schedule (names + appointment times) — it is the
+// bootstrap entry point (the panel needs it to resolve which patient to bind a token to), and
+// it is not patient-scoped by nature, so it stays open while every PER-PATIENT record route
+// below it is patient-bound-gated. This is the one deliberate scope decision in the PEP.
+const OPEN_PATHS = new Set<string>(['/health', '/ready', '/api/dev-login', '/api/patients']);
 // <img>-loaded and unauthenticated by nature; a bearer cannot ride an <img> src.
 const OPEN_PREFIXES = ['/api/images/'];
 

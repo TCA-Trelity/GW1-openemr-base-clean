@@ -7,14 +7,20 @@
 import { useCallback, useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import {
+    devLogin,
     fetchFacts,
+    fetchMe,
     fetchOverview,
     fetchPatients,
+    setAuthToken,
+    type AuthCapabilities,
+    type ClinicalRole,
     type FactsFetchResult,
     type OverviewFetchResult,
     type PatientsFetchResult,
 } from './api';
 import type { CitationRef } from './types';
+import RoleSwitcher from './RoleSwitcher';
 import { SourceNavContext } from './CitationChip';
 import PatientSidebar, { sortByAppointment } from './PatientSidebar';
 import AiInsightsTab, { InsightsHeaderControl, useInsights } from './AiInsights';
@@ -52,6 +58,10 @@ export default function App() {
     const [sourceFocus, setSourceFocus] = useState<SourceFocus | null>(null);
     const [reloadNonce, setReloadNonce] = useState(0);
     const [chatOpen, setChatOpen] = useState(false);
+    // Auth (Wave AZ): the demo role, whether dev-login is active, and the current capabilities.
+    const [role, setRole] = useState<ClinicalRole>('physician');
+    const [authActive, setAuthActive] = useState(false);
+    const [capabilities, setCapabilities] = useState<AuthCapabilities | null>(null);
 
     const loadPatients = useCallback(async () => {
         setPatientsState({ kind: 'loading' });
@@ -81,6 +91,10 @@ export default function App() {
     }, []);
 
     // One deterministic fetch renders the whole landing; facts ride along for Sources/Imaging.
+    // Auth first (Wave AZ): mint a dev token bound to THIS patient + role before the reads, so
+    // enforced mode authorizes them and the cross-patient boundary is real (the token is
+    // re-minted on every patient/role switch). When dev-login is disabled the reads run
+    // tokenless, which is correct in AUTH_MODE=off — the panel behaves exactly as before.
     useEffect(() => {
         if (patientId === null) {
             return;
@@ -88,20 +102,34 @@ export default function App() {
         let cancelled = false;
         setOverviewState({ kind: 'loading' });
         setFactsState({ kind: 'loading' });
-        void fetchOverview(patientId).then((result) => {
-            if (!cancelled) {
-                setOverviewState(result);
+        void (async () => {
+            const auth = await devLogin(role, patientId);
+            if (cancelled) {
+                return;
             }
-        });
-        void fetchFacts(patientId).then((result) => {
-            if (!cancelled) {
-                setFactsState(result);
+            if (auth.ok) {
+                setAuthToken(auth.token);
+                setAuthActive(true);
+                const me = await fetchMe();
+                if (cancelled) {
+                    return;
+                }
+                setCapabilities(me?.capabilities ?? null);
+            } else {
+                setAuthToken(null);
+                setAuthActive(false);
+                setCapabilities(null);
             }
-        });
+            const [overviewResult, factsResult] = await Promise.all([fetchOverview(patientId), fetchFacts(patientId)]);
+            if (!cancelled) {
+                setOverviewState(overviewResult);
+                setFactsState(factsResult);
+            }
+        })();
         return () => {
             cancelled = true;
         };
-    }, [patientId, reloadNonce]);
+    }, [patientId, reloadNonce, role]);
 
     const selectPatient = useCallback(
         (id: string) => {
@@ -143,9 +171,12 @@ export default function App() {
                 <div className="flex-1 min-w-0 flex flex-col">
                     {/* Dark chrome — echo of the prototype's slate-800 nav rail */}
                     <header className="bg-slate-800 text-white">
-                        <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-4">
-                            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Clinical Co-Pilot</p>
-                            <h1 className="text-xl font-semibold tracking-tight">{patientName}</h1>
+                        <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
+                            <div className="min-w-0">
+                                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Clinical Co-Pilot</p>
+                                <h1 className="text-xl font-semibold tracking-tight truncate">{patientName}</h1>
+                            </div>
+                            {authActive && <RoleSwitcher role={role} capabilities={capabilities} onChange={setRole} />}
                         </div>
                     </header>
 
@@ -200,11 +231,19 @@ export default function App() {
                                         patient={overview.patient}
                                         generatedAt={overview.generated_at}
                                         action={
-                                            <InsightsHeaderControl
-                                                state={insights.state}
-                                                onGenerate={insights.generate}
-                                                onRetry={insights.retry}
-                                            />
+                                            // Role capability made visible (AZ4): a read-only role (nurse) cannot
+                                            // trigger an AI prep — the server 403s it, and the panel reflects that.
+                                            capabilities !== null && !capabilities.triggerPrep ? (
+                                                <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-xs font-medium text-slate-500">
+                                                    Read-only role — AI prep disabled
+                                                </span>
+                                            ) : (
+                                                <InsightsHeaderControl
+                                                    state={insights.state}
+                                                    onGenerate={insights.generate}
+                                                    onRetry={insights.retry}
+                                                />
+                                            )
                                         }
                                     />
                                 </div>

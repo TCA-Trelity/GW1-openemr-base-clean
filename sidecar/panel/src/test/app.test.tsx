@@ -45,6 +45,9 @@ interface StubOptions {
     brief?: { status: number; body: unknown };
     prep?: { status: number; body: unknown };
     prepRuns?: { status: number; body: unknown };
+    /** Auth (AZ). Default: dev-login disabled (404) → panel runs tokenless, no role switcher. */
+    devLogin?: { status: number; body: unknown };
+    me?: { status: number; body: unknown };
 }
 
 function stubApp(options: StubOptions = {}) {
@@ -55,8 +58,16 @@ function stubApp(options: StubOptions = {}) {
         brief = { status: 200, body: storedBrief },
         prep = { status: 202, body: { prep_run_id: 'run-1', correlation_id: 'corr-1' } },
         prepRuns = { status: 200, body: { runs: [] } },
+        devLogin = { status: 404, body: { error: 'dev_login_disabled' } },
+        me = { status: 200, body: { authenticated: false } },
     } = options;
     return stubFetch((url, init) => {
+        if (url.includes('/api/dev-login')) {
+            return devLogin;
+        }
+        if (url.includes('/api/me')) {
+            return me;
+        }
         if (url.includes('/api/patients')) {
             return { status: 200, body: { patients: patientList } };
         }
@@ -88,6 +99,71 @@ afterEach(() => {
     vi.unstubAllGlobals();
     // Selection pushes ?patient= — reset so the next test starts without a deep link.
     window.history.replaceState(null, '', '/');
+});
+
+describe('App auth (role switcher, AZ4)', () => {
+    const CAPS: Record<string, { read: boolean; triggerPrep: boolean; verify: string | false }> = {
+        physician: { read: true, triggerPrep: true, verify: 'full' },
+        nurse: { read: true, triggerPrep: false, verify: false },
+        resident: { read: true, triggerPrep: true, verify: 'needs_attending_sign_off' },
+    };
+
+    // Failure mode: the role switcher is cosmetic — switching to nurse doesn't re-mint the token
+    // (so the server still sees a physician) or doesn't reflect the lost AI-prep capability.
+    it('shows the switcher when dev-login is active, re-mints on switch, and gates AI prep by role', async () => {
+        let lastRole = 'physician';
+        const mock = stubFetch((url, init) => {
+            if (url.includes('/api/dev-login')) {
+                const body = init?.body !== undefined ? (JSON.parse(String(init.body)) as { role?: string }) : {};
+                lastRole = body.role ?? 'physician';
+                return { status: 200, body: { access_token: `tok-${lastRole}`, role: lastRole, patient: 'margaret-chen' } };
+            }
+            if (url.includes('/api/me')) {
+                return { status: 200, body: { authenticated: true, role: lastRole, capabilities: CAPS[lastRole] } };
+            }
+            if (url.includes('/api/patients')) {
+                return { status: 200, body: { patients } };
+            }
+            if (url.includes('/api/overview/')) {
+                return { status: 200, body: overviewPayload };
+            }
+            if (url.includes('/api/facts/')) {
+                return { status: 200, body: factBundle };
+            }
+            if (url.includes('/api/brief/')) {
+                return { status: 200, body: storedBrief };
+            }
+            if (url.includes('/api/prep-runs/')) {
+                return { status: 200, body: { runs: [] } };
+            }
+            return undefined;
+        });
+        render(<App />);
+
+        // Physician by default: switcher present, no read-only banner.
+        expect(await screen.findByRole('radio', { name: 'Physician' })).toBeInTheDocument();
+        expect(screen.queryByText(/Read-only role/i)).not.toBeInTheDocument();
+
+        // Switch to nurse: the read-only capability surfaces and a fresh token is minted as nurse.
+        fireEvent.click(screen.getByRole('radio', { name: 'Nurse' }));
+        expect(await screen.findByText(/Read-only role/i)).toBeInTheDocument();
+        await waitFor(() =>
+            expect(
+                mock.mock.calls.some(
+                    ([input, init]) => String(input).includes('/api/dev-login') && String((init as RequestInit | undefined)?.body).includes('nurse'),
+                ),
+            ).toBe(true),
+        );
+    });
+
+    // Failure mode: the demo control leaks into a real session — the switcher must be hidden
+    // when dev-login is disabled (the standalone/off default).
+    it('hides the switcher when dev-login is disabled', async () => {
+        stubApp();
+        render(<App />);
+        await screen.findByText(/Margaret/);
+        expect(screen.queryByRole('radio', { name: 'Physician' })).not.toBeInTheDocument();
+    });
 });
 
 describe('App landing (deterministic overview)', () => {

@@ -284,12 +284,11 @@ describe('registerAuth middleware', () => {
         expect((await app.inject({ method: 'GET', url: '/api/images/oct.png' })).statusCode).toBe(200);
     });
 
-    // Failure mode: the multi-patient day list demands a patient binding it structurally can't have.
-    it('allows the patient list for any bound principal (no patient match required)', async () => {
-        const dev = devService();
-        const app = miniApp({ mode: 'enforced', devTokens: dev });
-        const { token } = dev.mint({ username: 'dr-demo', role: 'physician', patient: 'margaret-chen' });
-        expect((await app.inject({ method: 'GET', url: '/api/patients', headers: bearer(token) })).statusCode).toBe(200);
+    // Failure mode: the day-schedule list (the bootstrap entry) is gated, deadlocking the panel
+    // (it needs the list to know which patient to bind a token to). It is open by design.
+    it('leaves the patient list open (bootstrap entry, not patient-scoped)', async () => {
+        const app = miniApp({ mode: 'enforced', devTokens: devService() });
+        expect((await app.inject({ method: 'GET', url: '/api/patients' })).statusCode).toBe(200);
     });
 });
 

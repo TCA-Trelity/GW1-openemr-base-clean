@@ -5,6 +5,84 @@ import type { ChatCitation, FactBundle, OverviewPayload, PatientRecord, PrepRunR
 
 const UNREACHABLE = 'Could not reach the sidecar API.';
 
+// ---- Auth (Wave AZ) ----
+// The panel holds one bearer token (a sidecar dev token in the demo, or a SMART launch token in
+// production) and attaches it to every sidecar call through apiFetch. All request functions below
+// go through apiFetch, so this is the single place the Authorization header is added.
+
+export type ClinicalRole = 'physician' | 'nurse' | 'resident';
+
+export interface AuthCapabilities {
+    read: boolean;
+    triggerPrep: boolean;
+    verify: 'full' | 'needs_attending_sign_off' | false;
+}
+
+export interface MeResult {
+    authenticated: boolean;
+    user?: string;
+    patient?: string | null;
+    role?: ClinicalRole;
+    token_type?: 'smart' | 'dev';
+    capabilities?: AuthCapabilities;
+}
+
+let authToken: string | null = null;
+
+/** Set (or clear) the bearer sent on every sidecar call. Cleared by passing null. */
+export function setAuthToken(token: string | null): void {
+    authToken = token;
+}
+
+/** fetch + the current bearer. The only network entry point for the functions below. */
+function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+    const headers = new Headers(init?.headers);
+    if (authToken !== null) {
+        headers.set('Authorization', `Bearer ${authToken}`);
+    }
+    return fetch(path, { ...init, headers });
+}
+
+export type DevLoginResult = { ok: true; token: string } | { ok: false; disabled: boolean };
+
+/**
+ * Mint a demo dev token bound to (role, patient). patient may be null for a provider-scope token
+ * that can see the schedule but no chart. Returns { ok:false, disabled:true } when dev-login is
+ * turned off (404) — the caller then runs tokenless, which is correct in AUTH_MODE=off.
+ */
+export async function devLogin(role: ClinicalRole, patient: string | null): Promise<DevLoginResult> {
+    try {
+        const res = await fetch('/api/dev-login', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(patient === null ? { role } : { role, patient }),
+        });
+        if (res.status === 404) {
+            return { ok: false, disabled: true };
+        }
+        if (!res.ok) {
+            return { ok: false, disabled: false };
+        }
+        const body = (await res.json()) as { access_token?: string };
+        return typeof body.access_token === 'string' ? { ok: true, token: body.access_token } : { ok: false, disabled: false };
+    } catch {
+        return { ok: false, disabled: false };
+    }
+}
+
+/** The current principal + its capabilities, or null when unavailable. */
+export async function fetchMe(): Promise<MeResult | null> {
+    try {
+        const res = await apiFetch('/api/me');
+        if (!res.ok) {
+            return null;
+        }
+        return (await res.json()) as MeResult;
+    } catch {
+        return null;
+    }
+}
+
 export type PatientsFetchResult =
     | { kind: 'ready'; patients: PatientRecord[] }
     | { kind: 'error'; message: string };
@@ -12,7 +90,7 @@ export type PatientsFetchResult =
 /** GET /api/patients — the day schedule behind the sidebar. */
 export async function fetchPatients(): Promise<PatientsFetchResult> {
     try {
-        const res = await fetch('/api/patients');
+        const res = await apiFetch('/api/patients');
         if (!res.ok) {
             return { kind: 'error', message: `Patient list request failed (HTTP ${res.status}).` };
         }
@@ -30,7 +108,7 @@ export type OverviewFetchResult =
 /** GET /api/overview — the deterministic landing payload (no LLM in this path). */
 export async function fetchOverview(patientId: string): Promise<OverviewFetchResult> {
     try {
-        const res = await fetch(`/api/overview/${encodeURIComponent(patientId)}`);
+        const res = await apiFetch(`/api/overview/${encodeURIComponent(patientId)}`);
         if (res.status === 404) {
             return { kind: 'error', message: 'Patient is not registered in the sidecar.' };
         }
@@ -50,7 +128,7 @@ export type BriefFetchResult =
 
 export async function fetchBrief(patientId: string): Promise<BriefFetchResult> {
     try {
-        const res = await fetch(`/api/brief/${encodeURIComponent(patientId)}`);
+        const res = await apiFetch(`/api/brief/${encodeURIComponent(patientId)}`);
         if (res.status === 404) {
             return { kind: 'not_prepared' };
         }
@@ -69,7 +147,7 @@ export type FactsFetchResult =
 
 export async function fetchFacts(patientId: string): Promise<FactsFetchResult> {
     try {
-        const res = await fetch(`/api/facts/${encodeURIComponent(patientId)}`);
+        const res = await apiFetch(`/api/facts/${encodeURIComponent(patientId)}`);
         if (res.status === 404) {
             return { kind: 'error', message: 'Patient is not registered in the sidecar.' };
         }
@@ -99,7 +177,7 @@ export type EhrSyncFetchResult =
  */
 export async function syncEhr(patientId: string): Promise<EhrSyncFetchResult> {
     try {
-        const res = await fetch(`/api/ehr-sync/${encodeURIComponent(patientId)}`, { method: 'POST' });
+        const res = await apiFetch(`/api/ehr-sync/${encodeURIComponent(patientId)}`, { method: 'POST' });
         if (res.status === 503) {
             return { kind: 'not_configured' };
         }
@@ -131,7 +209,7 @@ export type PrepStartResult =
 /** POST /api/prep — 202 accepted/already_running, 200 fresh-brief reuse, 429 guard rejections. */
 export async function startPrep(patientId: string): Promise<PrepStartResult> {
     try {
-        const res = await fetch(`/api/prep/${encodeURIComponent(patientId)}`, { method: 'POST' });
+        const res = await apiFetch(`/api/prep/${encodeURIComponent(patientId)}`, { method: 'POST' });
         if (res.status === 202) {
             return { kind: 'accepted' };
         }
@@ -173,7 +251,7 @@ export type ChatHistoryFetchResult =
 /** GET /api/chat — oldest-first replay of a stored conversation. */
 export async function fetchChatHistory(patientId: string, conversationId: string): Promise<ChatHistoryFetchResult> {
     try {
-        const res = await fetch(
+        const res = await apiFetch(
             `/api/chat/${encodeURIComponent(patientId)}?conversation_id=${encodeURIComponent(conversationId)}`,
         );
         if (!res.ok) {
@@ -298,7 +376,7 @@ export async function sendChatMessage(
 ): Promise<ChatSendResult> {
     let res: Response;
     try {
-        res = await fetch(`/api/chat/${encodeURIComponent(patientId)}`, {
+        res = await apiFetch(`/api/chat/${encodeURIComponent(patientId)}`, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify(conversationId !== null ? { message, conversation_id: conversationId } : { message }),
@@ -376,7 +454,7 @@ export async function sendChatMessage(
 /** GET /api/prep-runs — newest-first run history with live stage progress. */
 export async function fetchPrepRuns(patientId: string): Promise<PrepRunsFetchResult> {
     try {
-        const res = await fetch(`/api/prep-runs/${encodeURIComponent(patientId)}`);
+        const res = await apiFetch(`/api/prep-runs/${encodeURIComponent(patientId)}`);
         if (!res.ok) {
             return { kind: 'error', message: `Prep-run request failed (HTTP ${res.status}).` };
         }
