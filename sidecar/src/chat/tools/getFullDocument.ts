@@ -58,3 +58,5 @@ export const getFullDocument = defineTool<Input, Output>({
         return [{ source_document_id: output.source_document_id, excerpt: output.text_content.slice(0, EXCERPT_CHARS) }];
     },
 });
+
+// (committed member of the chat tool registry — re-sync marker for the build context)

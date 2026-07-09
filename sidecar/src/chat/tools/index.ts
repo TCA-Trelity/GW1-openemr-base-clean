@@ -25,3 +25,5 @@ export const ALL_CHAT_TOOLS: readonly RegisteredTool[] = [
     searchRecord,
     getOpenQuestions,
 ];
+
+// (committed member of the chat tool registry — re-sync marker for the build context)
