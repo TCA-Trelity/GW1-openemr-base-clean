@@ -77,8 +77,10 @@ class InsuranceCompanyRestController
     )]
     public function getAll()
     {
-        $serviceResult = $this->insuranceCompanyService->getAll();
-        return RestControllerHelper::responseHandler($serviceResult, null, 200);
+        // The service was modernized to return a ProcessingResult; the legacy responseHandler
+        // path throws a TypeError on that (getResponseForPayload) and 500s every list call.
+        $processingResult = $this->insuranceCompanyService->getAll();
+        return RestControllerHelper::handleProcessingResult($processingResult, 200, true);
     }
 
     #[OA\Get(

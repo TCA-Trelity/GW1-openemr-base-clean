@@ -418,6 +418,33 @@ describe('seedPatientIntoEhr', () => {
         expect(calls.filter((call) => call.method === 'POST')).toEqual([]);
     });
 
+    // Guards (live lesson): GET /api/insurance_company 500'd on a server bug and voided the
+    // WHOLE patient — depth sections must degrade to a skipped outcome, never fail the chart.
+    it('records a depth section as skipped when its EHR route errors, without failing the patient', async () => {
+        const depth = depthRoutes('uuid-mc', '42').routes;
+        delete depth['GET /apis/default/api/insurance_company'];
+        const { fetch } = apiFake({
+            'GET /apis/default/api/patient': () => jsonResponse(200, envelope([MC_SEARCH_ROW])),
+            'GET /apis/default/api/patient/uuid-mc/medical_problem': () => jsonResponse(200, envelope([])),
+            'POST /apis/default/api/patient/uuid-mc/medical_problem': () => jsonResponse(201, envelope({ id: 1, uuid: 'u' })),
+            'GET /apis/default/api/patient/uuid-mc/allergy': () => jsonResponse(200, envelope([])),
+            'POST /apis/default/api/patient/uuid-mc/allergy': () => jsonResponse(201, envelope({ id: 2, uuid: 'u' })),
+            'GET /apis/default/api/patient/42/medication': () => jsonResponse(404, undefined),
+            'POST /apis/default/api/patient/42/medication': () => jsonResponse(200, 3),
+            ...depth,
+            'GET /apis/default/api/insurance_company': () =>
+                jsonResponse(500, { error: 'An error occurred', message: 'getResponseForPayload() expects a string, array, numeric, or JsonSerializable object, ProcessingResult given.' }),
+        });
+
+        const outcome = await seedPatientIntoEhr(standardApi(fetch), loadCorpus('margaret-chen.json'));
+
+        expect(outcome.encounters).toMatchObject({ created: 2, existing: 0 });
+        expect(outcome.appointments).toMatchObject({ created: 2, existing: 0 });
+        expect(outcome.insurance.created).toBe(0);
+        expect(outcome.insurance.skipped[0]?.factId).toBe('ehr.insurance');
+        expect(outcome.insurance.skipped[0]?.reason).toContain('status 500');
+    });
+
     // Guards: william has no medications, so the seeder must not even GET the medication list
     // (whose empty-list 404 would otherwise need special-casing for nothing).
     it('skips list reads entirely when a corpus has nothing to write', async () => {

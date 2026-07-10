@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import {
     StandardApiClient,
+    StandardApiError,
     type EhrAllergyPayload,
     type EhrAppointmentPayload,
     type EhrEncounterPayload,
@@ -532,11 +533,25 @@ export async function seedPatientIntoEhr(api: StandardApiClient, corpus: EhrSeed
     const allergies = await seedList(buildAllergyPayloads(corpus), () => api.listAllergyTitles(uuid), (item) => api.createAllergy(uuid, item));
     const medications = await seedList(buildMedicationPayloads(corpus), () => api.listMedicationTitles(pid), (item) => api.createMedication(pid, item));
 
-    const encounters = await seedEncounters(api, corpus, uuid, pid);
-    const appointments = await seedAppointments(api, corpus, pid);
-    const insurance = await seedInsurance(api, corpus, uuid);
+    // Depth sections degrade gracefully: the core chart (identity + problem/allergy/medication
+    // lists) stays fail-hard above, but one broken EHR route in the depth writes (live lesson:
+    // GET /api/insurance_company 500'd on a server bug) must not void the rest of the patient.
+    const encounters = await sectionSafe('ehr.encounters', () => seedEncounters(api, corpus, uuid, pid));
+    const appointments = await sectionSafe('ehr.appointments', () => seedAppointments(api, corpus, pid));
+    const insurance = await sectionSafe('ehr.insurance', () => seedInsurance(api, corpus, uuid));
 
     return { patientId: corpus.patient.patient_id, action, uuid, pid, problems, allergies, medications, encounters, appointments, insurance };
+}
+
+async function sectionSafe(label: string, run: () => Promise<SeedListOutcome>): Promise<SeedListOutcome> {
+    try {
+        return await run();
+    } catch (error) {
+        if (error instanceof StandardApiError) {
+            return { created: 0, existing: 0, skipped: [{ factId: label, reason: `EHR route failed: ${error.message}` }] };
+        }
+        throw error;
+    }
 }
 
 const NO_OUTCOME: SeedListOutcome = { created: 0, existing: 0, skipped: [] };
