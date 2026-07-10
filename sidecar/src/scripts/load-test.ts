@@ -27,7 +27,10 @@ const bearer = process.env['LOAD_BEARER'] ?? '';
 
 // The deterministic landing path: readiness + the two reads that render the whole overview.
 // No prep/chat here — those cost model tokens and are budget-gated by design.
-const PATHS: readonly string[] = ['/ready', '/api/patients', `/api/overview/${encodeURIComponent(patient)}`];
+// /ready is deliberately NOT in the rotation: it fans out to OpenEMR/Anthropic/Langfuse
+// healthchecks per hit, so loading it measures third-party dependencies, not this service
+// (first live run: 12-15% errors and a 3-5s tail, all from the /ready fanout).
+const PATHS: readonly string[] = ['/api/patients', `/api/overview/${encodeURIComponent(patient)}`];
 
 interface Sample {
     ms: number;
