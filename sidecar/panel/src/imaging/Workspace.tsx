@@ -10,12 +10,15 @@
 // each scan is a single 2D JPEG, so the filmstrip scrubs *scans in the series*, not slices.
 import type { ReactNode } from 'react';
 import { ArrowLeft, ChevronLeft, ChevronRight, ScanEye, Sparkles } from 'lucide-react';
+import { Minus, TrendingDown, TrendingUp } from 'lucide-react';
 import type { HcqProgressionAnalysis, ImageRecord } from '../types';
 import { Card, formatDate } from '../ui';
 import AnalysisPanel from './AnalysisPanel';
 import { TreatmentContextBadge } from './badges';
+import { deltaTone } from './delta';
 import ScanImage, { modalityLabel } from './ScanImage';
-import { seriesFor } from './series';
+import { measurementDeltaBetween, priorInSeries, seriesFor } from './series';
+import { metricPolarity } from './summary';
 import Trends from './Trends';
 
 function LateralityTag({ laterality }: { laterality: string }) {
@@ -115,6 +118,70 @@ function Filmstrip({
     );
 }
 
+// Q6: the metrics a doctor reaches for, written onto the scan's dead space — value + trend
+// vs the prior scan in the series, plus acquisition context, without leaving the image.
+const OVERLAY_METRICS: { type: string; label: string }[] = [
+    { type: 'central_retinal_thickness', label: 'CRT' },
+    { type: 'ganglion_cell_thickness', label: 'GC-IPL' },
+];
+
+const OVERLAY_TONE: Record<'good' | 'bad' | 'neutral', string> = {
+    good: 'text-emerald-300',
+    bad: 'text-red-300',
+    neutral: 'text-slate-300',
+};
+
+function ScanOverlay({ image, series }: { image: ImageRecord; series: ImageRecord[] }) {
+    const prior = priorInSeries(image, series);
+    const measurements = image.ai_analysis?.measurements ?? [];
+    const metricChips = OVERLAY_METRICS.flatMap(({ type, label }) => {
+        const measurement = measurements.find((m) => m.measurement_type === type);
+        if (measurement === undefined) {
+            return [];
+        }
+        const delta = measurementDeltaBetween(type, image, prior);
+        const tone = delta !== null ? deltaTone(delta, metricPolarity(type)) : 'neutral';
+        const Icon = delta === null || delta === 0 ? Minus : delta > 0 ? TrendingUp : TrendingDown;
+        return [{ label, measurement, delta, tone, Icon }];
+    });
+    const meta = image.image_metadata;
+    const context = image.treatment_context;
+    const contextParts = [
+        meta.scan_quality !== undefined ? `Q ${meta.scan_quality}/10` : '',
+        context?.treatment_cycle_number != null ? `Cycle #${context.treatment_cycle_number}` : '',
+        context?.days_since_last_treatment != null ? `${context.days_since_last_treatment}d post-tx` : '',
+    ].filter((part) => part !== '');
+    if (metricChips.length === 0 && contextParts.length === 0) {
+        return null;
+    }
+    return (
+        <div data-testid="scan-overlay" className="pointer-events-none absolute inset-0 p-3 flex flex-col justify-between">
+            <div className="flex flex-col items-start gap-1.5">
+                {metricChips.map(({ label, measurement, delta, tone, Icon }) => (
+                    <span
+                        key={label}
+                        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-950/70 border border-white/10 text-[11px] font-medium text-slate-100"
+                    >
+                        {label} {measurement.value}
+                        {measurement.unit !== undefined ? ` ${measurement.unit}` : ''}
+                        {delta !== null && delta !== 0 && (
+                            <span className={`inline-flex items-center gap-0.5 ${OVERLAY_TONE[tone]}`}>
+                                <Icon className="w-3 h-3" />
+                                {delta > 0 ? `+${delta}` : delta}
+                            </span>
+                        )}
+                    </span>
+                ))}
+            </div>
+            {contextParts.length > 0 && (
+                <span className="self-end inline-flex px-2 py-1 rounded-md bg-slate-950/70 border border-white/10 text-[11px] text-slate-200">
+                    {contextParts.join(' · ')}
+                </span>
+            )}
+        </div>
+    );
+}
+
 /** CENTER — the dark viewer: OD/OS label, prev/next, big B-scan, filmstrip scrubber. */
 function Viewer({
     image,
@@ -162,8 +229,9 @@ function Viewer({
                     </button>
                 </span>
             </div>
-            <div className="flex items-center justify-center p-4 bg-slate-950">
-                <ScanImage image={image} detail className="w-full max-h-[26rem] aspect-[4/3] object-contain" />
+            <div className="relative flex items-center justify-center p-4 bg-slate-950">
+                <ScanImage image={image} detail className="w-full max-h-[42rem] aspect-[4/3] object-contain" />
+                <ScanOverlay image={image} series={series} />
             </div>
             {series.length > 1 && <Filmstrip series={series} selectedId={image.id} onSelect={onSelect} />}
         </div>
@@ -224,15 +292,12 @@ export default function Workspace({
                 </span>
             </div>
 
-            {/* Center-stage viewer flanked by margins: LEFT acquisition, RIGHT findings/measurements. */}
-            <div className="grid gap-4 lg:grid-cols-12 items-start">
-                <div className="lg:col-span-3 order-2 lg:order-1">
+            {/* Q5 breakout: the viewer takes every pixel the full-bleed tab offers; acquisition
+                and the findings/measurements panel stack in one right-hand rail. */}
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] items-start">
+                <Viewer image={selected} series={series} onSelect={onSelect} />
+                <div className="space-y-4">
                     <AcquisitionMargin image={selected} />
-                </div>
-                <div className="lg:col-span-6 order-1 lg:order-2">
-                    <Viewer image={selected} series={series} onSelect={onSelect} />
-                </div>
-                <div className="lg:col-span-3 order-3">
                     <Card className="p-4">
                         <AnalysisPanel image={selected} images={images} />
                     </Card>

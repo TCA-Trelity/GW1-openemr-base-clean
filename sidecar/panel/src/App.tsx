@@ -204,7 +204,9 @@ export default function App() {
                         </div>
                     </header>
 
-                    <main className="max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex-1">
+                    {/* Q5: the imaging suite escapes the centered column — scans get the full
+                        viewport width beside the sidebar; every other tab keeps the reading width. */}
+                    <main className={`${activeTab === 'imaging' ? 'max-w-none' : 'max-w-6xl'} mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex-1`}>
                         {patientId === null && (
                             <>
                                 {patientsState.kind === 'loading' && (

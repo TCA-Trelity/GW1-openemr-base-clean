@@ -9,6 +9,7 @@ import Trends, { extractMeasurementSeries, selectedPoint } from '../imaging/Tren
 import ScanImage from '../imaging/ScanImage';
 import { deriveFluidStatus } from '../imaging/fluid';
 import { buildLadderData, OUTCOME_FILL } from '../imaging/IntervalLadder';
+import Workspace from '../imaging/Workspace';
 import { briefContent } from './fixtures';
 import {
     mcGcImages,
@@ -381,6 +382,20 @@ describe('Imaging workspace — HCQ patient', () => {
         ).toBeInTheDocument();
         // No days-post-injection context for a non-injection patient
         expect(within(workspace).queryByTestId('treatment-context-badge')).not.toBeInTheDocument();
+    });
+});
+
+describe('Imaging scan overlay (Q6)', () => {
+    // Failure mode: the on-scan HUD invents numbers or loses the trend — it must show the
+    // selected scan's real CRT with its delta vs the prior scan, and the acquisition context.
+    it('overlays CRT + delta and acquisition context on the selected scan', () => {
+        render(
+            <Workspace images={wtImages} selectedId="img-wt-007" onSelect={() => undefined} hcq={wtImaging.hcq_progression} />,
+        );
+        const overlay = screen.getByTestId('scan-overlay');
+        expect(overlay).toHaveTextContent('CRT 262 microns');
+        expect(overlay).toHaveTextContent('-6'); // vs img-wt-006's 268
+        expect(overlay).toHaveTextContent('Cycle #4 · 49d post-tx');
     });
 });
 
