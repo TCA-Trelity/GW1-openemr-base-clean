@@ -7,7 +7,7 @@ import type { FactInput, SourceDocumentInput } from '../store/index.js';
 import type { FhirBundle, FhirClient, PatientResourceType } from './fhir.js';
 
 /** The clinical resources we project into facts (Patient is read for linkage, not a fact). */
-const SYNCED_RESOURCES: PatientResourceType[] = ['AllergyIntolerance', 'Condition', 'MedicationRequest', 'Observation'];
+const SYNCED_RESOURCES: PatientResourceType[] = ['AllergyIntolerance', 'Condition', 'MedicationRequest', 'Observation', 'Encounter'];
 
 export interface EhrSyncResult {
     synced: boolean;
@@ -31,7 +31,7 @@ export const ehrSnapshotDocumentId = (patientId: string): string => `ehr-snapsho
 // ---- Pure FHIR → fact mapping (unit-tested without a store or a live EHR) ----
 
 interface MappedResource {
-    factType: 'allergy' | 'condition' | 'medication' | 'clinical_finding' | 'vital_sign';
+    factType: 'allergy' | 'condition' | 'medication' | 'clinical_finding' | 'vital_sign' | 'procedure_history';
     content: Record<string, unknown>;
     laterality: string | null;
     /** The one-line human rendering that becomes both the snapshot text and the citation excerpt. */
@@ -177,6 +177,32 @@ function mapObservation(resource: Record<string, unknown>): MappedResource | nul
     };
 }
 
+// Encounters (P4 record depth) become procedure_history facts — the visit trail the EHR
+// Record tab renders as "Visits & encounters". Reason falls back reasonCode → type → class
+// so a bare encounter still renders as something real, never an invented detail.
+function mapEncounter(resource: Record<string, unknown>): MappedResource | null {
+    const reasonCodes = Array.isArray(resource['reasonCode']) ? resource['reasonCode'] : [];
+    const reason =
+        reasonCodes.map((code) => conceptText(code)).find((text): text is string => text !== undefined) ??
+        (Array.isArray(resource['type']) ? resource['type'].map((t) => conceptText(t)).find((text): text is string => text !== undefined) : undefined) ??
+        conceptText(resource['class']);
+    if (reason === undefined) {
+        return null;
+    }
+    const period = isRecord(resource['period']) ? resource['period'] : undefined;
+    const date = period !== undefined ? asString(period['start'])?.slice(0, 10) : undefined;
+    const content: Record<string, unknown> = { procedure: reason };
+    if (date !== undefined) {
+        content['date'] = date;
+    }
+    return {
+        factType: 'procedure_history',
+        content,
+        laterality: null,
+        line: `Encounter: ${date !== undefined ? `${date} — ` : ''}${reason}`,
+    };
+}
+
 const MAPPERS: Record<PatientResourceType, ((r: Record<string, unknown>) => MappedResource | null) | undefined> = {
     AllergyIntolerance: mapAllergy,
     Condition: mapCondition,
@@ -185,7 +211,7 @@ const MAPPERS: Record<PatientResourceType, ((r: Record<string, unknown>) => Mapp
     Patient: undefined,
     DiagnosticReport: undefined,
     DocumentReference: undefined,
-    Encounter: undefined,
+    Encounter: mapEncounter,
 };
 
 function bundleResources(bundle: FhirBundle): Record<string, unknown>[] {

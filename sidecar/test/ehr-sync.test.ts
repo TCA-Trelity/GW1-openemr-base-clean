@@ -35,12 +35,19 @@ const IOP_OBS = {
     code: { text: 'Intraocular pressure' },
     valueQuantity: { value: 24, unit: 'mmHg' },
 };
+const ENCOUNTER = {
+    resourceType: 'Encounter',
+    reasonCode: [{ text: 'New patient examination — floaters and flashes, right eye' }],
+    period: { start: '2024-12-26T08:00:00Z' },
+    class: { code: 'AMB', display: 'ambulatory' },
+};
 
 const BUNDLES: Partial<Record<PatientResourceType, FhirBundle>> = {
     AllergyIntolerance: bundle(ALLERGY),
     Condition: bundle(CONDITION),
     MedicationRequest: bundle(MEDICATION),
     Observation: bundle(IOP_OBS),
+    Encounter: bundle(ENCOUNTER),
 };
 
 const NOW = '2026-07-08T14:00:00.000Z';
@@ -48,14 +55,19 @@ const NOW = '2026-07-08T14:00:00.000Z';
 describe('buildEhrSnapshot', () => {
     // Guards: FHIR shapes mismapped — each resource type must land as the right fact type
     // with its key fields extracted.
-    it('maps allergy/condition/medication/observation resources to typed facts', () => {
+    it('maps allergy/condition/medication/observation/encounter resources to typed facts', () => {
         const { facts, resourceCounts } = buildEhrSnapshot(BUNDLES, 'margaret-chen', NOW);
-        expect(resourceCounts).toEqual({ AllergyIntolerance: 1, Condition: 1, MedicationRequest: 1, Observation: 1 });
+        expect(resourceCounts).toEqual({ AllergyIntolerance: 1, Condition: 1, MedicationRequest: 1, Observation: 1, Encounter: 1 });
         const byType = Object.fromEntries(facts.map((f) => [f.fact_type, f.content]));
         expect(byType['allergy']).toMatchObject({ substance: 'Sulfonamides', reaction: 'Rash' });
         expect(byType['condition']).toMatchObject({ name: 'Rheumatoid arthritis', icd10: 'M06.9', status: 'active' });
         expect(byType['medication']).toMatchObject({ name: 'Hydroxychloroquine', dose: '200 mg daily' });
         expect(byType['vital_sign']).toMatchObject({ name: 'IOP', value: 24, units: 'mmHg' });
+        // P4 depth: the visit trail syncs as procedure_history with the reason + visit date.
+        expect(byType['procedure_history']).toMatchObject({
+            procedure: 'New patient examination — floaters and flashes, right eye',
+            date: '2024-12-26',
+        });
     });
 
     // Guards: THE integration invariant — EHR facts must pass the same citation gate as
@@ -66,8 +78,8 @@ describe('buildEhrSnapshot', () => {
         const docId = ehrSnapshotDocumentId('margaret-chen');
         const claims: Claim[] = facts.map((fact) => ({ id: fact.id, citations: fact.sources as Claim['citations'] }));
         const gate = runCitationGate(claims, (id) => (id === docId ? text : undefined));
-        expect(gate.metrics.claims).toBe(4);
-        expect(gate.metrics.verified).toBe(4);
+        expect(gate.metrics.claims).toBe(5);
+        expect(gate.metrics.verified).toBe(5);
         expect(gate.metrics.citationsFailed).toBe(0);
         // Every fact carries the EHR provenance the panel's origin badges read.
         expect(facts.every((f) => (f.sources as { source_type: string }[])[0]!.source_type === 'external_ehr_import')).toBe(true);
@@ -141,10 +153,10 @@ describe('EhrSyncService.sync', () => {
         const { fhir, searchByPatient } = fakeFhir(BUNDLES);
         const result = await new EhrSyncService(fhir, store, () => new Date(NOW)).sync('margaret-chen', 'corr-e');
         expect(result.synced).toBe(true);
-        expect(result.factCount).toBe(4);
+        expect(result.factCount).toBe(5);
         expect(store.wiped).toEqual([ehrSnapshotDocumentId('margaret-chen')]);
         expect(store.documents).toHaveLength(1);
-        expect(store.facts).toHaveLength(4);
+        expect(store.facts).toHaveLength(5);
         // FHIR was queried by the linked OpenEMR uuid, not the sidecar id.
         expect(searchByPatient).toHaveBeenCalledWith('Condition', 'uuid-123', 'corr-e');
     });

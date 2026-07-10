@@ -377,5 +377,63 @@
       "performed_by": "Elena Montzka, MD",
       "note": "Uncomplicated phacoemulsification with posterior chamber IOL (CPT 66984), Alcon AcrySof SN60WF 21.0 D"
     }
-  ]
+  ],
+  "ehr": {
+    "demographics": {
+      "email": "james.whitfield@example.com",
+      "phone_cell": "(407) 555-8841",
+      "language": "English",
+      "status": "married",
+      "occupation": "Retired high school teacher"
+    },
+    "insurance": {
+      "company": "Medicare",
+      "plan_name": "Medicare Part B",
+      "policy_number": "4KH7WQ2XR85",
+      "effective_date": "2018-06-01"
+    },
+    "encounters": [
+      {
+        "date": "2024-12-05",
+        "reason": "Cataract extraction with IOL implantation, right eye",
+        "vitals": {
+          "bps": 134,
+          "bpd": 78,
+          "pulse": 72,
+          "note": "Pre-operative check; NPO confirmed"
+        },
+        "soap": {
+          "subjective": "Elective cataract surgery, right eye, after progressive glare and reading difficulty.",
+          "objective": "Uncomplicated phacoemulsification with posterior chamber intraocular lens implantation, right eye.",
+          "assessment": "Age-related nuclear sclerotic cataract, right eye — extracted; left eye cataract remains mild.",
+          "plan": "Post-operative drop regimen started; shield at night; week-one review scheduled."
+        }
+      },
+      {
+        "date": "2024-12-12",
+        "reason": "Post-operative week 1 check, right eye",
+        "vitals": {
+          "bps": 132,
+          "bpd": 78,
+          "pulse": 70,
+          "note": "Comfortable; no pain"
+        },
+        "soap": {
+          "subjective": "One week after right eye cataract surgery. Very pleased with vision; no pain, redness, or new floaters. Using drops as directed.",
+          "objective": "Uncorrected acuity improved; cornea clear; anterior chamber quiet; IOL centered.",
+          "assessment": "Right pseudophakia, post-operative course on track at week one.",
+          "plan": "Begin steroid taper per schedule; week-three review with refraction planning."
+        }
+      }
+    ],
+    "appointments": [
+      {
+        "date": "2024-12-26",
+        "start_time": "13:30",
+        "duration_minutes": 30,
+        "title": "Post-op week 3 check, right eye",
+        "note": "Assess healing and taper; discuss refraction and second-eye timing."
+      }
+    ]
+  }
 }

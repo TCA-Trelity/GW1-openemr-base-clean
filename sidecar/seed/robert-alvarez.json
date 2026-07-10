@@ -602,5 +602,51 @@
     }
   ],
   "treatments": [],
-  "events": []
+  "events": [],
+  "ehr": {
+    "demographics": {
+      "email": "robert.alvarez@example.com",
+      "phone_cell": "(407) 555-4172",
+      "language": "English",
+      "ethnicity": "hisp_or_latin",
+      "status": "married",
+      "occupation": "Restaurant owner"
+    },
+    "insurance": {
+      "company": "UnitedHealthcare",
+      "plan_name": "Choice Plus",
+      "policy_number": "UHC914412650",
+      "group_number": "705513",
+      "effective_date": "2017-06-01"
+    },
+    "encounters": [
+      {
+        "date": "2023-12-05",
+        "reason": "Annual diabetic retinopathy examination",
+        "vitals": {
+          "bps": 130,
+          "bpd": 82,
+          "pulse": 78,
+          "weight_lb": 198,
+          "height_in": 69,
+          "note": "A1c 7.4% at the time of visit"
+        },
+        "soap": {
+          "subjective": "Annual diabetic eye examination. No blurred vision, floaters, flashes, or eye pain.",
+          "objective": "Dilated examination: mild nonproliferative diabetic retinopathy both eyes; no macular edema; corrected acuity 20/20 both eyes.",
+          "assessment": "Mild NPDR both eyes, stable; type 2 diabetes under medical management.",
+          "plan": "Continue current management; encourage glycemic and blood pressure control; return in twelve months with macular OCT, sooner for new floaters or vision change."
+        }
+      }
+    ],
+    "appointments": [
+      {
+        "date": "2024-12-26",
+        "start_time": "10:15",
+        "duration_minutes": 30,
+        "title": "Annual diabetic retinopathy surveillance + macular OCT",
+        "note": "Twelve-month return; compare against prior mild NPDR baseline."
+      }
+    ]
+  }
 }

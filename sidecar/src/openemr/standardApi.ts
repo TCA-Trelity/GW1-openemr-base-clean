@@ -43,6 +43,16 @@ export interface EhrPatientPayload {
     phone_contact?: string;
     /** External MRN; lands in patient_data.pubpid (PatientService::databaseInsert defaults it to pid otherwise). */
     pubpid?: string;
+    // P4 depth — additional patient_data columns the same route persists.
+    email?: string;
+    phone_cell?: string;
+    phone_home?: string;
+    language?: string;
+    ethnicity?: string;
+    race?: string;
+    /** Marital status (patient_data.status). */
+    status?: string;
+    occupation?: string;
 }
 
 export interface EhrProblemPayload {
@@ -69,6 +79,99 @@ export interface EhrMedicationPayload {
     begdate: string | null;
     enddate: null;
     diagnosis: null;
+}
+
+export interface EhrEncounterPayload {
+    // EncounterValidator::DATABASE_INSERT_CONTEXT (src/Validators/EncounterValidator.php:26-33):
+    // pc_catid and class_code (list_options _ActEncounterCode; 'AMB' = ambulatory) are required;
+    // the rest lands on form_encounter via EncounterService::insertEncounter.
+    pc_catid: number;
+    class_code: string;
+    date: string;
+    reason?: string;
+    facility_id?: number;
+    billing_facility?: number;
+}
+
+export interface EhrVitalPayload {
+    // Every field optional (EncounterService::validateVital, :657+). Weight/height are US units
+    // (lbs / inches) — what the stock vitals form stores and displays.
+    bps?: number;
+    bpd?: number;
+    pulse?: number;
+    respiration?: number;
+    temperature?: number;
+    oxygen_saturation?: number;
+    weight?: number;
+    height?: number;
+    note?: string;
+}
+
+export interface EhrSoapNotePayload {
+    subjective?: string;
+    objective?: string;
+    assessment?: string;
+    plan?: string;
+}
+
+export interface EhrAppointmentPayload {
+    // AppointmentService::validate (src/Services/AppointmentService.php:94-102): ALL of these are
+    // required; pc_duration is in SECONDS; pc_apptstatus '-' is the stock "scheduled" status.
+    pc_catid: number;
+    pc_title: string;
+    pc_duration: number;
+    pc_hometext: string;
+    pc_apptstatus: string;
+    pc_eventDate: string;
+    pc_startTime: string;
+    pc_facility: number;
+    pc_billing_location: number;
+}
+
+export interface EhrInsurancePayload {
+    // POST /api/patient/:puuid/insurance (InsuranceRestController::post, :261-283 — type defaults
+    // 'primary'). Subscriber fields mirror the patient for relationship 'self'.
+    type: 'primary' | 'secondary' | 'tertiary';
+    /** insurance_companies.id, as a string — find-or-create via the insurance_company routes. */
+    provider: string;
+    plan_name?: string;
+    policy_number: string;
+    group_number?: string;
+    subscriber_lname: string;
+    subscriber_fname: string;
+    subscriber_relationship: string;
+    subscriber_DOB: string;
+    subscriber_street?: string;
+    subscriber_city?: string;
+    subscriber_state?: string;
+    subscriber_postal_code?: string;
+    subscriber_sex?: string;
+    /** Coverage effective date (Y-m-d). */
+    date: string;
+    accept_assignment?: 'TRUE' | 'FALSE';
+}
+
+export interface EhrFacilityRecord {
+    id: number;
+    name: string;
+}
+
+export interface EhrEncounterRecord {
+    /** form_encounter.encounter — the numeric eid the vital/soap_note routes key on. */
+    id: string;
+    uuid: string;
+    date: string;
+    reason: string;
+}
+
+export interface EhrAppointmentRecord {
+    eventDate: string;
+    title: string;
+}
+
+export interface EhrInsuranceCompanyRecord {
+    id: string;
+    name: string;
 }
 
 export interface EhrPatientRecord {
@@ -177,6 +280,123 @@ export class StandardApiClient {
 
     async createMedication(pid: string, payload: EhrMedicationPayload): Promise<void> {
         await this.request('POST', `/patient/${encodeURIComponent(pid)}/medication`, payload);
+    }
+
+    // ---- P4 record depth: encounters, vitals, notes, appointments, insurance ----
+
+    async listFacilities(): Promise<EhrFacilityRecord[]> {
+        const rows = await this.listEnvelopeRows('/facility');
+        return rows.flatMap((row) => {
+            const id = Number(row['id']);
+            return Number.isFinite(id) && id > 0 ? [{ id, name: typeof row['name'] === 'string' ? row['name'] : '' }] : [];
+        });
+    }
+
+    async listEncounters(puuid: string): Promise<EhrEncounterRecord[]> {
+        const rows = await this.listEnvelopeRows(`/patient/${encodeURIComponent(puuid)}/encounter`);
+        return rows.flatMap((row) => {
+            // The numeric encounter id column is 'eid' on the list read; tolerate variants.
+            const id = row['eid'] ?? row['encounter'] ?? row['id'];
+            if (id === undefined || id === null || id === '') {
+                return [];
+            }
+            return [{
+                id: String(id),
+                uuid: typeof row['uuid'] === 'string' ? row['uuid'] : '',
+                date: typeof row['date'] === 'string' ? row['date'] : '',
+                reason: typeof row['reason'] === 'string' ? row['reason'] : '',
+            }];
+        });
+    }
+
+    async createEncounter(puuid: string, payload: EhrEncounterPayload): Promise<void> {
+        // The 201 envelope's row shape varies by version, so callers re-list and match by
+        // date+reason to learn the numeric eid — one extra GET buys shape independence.
+        await this.request('POST', `/patient/${encodeURIComponent(puuid)}/encounter`, payload);
+    }
+
+    async addVital(pid: string, eid: string, payload: EhrVitalPayload): Promise<void> {
+        await this.request('POST', `/patient/${encodeURIComponent(pid)}/encounter/${encodeURIComponent(eid)}/vital`, payload);
+    }
+
+    async addSoapNote(pid: string, eid: string, payload: EhrSoapNotePayload): Promise<void> {
+        await this.request('POST', `/patient/${encodeURIComponent(pid)}/encounter/${encodeURIComponent(eid)}/soap_note`, payload);
+    }
+
+    async listAppointments(pid: string): Promise<EhrAppointmentRecord[]> {
+        // Appointment reads 404 on an empty calendar (responseHandler semantics, like medications).
+        let rows: Record<string, unknown>[];
+        try {
+            rows = await this.listEnvelopeRows(`/patient/${encodeURIComponent(pid)}/appointment`);
+        } catch (error) {
+            if (error instanceof StandardApiError && error.status === 404) {
+                return [];
+            }
+            throw error;
+        }
+        return rows.map((row) => ({
+            eventDate: typeof row['pc_eventDate'] === 'string' ? row['pc_eventDate'] : '',
+            title: typeof row['pc_title'] === 'string' ? row['pc_title'] : '',
+        }));
+    }
+
+    async createAppointment(pid: string, payload: EhrAppointmentPayload): Promise<void> {
+        await this.request('POST', `/patient/${encodeURIComponent(pid)}/appointment`, payload);
+    }
+
+    async listInsuranceCompanies(): Promise<EhrInsuranceCompanyRecord[]> {
+        let rows: Record<string, unknown>[];
+        try {
+            rows = await this.listEnvelopeRows('/insurance_company');
+        } catch (error) {
+            if (error instanceof StandardApiError && error.status === 404) {
+                return []; // fresh install has none
+            }
+            throw error;
+        }
+        return rows.flatMap((row) => {
+            const id = row['id'];
+            if (id === undefined || id === null || id === '') {
+                return [];
+            }
+            return [{ id: String(id), name: typeof row['name'] === 'string' ? row['name'] : '' }];
+        });
+    }
+
+    async createInsuranceCompany(name: string): Promise<void> {
+        // Like encounters, the create response row shape varies — callers re-list by name.
+        await this.request('POST', '/insurance_company', { name });
+    }
+
+    /** Coverage types already on file ('primary' | ...), for idempotent insurance seeding. */
+    async listInsuranceTypes(puuid: string): Promise<string[]> {
+        let rows: Record<string, unknown>[];
+        try {
+            rows = await this.listEnvelopeRows(`/patient/${encodeURIComponent(puuid)}/insurance`);
+        } catch (error) {
+            if (error instanceof StandardApiError && error.status === 404) {
+                return [];
+            }
+            throw error;
+        }
+        return rows.flatMap((row) => (typeof row['type'] === 'string' && row['type'] !== '' ? [row['type']] : []));
+    }
+
+    async createInsurance(puuid: string, payload: EhrInsurancePayload): Promise<void> {
+        await this.request('POST', `/patient/${encodeURIComponent(puuid)}/insurance`, payload);
+    }
+
+    /** Envelope list read → array of records (non-record rows dropped). */
+    private async listEnvelopeRows(path: string): Promise<Record<string, unknown>[]> {
+        const body = await this.request('GET', path);
+        const rows = envelopeData(body, path);
+        if (!Array.isArray(rows)) {
+            return [];
+        }
+        return rows.flatMap((row) => {
+            const record = asRecord(row);
+            return record === undefined ? [] : [record];
+        });
     }
 
     private async listEnvelopeTitles(path: string): Promise<string[]> {

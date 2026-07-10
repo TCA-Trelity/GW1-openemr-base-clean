@@ -43,6 +43,7 @@ export const SYSTEM_SCOPES: readonly string[] = [
     'system/Observation.read',
     'system/DiagnosticReport.read',
     'system/DocumentReference.read',
+    'system/Coverage.read',
 ];
 
 // Standard-API ('api:oemr') scopes the EHR seeding script needs. There is no system-client
@@ -63,6 +64,21 @@ export const STANDARD_API_SEED_SCOPES: readonly string[] = [
     'user/allergy.write',
     'user/medication.read',
     'user/medication.write',
+    // P4 record depth — a client registered before these existed must be RE-registered
+    // (granted scopes are intersected with registration; see the register-oauth runbook).
+    'user/encounter.read',
+    'user/encounter.write',
+    'user/vital.read',
+    'user/vital.write',
+    'user/soap_note.read',
+    'user/soap_note.write',
+    'user/appointment.read',
+    'user/appointment.write',
+    'user/insurance.read',
+    'user/insurance.write',
+    'user/insurance_company.read',
+    'user/insurance_company.write',
+    'user/facility.read',
 ];
 
 // Typed OAuth failure: carries HTTP status and the OAuth error code/description only —

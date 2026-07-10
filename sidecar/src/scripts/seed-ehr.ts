@@ -18,13 +18,22 @@
 //   4. Seed the EHR:
 //        railway ssh "OPENEMR_SEED_USERNAME=admin OPENEMR_SEED_PASSWORD=<admin password> node dist/scripts/seed-ehr.js"
 //
-// What is seeded per patient: demographics (POST /api/patient), problem list with ICD-10
-// (POST /api/patient/:puuid/medical_problem), allergies (POST /api/patient/:puuid/allergy,
-// reaction/severity ride in comments — the route has no reaction field), and the medication
-// list (POST /api/patient/:pid/medication, dose/frequency encoded in the title — the lists
-// route has no structured dose columns). Prescriptions/drugs have no standard-API write route
-// (only GET /api/patient/:pid/prescription exists), so richer medication structure is
-// intentionally out of scope rather than written via SQL.
+// What is seeded per patient: demographics incl. contact/identity depth (POST /api/patient),
+// problem list with ICD-10 (POST /api/patient/:puuid/medical_problem), allergies
+// (POST /api/patient/:puuid/allergy, reaction/severity ride in comments — the route has no
+// reaction field), the medication list (POST /api/patient/:pid/medication, dose/frequency
+// encoded in the title — the lists route has no structured dose columns), and the P4 record
+// depth from each corpus file's `ehr` block: encounters with vitals + SOAP notes
+// (POST .../encounter, .../vital, .../soap_note), upcoming appointments
+// (POST /api/patient/:pid/appointment), and a primary insurance policy with find-or-create
+// payer (POST /api/insurance_company, /api/patient/:puuid/insurance). Prescriptions/drugs and
+// immunizations have no standard-API write route, so they are intentionally out of scope
+// rather than written via SQL.
+//
+// SCOPE NOTE (P4): the `ehr`-block writes need scopes added in P4 (encounter/vital/soap_note/
+// appointment/insurance/insurance_company/facility). A client registered before P4 must be
+// RE-registered (step 2) — granted scopes are the intersection with registration — then
+// re-enabled (step 3) and its new id/key set on the service.
 import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../config.js';
@@ -121,9 +130,19 @@ async function main(): Promise<void> {
             console.log(
                 `${file}: ${outcome.action} patient uuid=${outcome.uuid} pid=${outcome.pid} ` +
                     `${formatList('problems', outcome.problems)} ${formatList('allergies', outcome.allergies)} ` +
-                    `${formatList('medications', outcome.medications)} — linked to ${outcome.patientId}`,
+                    `${formatList('medications', outcome.medications)} ${formatList('encounters', outcome.encounters)} ` +
+                    `${formatList('appointments', outcome.appointments)} ${formatList('insurance', outcome.insurance)} ` +
+                    `— linked to ${outcome.patientId}`,
             );
-            for (const skipped of [...outcome.problems.skipped, ...outcome.allergies.skipped, ...outcome.medications.skipped]) {
+            const skippedAll = [
+                ...outcome.problems.skipped,
+                ...outcome.allergies.skipped,
+                ...outcome.medications.skipped,
+                ...outcome.encounters.skipped,
+                ...outcome.appointments.skipped,
+                ...outcome.insurance.skipped,
+            ];
+            for (const skipped of skippedAll) {
                 console.log(`${file}:   skipped ${skipped.factId}: ${skipped.reason}`);
             }
         } catch (error) {

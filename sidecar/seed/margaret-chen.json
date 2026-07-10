@@ -2069,5 +2069,80 @@
       "performed_by": "Anita Patel, MD (Rheumatology)",
       "note": "Faithful port of the prototype imaging-demo anchor (medication_start 2021-12-01); anchors the authored OCT trend series that begins 2021-12-15. The document corpus's pharmacy-verified HCQ first fill is 2019-01-15 and remains the contradiction ground truth."
     }
-  ]
+  ],
+  "ehr": {
+    "demographics": {
+      "email": "margaret.chen@example.com",
+      "phone_cell": "(407) 555-6790",
+      "language": "English",
+      "ethnicity": "not_hisp_or_latin",
+      "race": "white",
+      "status": "married",
+      "occupation": "Bookkeeper; primary caregiver for spouse"
+    },
+    "insurance": {
+      "company": "Blue Cross Blue Shield of Florida",
+      "plan_name": "BlueOptions PPO",
+      "policy_number": "BCBSFL448291073",
+      "group_number": "GRP-88213",
+      "effective_date": "2019-01-01"
+    },
+    "encounters": [
+      {
+        "date": "2024-03-19",
+        "reason": "HCQ retinopathy screening — OCT imaging visit",
+        "vitals": {
+          "bps": 136,
+          "bpd": 82,
+          "pulse": 74,
+          "weight_lb": 149,
+          "height_in": 64,
+          "note": "Screening visit; no acute complaints"
+        },
+        "soap": {
+          "subjective": "Here for scheduled hydroxychloroquine retinopathy screening. No new visual complaints today.",
+          "objective": "SD-OCT both eyes obtained; ganglion cell analysis reviewed against prior series.",
+          "assessment": "Long-term hydroxychloroquine therapy for rheumatoid arthritis; surveillance imaging updated.",
+          "plan": "Continue annual screening cadence; correlate with visual fields; rheumatology continues dosing."
+        }
+      },
+      {
+        "date": "2024-12-26",
+        "reason": "New patient examination — floaters and flashes, right eye",
+        "vitals": {
+          "bps": 138,
+          "bpd": 84,
+          "pulse": 76,
+          "respiration": 14,
+          "temperature": 98.2,
+          "oxygen_saturation": 98,
+          "weight_lb": 150,
+          "height_in": 64,
+          "note": "Anxious; BP mildly elevated over baseline"
+        },
+        "soap": {
+          "subjective": "Floaters and flashes x 2-3 weeks, worse in the right eye. Family history of retinal detachment (mother). Caregiver for spouse with Parkinson disease; daughter’s wedding in about six weeks.",
+          "objective": "Dilated fundus examination both eyes; SD-OCT and widefield imaging obtained.",
+          "assessment": "Symptomatic vitreous floaters and photopsias, right eye greater than left; rule out retinal tear or detachment. Long-term hydroxychloroquine therapy under surveillance.",
+          "plan": "Complete peripheral examination with scleral depression; review OCT with patient; safety counseling on retinal detachment warning signs; follow-up dilated examination scheduled."
+        }
+      }
+    ],
+    "appointments": [
+      {
+        "date": "2024-12-26",
+        "start_time": "08:00",
+        "duration_minutes": 45,
+        "title": "New patient exam — floaters/flashes OD",
+        "note": "Comprehensive new-patient evaluation with dilation and OCT."
+      },
+      {
+        "date": "2025-01-09",
+        "start_time": "08:30",
+        "duration_minutes": 30,
+        "title": "Dilated follow-up + OCT review",
+        "note": "Recheck peripheral retina; review ganglion cell trend before family event."
+      }
+    ]
+  }
 }

@@ -255,9 +255,49 @@ describe('buildMedicationPayloads', () => {
 
 const MC_SEARCH_ROW = { uuid: 'uuid-mc', pid: 42, fname: 'Margaret', lname: 'Chen', DOB: '1967-03-14' };
 
+// Stateful P4 depth routes: encounter/appointment/insurance lists grow as the seeder POSTs,
+// mirroring the live server, so the create → re-list → vitals/note flow runs end-to-end.
+function depthRoutes(uuid: string, pid: string): { routes: Record<string, (call: LoggedCall) => Response> } {
+    const encounters: Record<string, unknown>[] = [];
+    const appointments: Record<string, unknown>[] = [];
+    const insurance: Record<string, unknown>[] = [];
+    let nextEid = 100;
+    const vitalOrSoap = (): Response => jsonResponse(201, envelope({}));
+    const routes: Record<string, (call: LoggedCall) => Response> = {
+        'GET /apis/default/api/facility': () => jsonResponse(200, envelope([{ id: 3, name: 'Montzka Eye Clinic' }])),
+        [`GET /apis/default/api/patient/${uuid}/encounter`]: () => jsonResponse(200, envelope(encounters)),
+        [`POST /apis/default/api/patient/${uuid}/encounter`]: (call) => {
+            const body = call.body as Record<string, unknown>;
+            encounters.push({ eid: nextEid, uuid: `enc-${String(nextEid)}`, date: `${String(body['date'])} 00:00:00`, reason: body['reason'] });
+            nextEid += 1;
+            return jsonResponse(201, envelope({}));
+        },
+        [`POST /apis/default/api/patient/${pid}/encounter/100/vital`]: vitalOrSoap,
+        [`POST /apis/default/api/patient/${pid}/encounter/101/vital`]: vitalOrSoap,
+        [`POST /apis/default/api/patient/${pid}/encounter/100/soap_note`]: vitalOrSoap,
+        [`POST /apis/default/api/patient/${pid}/encounter/101/soap_note`]: vitalOrSoap,
+        [`GET /apis/default/api/patient/${pid}/appointment`]: () =>
+            appointments.length === 0 ? jsonResponse(404, undefined) : jsonResponse(200, envelope(appointments)),
+        [`POST /apis/default/api/patient/${pid}/appointment`]: (call) => {
+            const body = call.body as Record<string, unknown>;
+            appointments.push({ pc_eventDate: body['pc_eventDate'], pc_title: body['pc_title'] });
+            return jsonResponse(201, envelope({}));
+        },
+        [`GET /apis/default/api/patient/${uuid}/insurance`]: () => jsonResponse(200, envelope(insurance)),
+        [`POST /apis/default/api/patient/${uuid}/insurance`]: (call) => {
+            insurance.push({ type: (call.body as Record<string, unknown>)['type'] });
+            return jsonResponse(201, envelope({}));
+        },
+        'GET /apis/default/api/insurance_company': () => jsonResponse(200, envelope([{ id: '11', name: 'Blue Cross Blue Shield of Florida' }])),
+        'POST /apis/default/api/insurance_company': () => jsonResponse(201, envelope({})),
+    };
+    return { routes };
+}
+
 describe('seedPatientIntoEhr', () => {
     // Guards: the found-by-search branch must short-circuit POST /api/patient — re-running the
-    // seeder must never mint duplicate charts.
+    // seeder must never mint duplicate charts. The P4 depth (encounters + vitals + notes,
+    // appointments, insurance) seeds through the same idempotent pass.
     it('reuses an existing patient found by name+DOB and only tops up missing list entries', async () => {
         const { fetch, calls } = apiFake({
             'GET /apis/default/api/patient': () => jsonResponse(200, envelope([MC_SEARCH_ROW])),
@@ -270,6 +310,7 @@ describe('seedPatientIntoEhr', () => {
             // Empty medication list is a 404 on this route (RestControllerHelper::responseHandler).
             'GET /apis/default/api/patient/42/medication': () => jsonResponse(404, undefined),
             'POST /apis/default/api/patient/42/medication': () => jsonResponse(200, 77),
+            ...depthRoutes('uuid-mc', '42').routes,
         });
 
         const outcome = await seedPatientIntoEhr(standardApi(fetch), loadCorpus('margaret-chen.json'));
@@ -282,8 +323,23 @@ describe('seedPatientIntoEhr', () => {
             problems: { created: 1, existing: 1 },
             allergies: { created: 1, existing: 0 },
             medications: { created: 5, existing: 0 },
+            encounters: { created: 2, existing: 0, skipped: [] },
+            appointments: { created: 2, existing: 0 },
+            insurance: { created: 1, existing: 0 },
         });
         expect(calls.filter((call) => call.method === 'POST' && call.path === '/apis/default/api/patient')).toEqual([]);
+        // Vitals + SOAP landed on the encounters this run created, with authored numbers intact
+        // (eid 101 = the second created encounter, margaret's 2024-12-26 exam).
+        const vitalCall = calls.find((call) => call.path === '/apis/default/api/patient/42/encounter/101/vital');
+        expect(vitalCall?.body).toMatchObject({ bps: 138, bpd: 84, weight: 150, height: 64 });
+        expect(calls.filter((call) => call.path.endsWith('/soap_note'))).toHaveLength(2);
+        // The appointment write converts minutes → seconds and carries the calendar essentials.
+        const apptCall = calls.find((call) => call.method === 'POST' && call.path === '/apis/default/api/patient/42/appointment');
+        expect(apptCall?.body).toMatchObject({ pc_catid: 5, pc_duration: 2700, pc_facility: 3, pc_apptstatus: '-' });
+        // Insurance resolved the existing payer by name instead of creating a duplicate.
+        expect(calls.filter((call) => call.method === 'POST' && call.path === '/apis/default/api/insurance_company')).toEqual([]);
+        const insuranceCall = calls.find((call) => call.method === 'POST' && call.path === '/apis/default/api/patient/uuid-mc/insurance');
+        expect(insuranceCall?.body).toMatchObject({ type: 'primary', provider: '11', subscriber_relationship: 'self', subscriber_DOB: '1967-03-14' });
     });
 
     it('creates the patient when the search has no exact name+DOB match', async () => {
@@ -297,6 +353,7 @@ describe('seedPatientIntoEhr', () => {
             'POST /apis/default/api/patient/uuid-new/allergy': () => jsonResponse(201, envelope({ id: 2, uuid: 'u' })),
             'GET /apis/default/api/patient/7/medication': () => jsonResponse(404, undefined),
             'POST /apis/default/api/patient/7/medication': () => jsonResponse(200, 3),
+            ...depthRoutes('uuid-new', '7').routes,
         });
 
         const outcome = await seedPatientIntoEhr(standardApi(fetch), loadCorpus('margaret-chen.json'));
@@ -305,11 +362,20 @@ describe('seedPatientIntoEhr', () => {
         expect(outcome.uuid).toBe('uuid-new');
         expect(outcome.pid).toBe('7');
         const createCall = calls.find((call) => call.method === 'POST' && call.path === '/apis/default/api/patient');
-        expect(createCall?.body).toMatchObject({ fname: 'Margaret', lname: 'Chen', DOB: '1967-03-14', sex: 'Female' });
+        // P4 depth demographics ride the same patient write.
+        expect(createCall?.body).toMatchObject({
+            fname: 'Margaret',
+            lname: 'Chen',
+            DOB: '1967-03-14',
+            sex: 'Female',
+            email: 'margaret.chen@example.com',
+            status: 'married',
+        });
     });
 
-    // Guards: title matching must be case-insensitive — OpenEMR may return titles with
-    // different casing, and a false miss would duplicate list entries on every run.
+    // Guards: matching must be case-insensitive — OpenEMR may return titles/reasons with
+    // different casing, and a false miss would duplicate chart entries on every run. Covers
+    // the P4 depth too: everything already on the chart ⇒ ZERO POSTs on a re-run.
     it('deduplicates list entries case-insensitively', async () => {
         const { fetch, calls } = apiFake({
             'GET /apis/default/api/patient': () => jsonResponse(200, envelope([MC_SEARCH_ROW])),
@@ -327,6 +393,18 @@ describe('seedPatientIntoEhr', () => {
                     { title: 'Lisinopril 10mg daily' },
                     { title: 'Vitamin D3 2000 IU daily' },
                 ]),
+            'GET /apis/default/api/facility': () => jsonResponse(200, envelope([{ id: 3, name: 'Clinic' }])),
+            'GET /apis/default/api/patient/uuid-mc/encounter': () =>
+                jsonResponse(200, envelope([
+                    { eid: 1, date: '2024-03-19 00:00:00', reason: 'HCQ RETINOPATHY SCREENING — OCT IMAGING VISIT' },
+                    { eid: 2, date: '2024-12-26 00:00:00', reason: 'New patient examination — floaters and flashes, right eye' },
+                ])),
+            'GET /apis/default/api/patient/42/appointment': () =>
+                jsonResponse(200, envelope([
+                    { pc_eventDate: '2024-12-26', pc_title: 'NEW PATIENT EXAM — FLOATERS/FLASHES OD' },
+                    { pc_eventDate: '2025-01-09', pc_title: 'Dilated follow-up + OCT review' },
+                ])),
+            'GET /apis/default/api/patient/uuid-mc/insurance': () => jsonResponse(200, envelope([{ type: 'PRIMARY' }])),
         });
 
         const outcome = await seedPatientIntoEhr(standardApi(fetch), loadCorpus('margaret-chen.json'));
@@ -334,6 +412,9 @@ describe('seedPatientIntoEhr', () => {
         expect(outcome.problems).toMatchObject({ created: 0, existing: 2 });
         expect(outcome.allergies).toMatchObject({ created: 0, existing: 1 });
         expect(outcome.medications).toMatchObject({ created: 0, existing: 5 });
+        expect(outcome.encounters).toMatchObject({ created: 0, existing: 2 });
+        expect(outcome.appointments).toMatchObject({ created: 0, existing: 2 });
+        expect(outcome.insurance).toMatchObject({ created: 0, existing: 1 });
         expect(calls.filter((call) => call.method === 'POST')).toEqual([]);
     });
 
@@ -345,6 +426,7 @@ describe('seedPatientIntoEhr', () => {
             'POST /apis/default/api/patient': () => jsonResponse(201, envelope({ pid: 9, uuid: 'uuid-wt' })),
             'GET /apis/default/api/patient/uuid-wt/medical_problem': () => jsonResponse(200, envelope([])),
             'POST /apis/default/api/patient/uuid-wt/medical_problem': () => jsonResponse(201, envelope({ id: 1, uuid: 'u' })),
+            ...depthRoutes('uuid-wt', '9').routes,
         });
 
         const outcome = await seedPatientIntoEhr(standardApi(fetch), loadCorpus('william-thompson.json'));
@@ -352,6 +434,7 @@ describe('seedPatientIntoEhr', () => {
         expect(outcome.problems).toMatchObject({ created: 2, existing: 0 });
         expect(outcome.allergies).toMatchObject({ created: 0, existing: 0 });
         expect(outcome.medications).toMatchObject({ created: 0, existing: 0 });
+        expect(outcome.encounters).toMatchObject({ created: 2, existing: 0 });
         expect(calls.map((call) => call.path)).not.toContain('/apis/default/api/patient/9/medication');
         expect(calls.map((call) => call.path)).not.toContain('/apis/default/api/patient/uuid-wt/allergy');
     });
@@ -485,11 +568,17 @@ describe('registerSystemClient with seed scopes', () => {
     // registration fails whole with invalid_scope; api:oemr gates the /api/ routes themselves.
     it('asks for api:oemr plus read+write pairs for exactly the seeded resources', () => {
         expect(STANDARD_API_SEED_SCOPES).toContain('api:oemr');
-        for (const resource of ['patient', 'medical_problem', 'allergy', 'medication']) {
+        const resources = [
+            'patient', 'medical_problem', 'allergy', 'medication',
+            // P4 record depth
+            'encounter', 'vital', 'soap_note', 'appointment', 'insurance', 'insurance_company',
+        ];
+        for (const resource of resources) {
             expect(STANDARD_API_SEED_SCOPES).toContain(`user/${resource}.read`);
             expect(STANDARD_API_SEED_SCOPES).toContain(`user/${resource}.write`);
         }
-        expect(STANDARD_API_SEED_SCOPES).toHaveLength(9);
+        expect(STANDARD_API_SEED_SCOPES).toContain('user/facility.read'); // facility id resolution
+        expect(STANDARD_API_SEED_SCOPES).toHaveLength(22);
     });
 });
 

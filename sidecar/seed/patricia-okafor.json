@@ -460,5 +460,50 @@
     }
   ],
   "treatments": [],
-  "events": []
+  "events": [],
+  "ehr": {
+    "demographics": {
+      "email": "patricia.okafor@example.com",
+      "phone_cell": "(407) 555-6633",
+      "language": "English",
+      "status": "married",
+      "occupation": "Charge nurse, night shift"
+    },
+    "insurance": {
+      "company": "Aetna",
+      "plan_name": "Aetna Choice POS II",
+      "policy_number": "W224561189",
+      "group_number": "AET-99120",
+      "effective_date": "2021-01-01"
+    },
+    "encounters": [
+      {
+        "date": "2024-11-21",
+        "reason": "Glaucoma evaluation — elevated intraocular pressure",
+        "vitals": {
+          "bps": 124,
+          "bpd": 80,
+          "pulse": 72,
+          "weight_lb": 161,
+          "height_in": 66,
+          "note": "Referred from optometry"
+        },
+        "soap": {
+          "subjective": "Referred after elevated intraocular pressure on routine optometric examination. Asymptomatic. Works night shifts; prefers a once-daily routine.",
+          "objective": "Applanation pressures elevated both eyes; open angles on gonioscopy; healthy discs, full fields, normal RNFL thickness.",
+          "assessment": "Ocular hypertension without glaucomatous damage.",
+          "plan": "Latanoprost 0.005% one drop both eyes at bedtime started; pressure re-check on treatment in four to five weeks."
+        }
+      }
+    ],
+    "appointments": [
+      {
+        "date": "2024-12-26",
+        "start_time": "11:00",
+        "duration_minutes": 20,
+        "title": "IOP re-check on latanoprost",
+        "note": "First on-treatment pressure check; reinforce bedtime dosing routine."
+      }
+    ]
+  }
 }

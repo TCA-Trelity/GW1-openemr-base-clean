@@ -1055,5 +1055,74 @@
       "performed_by": "Dr. Sarah Morrison"
     }
   ],
-  "events": []
+  "events": [],
+  "ehr": {
+    "demographics": {
+      "email": "william.thompson@example.com",
+      "phone_cell": "(407) 555-2214",
+      "language": "English",
+      "ethnicity": "not_hisp_or_latin",
+      "race": "white",
+      "status": "widowed",
+      "occupation": "Retired postal carrier"
+    },
+    "insurance": {
+      "company": "Medicare",
+      "plan_name": "Medicare Part B",
+      "policy_number": "1EG4TE5MK72",
+      "effective_date": "2011-08-01"
+    },
+    "encounters": [
+      {
+        "date": "2025-11-19",
+        "reason": "OCT assessment — treat-and-extend interval check",
+        "vitals": {
+          "bps": 126,
+          "bpd": 72,
+          "pulse": 66,
+          "weight_lb": 172,
+          "height_in": 70,
+          "note": "Stable; no anticoagulant changes"
+        },
+        "soap": {
+          "subjective": "Mild recurrence of distortion in the right eye over the past week. Remains independent at home; main concern is keeping reading and driving vision.",
+          "objective": "SD-OCT right eye shows recurrent subretinal fluid; visual acuity corrected 20/30 right, 20/30 left.",
+          "assessment": "Neovascular AMD, right eye: early recurrence at the extended interval — interval over-extension suspected.",
+          "plan": "Return interval shortened; anti-VEGF injection scheduled; continue AREDS2 supplementation."
+        }
+      },
+      {
+        "date": "2025-12-10",
+        "reason": "Intravitreal anti-VEGF injection, right eye",
+        "vitals": {
+          "bps": 128,
+          "bpd": 74,
+          "pulse": 68,
+          "note": "Pre-injection check unremarkable"
+        },
+        "soap": {
+          "subjective": "Returns for scheduled intravitreal injection, right eye. No new symptoms since interval was shortened.",
+          "objective": "Aflibercept administered right eye without complication; post-injection pressure check normal.",
+          "assessment": "Neovascular AMD, right eye, on treat-and-extend anti-VEGF therapy; interval brought back toward optimal.",
+          "plan": "OCT and interval reassessment in four weeks; counsel on Amsler self-monitoring between visits."
+        }
+      }
+    ],
+    "appointments": [
+      {
+        "date": "2024-12-26",
+        "start_time": "09:30",
+        "duration_minutes": 30,
+        "title": "Injection follow-up — interval reassessment",
+        "note": "OCT both eyes; assess response at the shortened interval."
+      },
+      {
+        "date": "2026-01-07",
+        "start_time": "09:30",
+        "duration_minutes": 30,
+        "title": "OCT + treat-and-extend reassessment",
+        "note": "Confirm dryness at the current interval before extending again."
+      }
+    ]
+  }
 }

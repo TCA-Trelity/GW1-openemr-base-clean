@@ -5,7 +5,7 @@
 // refetches overview + facts; unlinked (409) / not-configured (503) surface inline, never
 // as a crash. Empty until the first sync.
 import { useState, type ComponentType } from 'react';
-import { Activity, AlertTriangle, Database, Pill, RefreshCw, Stethoscope } from 'lucide-react';
+import { Activity, AlertTriangle, CalendarDays, Database, Pill, RefreshCw, Stethoscope } from 'lucide-react';
 import { syncEhr } from './api';
 import type { FactType, OverviewPayload, PatientFact } from './types';
 import { Card, computeAge, formatDate } from './ui';
@@ -162,6 +162,8 @@ export default function EhrRecord({
         { title: 'Problem list', icon: Stethoscope, facts: ehrFactsOf('condition') },
         { title: 'Allergies', icon: AlertTriangle, facts: ehrFactsOf('allergy') },
         { title: 'Medications', icon: Pill, facts: ehrFactsOf('medication') },
+        // P4 record depth: the seeded visit trail, synced back over FHIR Encounter.
+        { title: 'Visits & encounters', icon: CalendarDays, facts: ehrFactsOf('procedure_history') },
         { title: 'Observations & vitals', icon: Activity, facts: [...ehrFactsOf('vital_sign'), ...ehrFactsOf('clinical_finding')] },
     ].filter((group) => group.facts.length > 0);
 
