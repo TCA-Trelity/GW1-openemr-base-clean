@@ -181,7 +181,7 @@ still passes the citation contract. All six approved.*
 | G1 | `docs/execution/observability.md`: dashboard metric spec (mapped to emitted Langfuse traces) + the 3 required alerts (p95 latency, error rate, tool-failure) with thresholds + on-call response | main | S2.6 | review | ☑ |
 | G2 | Langfuse deployed live on Railway + 3 alerts configured; `/ready` langfuse check flips to required | user + main | G1 | screenshot | ☐ |
 | G3 | Doc alignment to verbatim PDF: PRD tiers, `presearch.md`, `ARCHITECTURE.md`/`AUDIT.md` authz sections reflect the honest built status (no overclaim) | main | AZ2 | review | ☑ |
-| G4 | Demo video (Early: brief → cited chat with tool use → imaging → EHR Record + origin badges → cross-patient 403) | user | AZ,TC | — | ☐ |
+| G4 | Demo video (Early: brief → cited chat with tool use → imaging → EHR Record + origin badges → cross-patient 403) *(submitted 2026-07-10)* | user | AZ,TC | — | ☑ |
 
 ## Standing rules
 

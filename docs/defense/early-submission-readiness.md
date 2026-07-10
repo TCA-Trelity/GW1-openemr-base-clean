@@ -42,7 +42,7 @@ repository, as of 2026-07-09. Live EHR:
 | Baseline CPU/memory/latency/throughput | Committed in `docs/execution/baselines.md` from a live capture against the enforced-auth deployment (2026-07-10): 290 req/s / p95 46 ms @10, 430 req/s / p95 193 ms @50, 0% errors at both levels; CPU/memory read-off windows and in-band evidence documented there. |
 | Load tests at 10 and 50 concurrent | CI workflow (`sidecar-load.yml`) ran serialized 10- and 50-concurrent probes against production with a 1500 ms p95 SLO gate — both PASS with 32× / 7.8× headroom (run 29105511473); numbers + methodology + the discarded first capture in `docs/execution/baselines.md`. |
 
-**Submission deliverables:** repo (this), audit/user/architecture docs (above), eval dataset + results (`sidecar/eval/`, `docs/execution/eval-results.md`), AI cost analysis (`docs/COSTS.md` — actual dev spend plus 100/1K/10K/100K projections with the architecture inflection at each tier, and a live $5/day spend guard enforcing the cost model), deployed app with the agent working live (verified today), demo video (user action, script in `docs/defense/demo-script.md`).
+**Submission deliverables:** repo (this), audit/user/architecture docs (above), eval dataset + results (`sidecar/eval/`, `docs/execution/eval-results.md`), AI cost analysis (`docs/COSTS.md` — actual dev spend plus 100/1K/10K/100K projections with the architecture inflection at each tier, and a live $5/day spend guard enforcing the cost model), deployed app with the agent working live (verified today), demo video (submitted 2026-07-10; script in `docs/defense/demo-script.md`).
 
 ## Testing & evaluation approach
 
@@ -58,4 +58,4 @@ Posture: **demo data only** — the corpus is entirely synthetic patients, per t
 
 ## Known-partial at submission time
 
-Langfuse dashboard build-out (cloud tracing live, custom tiles in progress), live browser SMART EHR-launch (verifier + token plumbing built and tested; dev-login stands in for grading), demo video (user).
+Langfuse dashboard build-out (cloud tracing live, custom tiles in progress), live browser SMART EHR-launch (verifier + token plumbing built and tested; dev-login stands in for grading).
