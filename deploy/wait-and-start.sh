@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Railway deploy entrypoint wrapper. (rev 2: context-size fix rollout)
+# Railway deploy entrypoint wrapper. (rev 3: boot-time source refresh)
 #
 # Railway's private network (mariadb.railway.internal) can take several seconds
 # to become resolvable when a container starts. OpenEMR's setup tries the DB
@@ -36,6 +36,21 @@ done
 # the full rationale. Fail-open — any error here is ignored so it can never
 # block boot.
 php /restore-sqlconf.php || true
+
+# Code-freshness guarantee: the flex entrypoint's EASY_DEV_MODE_NEW rsync uses
+# --ignore-existing (docker/flex/openemr.sh:686), so any file that persists
+# under htdocs across deploys is NEVER updated — code freezes at first-boot
+# vintage while images rebuild uselessly (live find: an EHR-side fix that
+# would not ship). Sync the baked fork source over the app dir on every boot,
+# excluding sites/ (patient data + sqlconf live on the volume) and the
+# setup-built artifacts (vendor/, node_modules/) that the repo does not carry.
+# Fail-open like the backstop above — a failed refresh must not block boot.
+if [ -d /var/www/localhost/htdocs/openemr ]; then
+    echo "wait-and-start: refreshing app source from the baked image (fix for --ignore-existing staleness)"
+    rsync --recursive --links \
+        --exclude sites --exclude .git --exclude vendor --exclude node_modules \
+        /openemr/ /var/www/localhost/htdocs/openemr/ || true
+fi
 
 cd /var/www/localhost/htdocs
 exec ./openemr.sh
