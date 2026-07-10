@@ -35,10 +35,11 @@ import SourcesTab, { type SourceFocus } from './SourcesTab';
 
 type TabId = 'ehr' | 'overview' | 'background' | 'imaging' | 'insights' | 'careplan' | 'sources';
 
-// EHR Record sits FIRST — it represents the system of record the co-pilot layers on top of.
+// Overview leads (P5 — it's the working surface); EHR Record sits beside it as the
+// system of record the co-pilot layers on top of.
 const TABS: { id: TabId; label: string }[] = [
-    { id: 'ehr', label: 'EHR Record' },
     { id: 'overview', label: 'Overview' },
+    { id: 'ehr', label: 'EHR Record' },
     { id: 'background', label: 'Medical Background' },
     { id: 'imaging', label: 'Imaging' },
     { id: 'insights', label: 'AI Insights' },
@@ -188,7 +189,7 @@ export default function App() {
                 <div className="flex-1 min-w-0 flex flex-col">
                     {/* Dark chrome — echo of the prototype's slate-800 nav rail */}
                     <header className="bg-slate-800 text-white">
-                        <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
+                        <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
                             <div className="min-w-0">
                                 <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Clinical Co-Pilot</p>
                                 <h1 className="text-xl font-semibold tracking-tight truncate">{patientName}</h1>
@@ -197,7 +198,7 @@ export default function App() {
                         </div>
                     </header>
 
-                    <main className="max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex-1">
+                    <main className="max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex-1">
                         {patientId === null && (
                             <>
                                 {patientsState.kind === 'loading' && (

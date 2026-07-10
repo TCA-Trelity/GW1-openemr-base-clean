@@ -136,7 +136,46 @@
     }
   ],
   "family_history": [],
-  "patient_goals": [],
+  "patient_goals": [
+    {
+      "id": "fact-jw-goal-001",
+      "patient_id": "james-whitfield",
+      "fact_type": "patient_goal",
+      "content": {
+        "goal": "Confirm the right eye is healing cleanly and stay on the drop taper — he's very pleased with the result so far",
+        "specific_concerns": [
+          "Wants reassurance the healing is on track"
+        ],
+        "verbatim_quotes": [],
+        "emotional_state": "reassured, upbeat"
+      },
+      "is_current": true,
+      "source_document_id": "doc-jw-002",
+      "sources": [
+        {
+          "id": "cit-jw-goal-001",
+          "fact_id": "fact-jw-goal-001",
+          "source_label": "Post-op week 1 note",
+          "source_type": "prior_visit_note",
+          "excerpt_text": "He is very pleased with his vision and reports no pain, redness, or new floaters. He is using his drops as directed.",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 452,
+            "end_char": 568,
+            "context_before": "cation with intraocular lens implantation of the right eye. ",
+            "context_after": "\n\nEXAMINATION:\nVisual acuity (uncorrected): OD 20/25, OS 20/"
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Surgical clinic",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-jw-002",
+          "document_date": "2024-12-12"
+        }
+      ]
+    }
+  ],
   "chief_complaint": {
     "id": "fact-jw-cc-001",
     "patient_id": "james-whitfield",

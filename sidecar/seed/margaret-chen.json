@@ -550,7 +550,7 @@
       "patient_id": "margaret-chen",
       "fact_type": "patient_goal",
       "content": {
-        "goal": "Understand what is causing the floaters and rule out the retinal detachment her mother had",
+        "goal": "Rule out her mother's retinal detachment — and protect the vision she needs as David's caregiver and for Emily's wedding in six weeks",
         "specific_concerns": [
           "Worried about having the same condition as her mother (retinal detachment)",
           "Needs to maintain vision for caregiving duties - husband David has Parkinson's disease",
@@ -579,6 +579,27 @@
             "end_char": 3780,
             "context_before": "ecific you're hoping to get out of today's visit?\n\nPATIENT: ",
             "context_after": " I've been reading online about retinal detachment and it's "
+          },
+          "attribution": {
+            "speaker_role": "patient",
+            "speaker_name": "Margaret Chen",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-mc-012",
+          "document_date": "2024-12-26"
+        },
+        {
+          "id": "cit-mc-goal-002",
+          "fact_id": "fact-mc-goal-001",
+          "source_label": "Conversational intake transcript",
+          "source_type": "intake_transcript",
+          "excerpt_text": "I need to be able to drive him to his appointments. Plus my daughter Emily's wedding is in about 6 weeks and I need to be able to see for all of that!",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 4028,
+            "end_char": 4178,
+            "context_before": "on's disease and needs help with a lot of daily activities. ",
+            "context_after": "\n\nASSISTANT: I completely understand. One last question - ha"
           },
           "attribution": {
             "speaker_role": "patient",

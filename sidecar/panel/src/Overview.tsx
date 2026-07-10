@@ -1,11 +1,13 @@
-// Overview landing (S2.11, R2 IA, R7 order) — rendered instantly from GET /api/overview,
-// no LLM in the path: chief complaint with the recent-scans strip directly beneath it,
-// then the data-conflicts card, then meds + deterministic risk flags, allergies,
-// conditions. The patient header band is exported for App to mount above the tab bar (it
-// hosts the AI insights control); AI insights itself lives on its own tab.
+// Overview landing (S2.11, R2 IA, R7 order, P5/P6 restructure) — rendered instantly from
+// GET /api/overview, no LLM in the path: "Why are we here today?" (patient goal + chief
+// complaint), the recent-scans workspace with its at-hand analytics rail, the compact
+// facts-to-resolve card, then risk flags above collapsed meds, allergies, conditions. The
+// patient header band is exported for App to mount above the tab bar (it hosts the AI
+// insights control); AI insights itself lives on its own tab.
 import { useState, type ComponentType, type ReactNode } from 'react';
 import {
     AlertTriangle,
+    ChevronDown,
     Clock,
     ExternalLink,
     GitMerge,
@@ -107,12 +109,14 @@ export function projectContradictionRow(row: StoredContradictionRow): RuntimeCon
     };
 }
 
-// ---- Contradiction alerts banner (port of ContradictionAlert.jsx severityConfig) ----
+// ---- Facts-to-resolve card (P5: quieter than the old red data-conflicts banner) ----
 
-const SEVERITY_BANNER: Record<'high' | 'medium' | 'low', { bg: string; border: string; iconBg: string; iconColor: string; text: string; subText: string }> = {
-    high: { bg: 'bg-red-50', border: 'border-red-300', iconBg: 'bg-red-100', iconColor: 'text-red-600', text: 'text-red-800', subText: 'text-red-600' },
-    medium: { bg: 'bg-amber-50', border: 'border-amber-300', iconBg: 'bg-amber-100', iconColor: 'text-amber-600', text: 'text-amber-800', subText: 'text-amber-600' },
-    low: { bg: 'bg-slate-50', border: 'border-slate-300', iconBg: 'bg-slate-100', iconColor: 'text-slate-600', text: 'text-slate-800', subText: 'text-slate-600' },
+// Deliberately capped at amber: this card asks the clinician to reconcile sources, it is
+// not an emergency banner — red is reserved for the medication-risk alerts.
+const SEVERITY_BANNER: Record<'high' | 'medium' | 'low', { accent: string; iconBg: string; iconColor: string; chip: string }> = {
+    high: { accent: 'border-l-amber-400', iconBg: 'bg-amber-100', iconColor: 'text-amber-600', chip: 'bg-amber-100 text-amber-700' },
+    medium: { accent: 'border-l-amber-300', iconBg: 'bg-amber-50', iconColor: 'text-amber-500', chip: 'bg-amber-50 text-amber-700' },
+    low: { accent: 'border-l-slate-300', iconBg: 'bg-slate-100', iconColor: 'text-slate-500', chip: 'bg-slate-100 text-slate-600' },
 };
 
 function bannerTier(severity: ContradictionSeverity): 'high' | 'medium' | 'low' {
@@ -165,11 +169,15 @@ function ContradictionSides({ alert }: { alert: RuntimeContradiction }) {
 export function ContradictionAlerts({
     alerts,
     anchorPrefix,
+    collapsible = false,
 }: {
     alerts: RuntimeContradiction[];
     /** When set, each alert row gets id `${anchorPrefix}-${alert.id}` so links can scroll to it. */
     anchorPrefix?: string;
+    /** Overview renders the card collapsed to a summary row; deep-link surfaces keep it open. */
+    collapsible?: boolean;
 }) {
+    const [open, setOpen] = useState(!collapsible);
     if (alerts.length === 0) {
         return null;
     }
@@ -177,41 +185,63 @@ export function ContradictionAlerts({
     const topTier = tiers.includes('high') ? 'high' : tiers.includes('medium') ? 'medium' : 'low';
     const config = SEVERITY_BANNER[topTier];
     const highCount = tiers.filter((tier) => tier === 'high').length;
-    return (
-        <div className={`rounded-xl border-2 ${config.border} ${config.bg} p-4`}>
-            <div className="flex items-start gap-3">
-                <div className={`p-2 rounded-lg ${config.iconBg}`}>
-                    <GitMerge className={`w-5 h-5 ${config.iconColor}`} />
-                </div>
-                <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                        <h3 className={`font-semibold ${config.text}`}>
-                            {alerts.length} Data Conflict{alerts.length !== 1 ? 's' : ''} Detected
-                        </h3>
-                        {highCount > 0 && (
-                            <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-medium rounded-full">
-                                {highCount} High Priority
-                            </span>
-                        )}
-                    </div>
-                    <ul className="space-y-3">
-                        {alerts.map((alert) => (
-                            <li key={alert.id} id={anchorPrefix !== undefined ? `${anchorPrefix}-${alert.id}` : undefined}>
-                                {/* div, not p: the chip popover nests block elements */}
-                                <div className={`text-sm ${config.subText}`}>
-                                    <span className="font-medium">{titleCase(alert.type)}:</span> {alert.description}
-                                    {/* Per-side (never grouped): distinct claims, each with its own origin marker. */}
-                                    <ContradictionSides alert={alert} />
-                                </div>
-                                {alert.suggested_question !== null && alert.suggested_question !== '' && (
-                                    <p className="text-sm text-slate-600 italic mt-0.5">→ {alert.suggested_question}</p>
-                                )}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
+    const header = (
+        <>
+            <div className={`p-1.5 rounded-lg ${config.iconBg}`}>
+                <GitMerge className={`w-4 h-4 ${config.iconColor}`} />
             </div>
-        </div>
+            <h3 className="text-sm font-semibold text-slate-700">
+                {alerts.length} fact{alerts.length !== 1 ? 's' : ''} to resolve
+            </h3>
+            {highCount > 0 && (
+                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${config.chip}`}>
+                    {highCount} high priority
+                </span>
+            )}
+        </>
+    );
+    return (
+        <section data-testid="facts-to-resolve">
+        <Card className={`border-l-4 ${config.accent}`}>
+            {collapsible ? (
+                <button
+                    type="button"
+                    aria-expanded={open}
+                    onClick={() => setOpen((current) => !current)}
+                    className="w-full flex items-center gap-2.5 px-4 py-3 text-left"
+                >
+                    {header}
+                    {!open && (
+                        <span className="flex-1 min-w-0 truncate text-xs text-slate-400">
+                            {titleCase(alerts[0]?.type ?? '')}: {alerts[0]?.description}
+                        </span>
+                    )}
+                    <ChevronDown
+                        className={`w-4 h-4 text-slate-400 ml-auto flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+                    />
+                </button>
+            ) : (
+                <div className="flex items-center gap-2.5 px-4 py-3">{header}</div>
+            )}
+            {open && (
+                <ul className="space-y-3 px-4 pb-4 pt-1">
+                    {alerts.map((alert) => (
+                        <li key={alert.id} id={anchorPrefix !== undefined ? `${anchorPrefix}-${alert.id}` : undefined}>
+                            {/* div, not p: the chip popover nests block elements */}
+                            <div className="text-sm text-slate-600">
+                                <span className="font-medium text-slate-700">{titleCase(alert.type)}:</span> {alert.description}
+                                {/* Per-side (never grouped): distinct claims, each with its own origin marker. */}
+                                <ContradictionSides alert={alert} />
+                            </div>
+                            {alert.suggested_question !== null && alert.suggested_question !== '' && (
+                                <p className="text-sm text-slate-500 italic mt-0.5">→ {alert.suggested_question}</p>
+                            )}
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </Card>
+        </section>
     );
 }
 
@@ -348,30 +378,48 @@ export function PatientHeaderBand({
 
 // ---- Chief complaint card ----
 
-function ChiefComplaintCard({ fact }: { fact: PatientFact | undefined }) {
-    if (fact === undefined || fact.fact_type !== 'chief_complaint') {
+/**
+ * "Why are we here today?" (P5) — one centered line the physician can hold in context: the
+ * patient's own goal for the visit (authored per storyline, cited to the intake corpus),
+ * followed by the clinical chief-complaint detail it frames.
+ */
+function WhyHereCard({ goal, complaint }: { goal: PatientFact | undefined; complaint: PatientFact | undefined }) {
+    const goalContent = goal !== undefined && goal.fact_type === 'patient_goal' ? goal.content : null;
+    const ccContent = complaint !== undefined && complaint.fact_type === 'chief_complaint' ? complaint.content : null;
+    if (goalContent === null && ccContent === null) {
         return null;
     }
-    const content = fact.content;
     return (
-        <section>
+        <section data-testid="why-here">
             <SectionLabel>
                 <MessageSquare className="w-4 h-4" />
-                Chief Complaint
+                Why are we here today?
             </SectionLabel>
             <Card className="p-5">
-                {/* div, not p: the chip popover nests block elements */}
-                <div className="text-lg text-slate-700 leading-relaxed">
-                    {content.statement}
-                    <CitationChips citations={fact.sources} />
-                </div>
-                <div className="mt-2 text-sm text-slate-500 space-y-0.5">
-                    {content.onset !== undefined && <p>Onset: {content.onset}</p>}
-                    {content.progression !== undefined && <p>Progression: {content.progression}</p>}
-                    {content.pertinent_negatives !== undefined && content.pertinent_negatives.length > 0 && (
-                        <p>Pertinent negatives: {content.pertinent_negatives.join('; ')}</p>
-                    )}
-                </div>
+                {goalContent !== null && (
+                    <div className={`text-center px-2 ${ccContent !== null ? 'pb-4 mb-4 border-b border-slate-100' : ''}`}>
+                        {/* div, not p: the chip popover nests block elements */}
+                        <div className="text-lg font-medium text-slate-800 leading-snug">
+                            {goalContent.goal}
+                            {goal !== undefined && <CitationChips citations={goal.sources} />}
+                        </div>
+                    </div>
+                )}
+                {ccContent !== null && (
+                    <>
+                        <div className="text-base text-slate-700 leading-relaxed">
+                            {ccContent.statement}
+                            {complaint !== undefined && <CitationChips citations={complaint.sources} />}
+                        </div>
+                        <div className="mt-2 text-sm text-slate-500 space-y-0.5">
+                            {ccContent.onset !== undefined && <p>Onset: {ccContent.onset}</p>}
+                            {ccContent.progression !== undefined && <p>Progression: {ccContent.progression}</p>}
+                            {ccContent.pertinent_negatives !== undefined && ccContent.pertinent_negatives.length > 0 && (
+                                <p>Pertinent negatives: {ccContent.pertinent_negatives.join('; ')}</p>
+                            )}
+                        </div>
+                    </>
+                )}
             </Card>
         </section>
     );
@@ -384,12 +432,18 @@ function FactGroupCard({
     icon: Icon,
     facts,
     badgesFor,
+    collapsible = false,
+    collapsedSummary,
 }: {
     title: string;
     icon: ComponentType<{ className?: string }>;
     facts: PatientFact[];
     badgesFor?: (fact: PatientFact) => ReactNode;
+    /** P5: start as a one-line summary row; the chevron expands to the full rows. */
+    collapsible?: boolean;
+    collapsedSummary?: string;
 }) {
+    const [open, setOpen] = useState(!collapsible);
     if (facts.length === 0) {
         return null;
     }
@@ -399,18 +453,130 @@ function FactGroupCard({
                 <Icon className="w-4 h-4" />
                 {title} ({facts.length})
             </SectionLabel>
-            <Card className="px-5 py-1">
-                {facts.map((fact) => (
-                    <FactRow key={fact.id} fact={fact} badges={badgesFor?.(fact)} />
-                ))}
-            </Card>
+            {collapsible ? (
+                <Card>
+                    <button
+                        type="button"
+                        aria-expanded={open}
+                        onClick={() => setOpen((current) => !current)}
+                        className="w-full flex items-center gap-2.5 px-5 py-3 text-left"
+                    >
+                        <span className="flex-1 min-w-0 truncate text-sm text-slate-600">
+                            {collapsedSummary ?? `${facts.length} on record`}
+                        </span>
+                        <ChevronDown
+                            className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+                        />
+                    </button>
+                    {open && (
+                        <div className="px-5 pb-1 border-t border-slate-100">
+                            {facts.map((fact) => (
+                                <FactRow key={fact.id} fact={fact} badges={badgesFor?.(fact)} />
+                            ))}
+                        </div>
+                    )}
+                </Card>
+            ) : (
+                <Card className="px-5 py-1">
+                    {facts.map((fact) => (
+                        <FactRow key={fact.id} fact={fact} badges={badgesFor?.(fact)} />
+                    ))}
+                </Card>
+            )}
         </section>
     );
 }
 
-// ---- Recent scans strip ----
+// ---- Recent scans workspace (P6): stacked scans left, at-hand analytics rail right ----
 
-function RecentScans({ images, onOpenImaging }: { images: ImageRecord[]; onOpenImaging: () => void }) {
+/** One label/value line on the analytics rail. */
+function RailRow({ label, value }: { label: string; value: ReactNode }) {
+    return (
+        <div className="flex items-baseline justify-between gap-3 text-sm">
+            <span className="text-slate-500">{label}</span>
+            <span className="font-semibold text-slate-800 text-right">{value}</span>
+        </div>
+    );
+}
+
+const RAIL_ALERT_CHIP: Record<'high' | 'medium' | 'low', string> = {
+    high: 'bg-amber-100 text-amber-700',
+    medium: 'bg-amber-50 text-amber-600',
+    low: 'bg-slate-100 text-slate-600',
+};
+
+/**
+ * The numbers Dan reaches for while looking at the scans, lifted from the same engines the
+ * Imaging tab renders (overview.imaging is deterministic — no extra fetch). HCQ patients get
+ * the GC-IPL story; treat-and-extend patients get the interval story; everyone gets a
+ * pointer deeper into the Imaging tab.
+ */
+function ImagingAtHand({ imaging, latest }: { imaging: OverviewPayload['imaging']; latest: ImageRecord | undefined }) {
+    const hcq = imaging.hcq_progression;
+    const intervals = imaging.interval_analysis;
+    const gcTrend = hcq.gc_thickness_trend;
+    const hasHcq = gcTrend.length > 0;
+    const hasIntervals = intervals.intervals.length > 0;
+    const lastGc = gcTrend.at(-1);
+    const priorGc = gcTrend.at(-2);
+    const gcDelta = lastGc !== undefined && priorGc !== undefined ? lastGc.value - priorGc.value : null;
+    const lastInterval = intervals.intervals.at(-1);
+    const daysSinceTreatment = latest?.treatment_context?.days_since_last_treatment ?? null;
+    return (
+        <aside data-testid="imaging-at-hand" className="rounded-lg bg-slate-50 border border-slate-100 p-4 space-y-2.5 self-start">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">At-hand analytics</p>
+            {hasHcq && (
+                <>
+                    <RailRow
+                        label="HCQ alert"
+                        value={
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold uppercase ${RAIL_ALERT_CHIP[hcq.alert_level]}`}>
+                                {hcq.alert_level}
+                            </span>
+                        }
+                    />
+                    {lastGc !== undefined && (
+                        <RailRow
+                            label="GC-IPL thickness"
+                            value={`${lastGc.value} µm${gcDelta !== null ? ` (${gcDelta > 0 ? '+' : ''}${gcDelta} µm)` : ''}`}
+                        />
+                    )}
+                    {hcq.progression_description !== '' && (
+                        <p className="text-xs text-slate-500 leading-relaxed">{hcq.progression_description}</p>
+                    )}
+                </>
+            )}
+            {hasIntervals && (
+                <>
+                    {lastInterval !== undefined && (
+                        <RailRow label="Current interval" value={`${lastInterval.interval_weeks} wks (${titleCase(lastInterval.outcome)})`} />
+                    )}
+                    {intervals.optimal_interval !== null && <RailRow label="Optimal interval" value={`${intervals.optimal_interval} wks`} />}
+                    <RailRow
+                        label="Response pattern"
+                        value={`${intervals.pattern_summary.good_response_count} good / ${intervals.pattern_summary.poor_response_count} poor`}
+                    />
+                </>
+            )}
+            {!hasHcq && !hasIntervals && (
+                <>
+                    {daysSinceTreatment !== null && <RailRow label="Days since last treatment" value={`${daysSinceTreatment}`} />}
+                    <p className="text-xs text-slate-500 leading-relaxed">No trend analytics for this modality yet — the Imaging tab has the full workspace.</p>
+                </>
+            )}
+        </aside>
+    );
+}
+
+function RecentScans({
+    images,
+    imaging,
+    onOpenImaging,
+}: {
+    images: ImageRecord[];
+    imaging: OverviewPayload['imaging'];
+    onOpenImaging: () => void;
+}) {
     // Wire order is ascending capture_date; re-sort defensively, newest first.
     const sorted = [...images].sort(
         (a, b) => new Date(b.image_metadata.capture_date).getTime() - new Date(a.image_metadata.capture_date).getTime(),
@@ -456,16 +622,21 @@ function RecentScans({ images, onOpenImaging }: { images: ImageRecord[]; onOpenI
                 {shown.length === 0 ? (
                     <p className="text-sm text-slate-400">No {side} scans on file.</p>
                 ) : (
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        {shown.map((image) => (
-                            <figure key={image.id}>
-                                <ScanImage image={image} className="w-full h-40" />
-                                <figcaption className="mt-1.5 text-xs text-slate-500">
-                                    {modalityLabel(image.image_metadata.modality)} {image.image_metadata.laterality.toUpperCase()} ·{' '}
-                                    {formatDate(image.image_metadata.capture_date)}
-                                </figcaption>
-                            </figure>
-                        ))}
+                    // P6: scans stack vertically (taller) so the analytics rail rides beside
+                    // them — the numbers Dan wants are at hand, not a tab away.
+                    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+                        <div className="space-y-4">
+                            {shown.map((image) => (
+                                <figure key={image.id}>
+                                    <ScanImage image={image} className="w-full h-56" />
+                                    <figcaption className="mt-1.5 text-xs text-slate-500">
+                                        {modalityLabel(image.image_metadata.modality)} {image.image_metadata.laterality.toUpperCase()} ·{' '}
+                                        {formatDate(image.image_metadata.capture_date)}
+                                    </figcaption>
+                                </figure>
+                            ))}
+                        </div>
+                        <ImagingAtHand imaging={imaging} latest={shown[0]} />
                     </div>
                 )}
             </Card>
@@ -486,18 +657,26 @@ export default function Overview({
     const medications = facts.medication ?? [];
     const alerts = overview.contradictions.filter((row) => row.status !== 'resolved').map(projectContradictionRow);
 
+    const medicationNames = medications
+        .map((fact) => (fact.fact_type === 'medication' ? fact.content.name : null))
+        .filter((name): name is string => name !== null);
     return (
         <div className="space-y-10">
-            <ChiefComplaintCard fact={(facts.chief_complaint ?? [])[0]} />
+            <WhyHereCard goal={(facts.patient_goal ?? [])[0]} complaint={(facts.chief_complaint ?? [])[0]} />
 
-            <RecentScans images={overview.images} onOpenImaging={onOpenImaging} />
+            <RecentScans images={overview.images} imaging={overview.imaging} onOpenImaging={onOpenImaging} />
 
-            <ContradictionAlerts alerts={alerts} />
+            <ContradictionAlerts alerts={alerts} collapsible />
+
+            {/* P5 order: the deterministic risk story reads before the raw med list it flags. */}
+            <MedicationRiskFlags flags={overview.medication_risk_flags} />
 
             <FactGroupCard
                 title="Medications"
                 icon={Pill}
                 facts={medications}
+                collapsible
+                collapsedSummary={medicationNames.join(' · ')}
                 badgesFor={(fact) =>
                     fact.fact_type === 'medication'
                         ? flagsForMedication(fact.content.name, overview.medication_risk_flags).map((flag, i) => (
@@ -506,8 +685,6 @@ export default function Overview({
                         : null
                 }
             />
-
-            <MedicationRiskFlags flags={overview.medication_risk_flags} />
 
             <FactGroupCard title="Allergies" icon={AlertTriangle} facts={facts.allergy ?? []} />
 

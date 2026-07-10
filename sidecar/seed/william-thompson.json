@@ -134,7 +134,7 @@
       "patient_id": "william-thompson",
       "fact_type": "patient_goal",
       "content": {
-        "goal": "Preserve reading and driving vision",
+        "goal": "Stay independent at home — protect the reading and driving vision he relies on",
         "specific_concerns": [
           "Wants to remain independent at home",
           "Anxious about losing central vision in his better-seeing tasks"
@@ -146,21 +146,21 @@
       "source_document_id": "doc-wt-002",
       "sources": [
         {
-          "id": "cit-wt-005",
+          "id": "cit-wt-goal-001",
           "fact_id": "fact-wt-goal-001",
-          "source_label": "Retina clinic visit note - Dr. Sarah Morrison",
+          "source_label": "Prior retina clinic note",
           "source_type": "prior_visit_note",
-          "excerpt_text": "His main concern is keeping his reading and driving vision.",
+          "excerpt_text": "He remains independent at home. His main concern is keeping his reading and driving vision.",
           "excerpt_location": {
             "type": "character_range",
-            "start_char": 560,
+            "start_char": 528,
             "end_char": 619,
-            "context_before": "ght eye over the past week. He remains independent at home. ",
+            "context_before": "currence of distortion in the right eye over the past week. ",
             "context_after": "\n\nEXAMINATION:\nVisual acuity (corrected): OD 20/30 (was 20/2"
           },
           "attribution": {
             "speaker_role": "physician",
-            "speaker_name": "Sarah Morrison, MD",
+            "speaker_name": "Retina clinic",
             "confidence": 0.95
           },
           "source_document_id": "doc-wt-002",

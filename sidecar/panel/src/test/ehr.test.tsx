@@ -226,6 +226,10 @@ describe('Origin badges', () => {
         stubEhr();
         render(<App />);
         await screen.findByRole('tab', { name: 'EHR Record' }); // landing ready (Overview active)
+        // P5 collapses meds + facts-to-resolve to summary rows — expand them to reach the badges.
+        for (const toggle of screen.getAllByRole('button', { expanded: false })) {
+            fireEvent.click(toggle);
+        }
         const overviewBadges = screen.getAllByTestId('origin-badge');
         expect(overviewBadges.some((b) => b.getAttribute('data-origin') === 'ehr')).toBe(true);
         expect(overviewBadges.some((b) => b.getAttribute('data-origin') === 'external')).toBe(true);
@@ -241,7 +245,9 @@ describe('Origin badges', () => {
     it('labels both sides of an EHR-vs-external contradiction with their origin', async () => {
         stubEhr({ overview: ehrContradictionOverview });
         render(<App />);
-        await screen.findByText('1 Data Conflict Detected');
+        await screen.findByText('1 fact to resolve');
+        // Collapsed summary row on the landing (P5) — expand to read both sides.
+        fireEvent.click(within(screen.getByTestId('facts-to-resolve')).getByRole('button', { expanded: false }));
         expect(screen.getByText(/OpenEMR lists Hydroxychloroquine 200mg/)).toBeInTheDocument();
 
         const badges = screen.getAllByTestId('origin-badge');

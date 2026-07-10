@@ -227,7 +227,46 @@
     }
   ],
   "family_history": [],
-  "patient_goals": [],
+  "patient_goals": [
+    {
+      "id": "fact-po-goal-001",
+      "patient_id": "patricia-okafor",
+      "fact_type": "patient_goal",
+      "content": {
+        "goal": "Prove the new bedtime drop is doing its job — pressures down on a routine she can keep",
+        "specific_concerns": [
+          "Prefers a once-daily routine she can stick to"
+        ],
+        "verbatim_quotes": [],
+        "emotional_state": "matter-of-fact"
+      },
+      "is_current": true,
+      "source_document_id": "doc-po-002",
+      "sources": [
+        {
+          "id": "cit-po-goal-001",
+          "fact_id": "fact-po-goal-001",
+          "source_label": "Glaucoma evaluation note",
+          "source_type": "prior_visit_note",
+          "excerpt_text": "Started latanoprost 0.005% one drop in both eyes at bedtime.",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 1353,
+            "end_char": 1413,
+            "context_before": "s, full visual fields, and normal RNFL thickness.\n\nPLAN:\n1. ",
+            "context_after": "\n2. Return in four to five weeks for repeat intraocular pres"
+          },
+          "attribution": {
+            "speaker_role": "physician",
+            "speaker_name": "Glaucoma clinic",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-po-002",
+          "document_date": "2024-11-21"
+        }
+      ]
+    }
+  ],
   "chief_complaint": {
     "id": "fact-po-cc-001",
     "patient_id": "patricia-okafor",

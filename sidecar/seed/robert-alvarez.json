@@ -279,7 +279,43 @@
     }
   ],
   "family_history": [],
-  "patient_goals": [],
+  "patient_goals": [
+    {
+      "id": "fact-ra-goal-001",
+      "patient_id": "robert-alvarez",
+      "fact_type": "patient_goal",
+      "content": {
+        "goal": "Leave with proof the diabetes still hasn't touched his vision — and keep it that way for another year",
+        "specific_concerns": [],
+        "verbatim_quotes": []
+      },
+      "is_current": true,
+      "source_document_id": "doc-ra-001",
+      "sources": [
+        {
+          "id": "cit-ra-goal-001",
+          "fact_id": "fact-ra-goal-001",
+          "source_label": "PCP referral letter",
+          "source_type": "referral_letter",
+          "excerpt_text": "He reports no blurred vision, floaters, flashes, or other visual complaints.",
+          "excerpt_location": {
+            "type": "character_range",
+            "start_char": 938,
+            "end_char": 1014,
+            "context_before": "thy in both eyes; he was asked to return in twelve months.\n\n",
+            "context_after": "\n\nCURRENT MEDICATIONS:\n1. Metformin 1000mg PO twice daily\n2."
+          },
+          "attribution": {
+            "speaker_role": "external_provider",
+            "speaker_name": "Primary care",
+            "confidence": 0.95
+          },
+          "source_document_id": "doc-ra-001",
+          "document_date": "2024-12-12"
+        }
+      ]
+    }
+  ],
   "chief_complaint": {
     "id": "fact-ra-cc-001",
     "patient_id": "robert-alvarez",

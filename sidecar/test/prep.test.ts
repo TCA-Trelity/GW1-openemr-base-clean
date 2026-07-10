@@ -840,7 +840,8 @@ describe('prep pipeline end-to-end', () => {
         expect(contradictionPoint?.contradiction_id).toBeTruthy();
         expect(content.questions_to_confirm.length).toBeGreaterThan(0);
         expect(content.why_they_are_here?.content.statement).toContain('Floaters');
-        expect(content.what_they_are_hoping_for?.content.goal).toContain('floaters');
+        // P5 goal one-liner: the life anchor (Emily's wedding) rides the corpus goal fact.
+        expect(content.what_they_are_hoping_for?.content.goal).toContain("Emily's wedding");
         expect(content.contradiction_alerts).toHaveLength(4);
         expect(content.urgency?.level).toBe('high'); // critical sulfa-allergy contradiction
         expect(content.facts_by_type.medication).toHaveLength(5);

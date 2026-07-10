@@ -177,9 +177,24 @@ describe('App landing (deterministic overview)', () => {
         expect(await screen.findByText('57 yrs · Female · MRN FPA-2019-4521')).toBeInTheDocument();
         expect(screen.getAllByText('10:30 AM').length).toBeGreaterThanOrEqual(1); // band + sidebar
         expect(screen.getAllByText('New patient').length).toBeGreaterThanOrEqual(1);
-        // Chief complaint card
+        // "Why are we here today?" leads: the patient's own goal, then the complaint detail (P5)
+        expect(screen.getByText('Why are we here today?')).toBeInTheDocument();
+        expect(screen.getByText(/rule out the retinal detachment her mother had/)).toBeInTheDocument();
         expect(screen.getByText(/Floaters and flashes x 2-3 weeks, worse OD/)).toBeInTheDocument();
-        // Medications card with a severity-styled risk badge on the HCQ row
+        // At-hand analytics rail beside the scans (P6) — engine numbers, no extra fetch
+        const rail = screen.getByTestId('imaging-at-hand');
+        expect(within(rail).getByText('HCQ alert')).toBeInTheDocument();
+        expect(within(rail).getByText('70 µm (-12 µm)')).toBeInTheDocument();
+        // Facts to resolve starts collapsed (P5): count visible, detail only after expanding
+        expect(screen.getByText('2 facts to resolve')).toBeInTheDocument();
+        expect(screen.queryByText(/HCQ duration conflicts across sources/)).not.toBeInTheDocument();
+        fireEvent.click(within(screen.getByTestId('facts-to-resolve')).getByRole('button', { expanded: false }));
+        expect(screen.getByText(/Referral letter documents NKDA/)).toBeInTheDocument();
+        expect(screen.getByText(/HCQ duration conflicts across sources/)).toBeInTheDocument();
+        expect(screen.getByText(/How long have you actually been taking hydroxychloroquine\?/)).toBeInTheDocument();
+        // Medications starts as a one-line summary (P5); expanding shows rows + risk badge
+        expect(screen.queryByText(/Hydroxychloroquine \(Plaquenil\) · 200mg · daily · PO/)).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /^Hydroxychloroquine/, expanded: false }));
         expect(screen.getByText(/Hydroxychloroquine \(Plaquenil\) · 200mg · daily · PO/)).toBeInTheDocument();
         const riskBadge = screen.getByTestId('med-risk-badge');
         expect(riskBadge).toHaveTextContent(/Retinal Toxicity · HIGH/);
@@ -189,34 +204,31 @@ describe('App landing (deterministic overview)', () => {
         // Allergies + conditions
         expect(screen.getByText('Sulfa antibiotics')).toBeInTheDocument();
         expect(screen.getByText(/Rheumatoid arthritis \(M06\.9\)/)).toBeInTheDocument();
-        // Contradiction alerts from BOTH stored payload shapes (runtime + rich seed)
-        expect(screen.getByText('2 Data Conflicts Detected')).toBeInTheDocument();
-        expect(screen.getByText(/Referral letter documents NKDA/)).toBeInTheDocument();
-        expect(screen.getByText(/HCQ duration conflicts across sources/)).toBeInTheDocument();
-        expect(screen.getByText(/How long have you actually been taking hydroxychloroquine\?/)).toBeInTheDocument();
-        // R7 section order: chief complaint -> recent scans -> data conflicts -> meds
+        // P5 section order: why-here -> recent scans -> facts to resolve -> risk story -> meds
         const strip = screen.getByTestId('recent-scans');
         const complaint = screen.getByText(/Floaters and flashes x 2-3 weeks, worse OD/);
-        const conflicts = screen.getByText('2 Data Conflicts Detected');
-        const meds = screen.getByText(/Hydroxychloroquine \(Plaquenil\) · 200mg/);
+        const conflicts = screen.getByText('2 facts to resolve');
+        const riskSource = screen.getByText('AAO HCQ Screening Guidelines 2016 (revised 2020)');
+        const meds = screen.getByText(/Hydroxychloroquine \(Plaquenil\) · 200mg · daily · PO/);
         expect(complaint.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         expect(strip.compareDocumentPosition(conflicts) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect(conflicts.compareDocumentPosition(meds) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(conflicts.compareDocumentPosition(riskSource) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(riskSource.compareDocumentPosition(meds) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         // The Generate control lives in the patient header band, left of the time chip (R2)
         expect(screen.getByRole('button', { name: /Generate AI insights/i })).toBeInTheDocument();
         // The invariant itself: zero /api/brief traffic
         expect(briefCalls(mock)).toBe(0);
     });
 
-    // Failure mode: the tab bar regresses to the old IA — EHR Record leads (system of
-    // record, E3), then AI Insights must be its own top-level tab right of Imaging (R2).
-    it('orders the tabs EHR Record, Overview, Medical Background, Imaging, AI Insights, Diagnosis & Care, Sources', async () => {
+    // Failure mode: the tab bar regresses — Overview must lead (P5, the working surface)
+    // with EHR Record beside it, and AI Insights stays its own tab right of Imaging (R2).
+    it('orders the tabs Overview, EHR Record, Medical Background, Imaging, AI Insights, Diagnosis & Care, Sources', async () => {
         stubApp({ overview: overviewNoBrief });
         render(<App />);
         const tabs = await screen.findAllByRole('tab');
         expect(tabs.map((tab) => tab.textContent)).toEqual([
-            'EHR Record',
             'Overview',
+            'EHR Record',
             'Medical Background',
             'Imaging',
             'AI Insights',
@@ -231,7 +243,9 @@ describe('App landing (deterministic overview)', () => {
     it('quotes both sources of a rich-seed contradiction via citation chips', async () => {
         stubApp({ overview: overviewNoBrief });
         render(<App />);
-        await screen.findByText('2 Data Conflicts Detected');
+        await screen.findByText('2 facts to resolve');
+        // The card collapses to a summary row on the landing (P5) — expand to reach the chips.
+        fireEvent.click(within(screen.getByTestId('facts-to-resolve')).getByRole('button', { expanded: false }));
         const chips = screen.getAllByRole('button', { name: /Citation \d: Source Document/i });
         expect(chips).toHaveLength(2); // rich-seed row projects source_documents[0..1]
         fireEvent.click(chips[0]!);
@@ -466,7 +480,7 @@ describe('AI insights', () => {
         );
         expect(prepCall).toBeDefined();
         // The rest of the landing never blanks while generating
-        expect(screen.getByText(/Hydroxychloroquine \(Plaquenil\) · 200mg/)).toBeInTheDocument();
+        expect(screen.getByText(/Floaters and flashes x 2-3 weeks, worse OD/)).toBeInTheDocument();
         // The AI Insights tab reports the same run with the full stage label
         fireEvent.click(screen.getByRole('tab', { name: 'AI Insights' }));
         expect(screen.getByTestId('insights-progress')).toHaveTextContent('Reading documents 7/12');
@@ -539,7 +553,7 @@ describe('Citation deep links', () => {
     it('deep-links from a landing citation chip to the Sources tab with the excerpt highlighted', async () => {
         stubApp({ overview: overviewNoBrief });
         const { container } = render(<App />);
-        // Open the chief-complaint citation chip on the landing card (labelled "Intake", R8).
+        // Open the patient-goal citation chip on the why-here card (labelled "Intake", R8/P5).
         const chips = await screen.findAllByRole('button', { name: /Citation 1: Conversational intake transcript/i });
         expect(chips[0]).toHaveTextContent('Intake');
         fireEvent.click(chips[0]!);
@@ -552,7 +566,7 @@ describe('Citation deep links', () => {
         await waitFor(() => {
             const mark = container.querySelector('#citation-highlight');
             expect(mark).not.toBeNull();
-            expect(mark).toHaveTextContent("I've been seeing these floaters in my vision, especially in my right eye.");
+            expect(mark).toHaveTextContent("I really want to understand what's causing these floaters and make sure I don't have what my mother had.");
         });
     });
 });
