@@ -71,3 +71,9 @@ architecture docs:
 - DECISION: dev-login is **demoted, not removed** — hidden behind its env flag plus `?dev=1`; CI smoke and graders keep a deterministic door that cannot rot the demo.
 - DECISION: Patient goal one-liners are **agent-authored for all five** patients to fit each arc (user delegated), rendered deterministically on the overview AND planted verbatim in the intake documents so chat citations can back the same sentence. Margaret's goal is phrased around stability through her daughter's wedding (her arc has no surgery).
 - DECISION: Labels per user wording: section title **"Why are we here today?"**; conflicts container **"Facts to resolve"**. Width target `max-w-6xl` (~14% wider each side, inside the requested 10–15%).
+
+## Wave Q (2026-07-10, user answers to the round-2 UI review clarifications)
+
+- DECISION: Q3 game plan = **prep-ride + one bounded Haiku call** stored on the brief; engines set the deterministic skeleton (follow-up interval, monitoring cadence), Haiku composes the who-does-what in a consultative tone; read-only proposal this pass (editable plan items explicitly deferred).
+- DECISION: Build order = **Wave Q before the login wave** — Q1/Q2/Q7/Q8 (pure UI) → Q5/Q6 (imaging) → Q3/Q4 (LLM surfaces), screenshots at each step; P1–P3 immediately after.
+- DECISION: Q8 relocation — **medication-risk alerts move with Medications into Medical Background** (nothing deleted); AI Insights and the care plan keep surfacing risks.
