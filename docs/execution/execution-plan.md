@@ -209,14 +209,14 @@ P4 → P1–P3 → P7/P8 rolling.*
 
 | ID | Ticket | Agent | Depends | Verify | Done |
 |---|---|---|---|---|---|
-| Q1 | Sources tab: auto-select the first document so the viewer never opens empty (e.g. Margaret lands on her referral letter) | sub | S2.12 | unit + screenshot | ☐ |
-| Q2 | Sources tab: document-type filter chips — 13 documents is a real list to navigate | sub | Q1 | unit + screenshot | ☐ |
+| Q1 | Sources tab: auto-select the first document so the viewer never opens empty (Margaret lands on her referral letter); deep-link focus wins over the auto-select; dismissal sticks. *(Done `b0035d0`, screenshot-verified.)* | sub | S2.12 | unit + screenshot | ☑ |
+| Q2 | Sources tab: document-type filter chips over the rail (All + per-type counts). *(Done `b0035d0`.)* | sub | Q1 | unit + screenshot | ☑ |
 | Q3 | Diagnosis & Care overhaul: an ophthalmology-focused "game plan" — who does what (nurse check-ins, forms, call-backs, meds to prescribe), deterministic skeleton from the engines + ONE bounded Haiku call riding the existing prep run; consultative game-plan feel, not a pool of data fields | main | R3 | unit + screenshot | ☐ |
 | Q4 | AI Insights redesign: ~10–15% of current length, bullet-first, consultative thought-partner tone ("a question you might want to ask"), calm palette — no red alarm dump; gate metrics stay as a small footer chip | main | R4 | unit + screenshot | ☐ |
 | Q5 | Imaging suite breakout width: the module escapes the content column (bumps the left sidebar, runs to the right viewport edge) — scan image ≥2× current width, analytics get room | sub | V1 | screenshot | ☐ |
 | Q6 | Scan-image metric overlay: quick key metrics (CRT, Δ vs prior, interval status, date) rendered onto the scan's dead space — first pass to eyeball together | sub | Q5 | screenshot | ☐ |
-| Q7 | Medical Background curation: meds + allergies + true history stay (family history; conditions arrive here as "Medical history"); duplicated chief-complaint / patient-goal dumps removed — no data fields for their own sake | sub | P5 | unit + screenshot | ☐ |
-| Q8 | Overview minimalism: landing = why-are-we-here + recent scans + facts-to-resolve ONLY; medications, med-risk alerts, allergies, conditions move off the overview (risk alerts ride with meds in Medical Background; AI insights / care plan still surface them) | sub | Q7 | unit + screenshot | ☐ |
+| Q7 | Medical Background curation: meds (with risk badges) + Medication Risk Alerts detail + allergies + conditions-as-Medical-History + family history; duplicated chief-complaint / patient-goal dumps removed. *(Done `b0035d0`.)* | sub | P5 | unit + screenshot | ☑ |
+| Q8 | Overview minimalism: landing = why-are-we-here + recent scans + facts-to-resolve ONLY; meds, risk alerts, allergies, conditions relocated to Medical Background per the locked decision. Bonus: `?tab=` deep links. *(Done `b0035d0`.)* | sub | Q7 | unit + screenshot | ☑ |
 
 ## Standing rules
 
