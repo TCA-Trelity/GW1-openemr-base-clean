@@ -324,20 +324,31 @@ export class StandardApiClient {
     }
 
     async listAppointments(pid: string): Promise<EhrAppointmentRecord[]> {
-        // Appointment reads 404 on an empty calendar (responseHandler semantics, like medications).
-        let rows: Record<string, unknown>[];
+        // Live lesson: this route answers like the medication list — RAW rows through the legacy
+        // responseHandler (no {data} envelope; AppointmentRestController::getAllForPatient) and a
+        // 404 when the calendar is empty. Tolerate an envelope too in case the route modernizes.
+        const path = `/patient/${encodeURIComponent(pid)}/appointment`;
+        let body: unknown;
         try {
-            rows = await this.listEnvelopeRows(`/patient/${encodeURIComponent(pid)}/appointment`);
+            body = await this.request('GET', path);
         } catch (error) {
             if (error instanceof StandardApiError && error.status === 404) {
                 return [];
             }
             throw error;
         }
-        return rows.map((row) => ({
-            eventDate: typeof row['pc_eventDate'] === 'string' ? row['pc_eventDate'] : '',
-            title: typeof row['pc_title'] === 'string' ? row['pc_title'] : '',
-        }));
+        const envelope = asRecord(body);
+        const rows = Array.isArray(body) ? body : envelope !== undefined && Array.isArray(envelope['data']) ? envelope['data'] : [];
+        return rows.flatMap((row) => {
+            const record = asRecord(row);
+            if (record === undefined) {
+                return [];
+            }
+            return [{
+                eventDate: typeof record['pc_eventDate'] === 'string' ? record['pc_eventDate'] : '',
+                title: typeof record['pc_title'] === 'string' ? record['pc_title'] : '',
+            }];
+        });
     }
 
     async createAppointment(pid: string, payload: EhrAppointmentPayload): Promise<void> {

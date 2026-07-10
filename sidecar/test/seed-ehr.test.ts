@@ -276,8 +276,9 @@ function depthRoutes(uuid: string, pid: string): { routes: Record<string, (call:
         [`POST /apis/default/api/patient/${pid}/encounter/101/vital`]: vitalOrSoap,
         [`POST /apis/default/api/patient/${pid}/encounter/100/soap_note`]: vitalOrSoap,
         [`POST /apis/default/api/patient/${pid}/encounter/101/soap_note`]: vitalOrSoap,
+        // Raw rows, no envelope — the live route's actual shape (legacy responseHandler).
         [`GET /apis/default/api/patient/${pid}/appointment`]: () =>
-            appointments.length === 0 ? jsonResponse(404, undefined) : jsonResponse(200, envelope(appointments)),
+            appointments.length === 0 ? jsonResponse(404, undefined) : jsonResponse(200, appointments),
         [`POST /apis/default/api/patient/${pid}/appointment`]: (call) => {
             const body = call.body as Record<string, unknown>;
             appointments.push({ pc_eventDate: body['pc_eventDate'], pc_title: body['pc_title'] });
@@ -400,10 +401,10 @@ describe('seedPatientIntoEhr', () => {
                     { eid: 2, date: '2024-12-26 00:00:00', reason: 'New patient examination — floaters and flashes, right eye' },
                 ])),
             'GET /apis/default/api/patient/42/appointment': () =>
-                jsonResponse(200, envelope([
+                jsonResponse(200, [
                     { pc_eventDate: '2024-12-26', pc_title: 'NEW PATIENT EXAM — FLOATERS/FLASHES OD' },
                     { pc_eventDate: '2025-01-09', pc_title: 'Dilated follow-up + OCT review' },
-                ])),
+                ]),
             'GET /apis/default/api/patient/uuid-mc/insurance': () => jsonResponse(200, envelope([{ type: 'PRIMARY' }])),
         });
 
