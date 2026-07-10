@@ -302,6 +302,7 @@ describe('seedPatientIntoEhr', () => {
     it('reuses an existing patient found by name+DOB and only tops up missing list entries', async () => {
         const { fetch, calls } = apiFake({
             'GET /apis/default/api/patient': () => jsonResponse(200, envelope([MC_SEARCH_ROW])),
+            'PUT /apis/default/api/patient/uuid-mc': () => jsonResponse(200, envelope({})),
             'GET /apis/default/api/patient/uuid-mc/medical_problem': () =>
                 jsonResponse(200, envelope([{ title: 'Rheumatoid arthritis (seropositive)' }])),
             'POST /apis/default/api/patient/uuid-mc/medical_problem': () =>
@@ -380,6 +381,7 @@ describe('seedPatientIntoEhr', () => {
     it('deduplicates list entries case-insensitively', async () => {
         const { fetch, calls } = apiFake({
             'GET /apis/default/api/patient': () => jsonResponse(200, envelope([MC_SEARCH_ROW])),
+            'PUT /apis/default/api/patient/uuid-mc': () => jsonResponse(200, envelope({})),
             'GET /apis/default/api/patient/uuid-mc/medical_problem': () =>
                 jsonResponse(200, envelope([
                     { title: 'RHEUMATOID ARTHRITIS (SEROPOSITIVE)' },
@@ -426,6 +428,7 @@ describe('seedPatientIntoEhr', () => {
         delete depth['GET /apis/default/api/insurance_company'];
         const { fetch } = apiFake({
             'GET /apis/default/api/patient': () => jsonResponse(200, envelope([MC_SEARCH_ROW])),
+            'PUT /apis/default/api/patient/uuid-mc': () => jsonResponse(200, envelope({})),
             'GET /apis/default/api/patient/uuid-mc/medical_problem': () => jsonResponse(200, envelope([])),
             'POST /apis/default/api/patient/uuid-mc/medical_problem': () => jsonResponse(201, envelope({ id: 1, uuid: 'u' })),
             'GET /apis/default/api/patient/uuid-mc/allergy': () => jsonResponse(200, envelope([])),

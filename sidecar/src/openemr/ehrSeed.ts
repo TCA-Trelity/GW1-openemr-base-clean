@@ -528,6 +528,11 @@ export async function seedPatientIntoEhr(api: StandardApiClient, corpus: EhrSeed
     );
     const action: SeedPatientOutcome['action'] = match === undefined ? 'created' : 'found';
     const { uuid, pid } = match ?? (await api.createPatient(payload));
+    if (match !== undefined) {
+        // Found charts predate corpus additions: PUT the same payload so demographics depth
+        // added later (P4) converges onto them — idempotent, same values every run.
+        await api.updatePatient(uuid, payload);
+    }
 
     const problems = await seedList(buildProblemPayloads(corpus), () => api.listMedicalProblemTitles(uuid), (item) => api.createMedicalProblem(uuid, item));
     const allergies = await seedList(buildAllergyPayloads(corpus), () => api.listAllergyTitles(uuid), (item) => api.createAllergy(uuid, item));

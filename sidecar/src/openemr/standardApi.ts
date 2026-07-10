@@ -234,6 +234,13 @@ export class StandardApiClient {
         });
     }
 
+    // PUT /api/patient/:puuid (PatientRestController::put) — idempotent demographics converge
+    // for patients that already exist (the found branch), so depth added to the corpus after a
+    // chart was created still lands on it.
+    async updatePatient(puuid: string, payload: EhrPatientPayload): Promise<void> {
+        await this.request('PUT', `/patient/${encodeURIComponent(puuid)}`, payload);
+    }
+
     // POST /api/patient returns {pid, uuid} on 201 (PatientService::insert, src/Services/PatientService.php:229-234).
     async createPatient(payload: EhrPatientPayload): Promise<CreatedRecord> {
         const body = await this.request('POST', '/patient', payload);
@@ -416,7 +423,7 @@ export class StandardApiClient {
         return Array.isArray(rows) ? titlesOf(rows) : [];
     }
 
-    private async request(method: 'GET' | 'POST', path: string, payload?: unknown): Promise<unknown> {
+    private async request(method: 'GET' | 'POST' | 'PUT', path: string, payload?: unknown): Promise<unknown> {
         const token = await this.tokenProvider.getAccessToken();
         const init: RequestInit = {
             method,
