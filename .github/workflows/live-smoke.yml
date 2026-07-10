@@ -23,6 +23,11 @@ env:
 
 # One probe at a time — pushes land on several branches at once and the e2e run
 # triggers a real prep; queue instead of stampeding the live service (gate-fix).
+# Deploy-race gotcha: a push that also changes sidecar code starts a Railway
+# rebuild, and the cutover kills any prep the smoke just started on the old
+# instance (the run dies mid llm_extraction; its prep_run row stays 'running'
+# forever, harmlessly — the in-flight dedupe is per-process, not DB-backed).
+# Re-kick the smoke after the deploy settles rather than chasing ghosts.
 concurrency:
   group: live-smoke
   cancel-in-progress: false
