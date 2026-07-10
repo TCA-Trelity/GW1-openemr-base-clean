@@ -15,6 +15,7 @@ import type { PrepTracer, PrepTraceHandle } from '../obs/langfuse.js';
 import { DEFAULT_PROVIDER_PROFILE, type PatientFact, type ProviderProfile } from '../schemas/index.js';
 import type { BriefInput, PrepRunStatus, StoredBrief } from '../store/index.js';
 import { assembleBrief, type BriefContent } from './brief.js';
+import { gamePlanInputFromBrief, type GamePlanComposer } from './gamePlan.js';
 import type { LlmCallRecord } from './budget.js';
 import type { FactExtractor, PrepLogger } from './extraction.js';
 import type { DocumentSource } from './sources.js';
@@ -38,6 +39,8 @@ export interface PrepDeps {
     store: PrepStore;
     source: DocumentSource;
     extractor: FactExtractor;
+    /** Q3: optional — when absent (or on any failure) the brief stores game_plan: null. */
+    gamePlanComposer?: GamePlanComposer;
     logger: PrepLogger;
     /** Spend guardrails: 24h budget gate before the LLM call + per-call ledger writes. */
     spendGuard?: PrepSpendGuard;
@@ -183,11 +186,43 @@ export async function executePrep(deps: PrepDeps, ctx: PrepRunContext): Promise<
             }),
         );
 
+        // Q3: one bounded Haiku call over the ASSEMBLED (gated) content — a proposal, never
+        // a gate: compose() returns null on any failure and the brief completes without it.
+        const gamePlan =
+            deps.gamePlanComposer === undefined
+                ? null
+                : await runStage('game_plan', () =>
+                      deps.gamePlanComposer!.compose(
+                          gamePlanInputFromBrief(content, sources.patient.name ?? patientId),
+                          correlationId,
+                          logger,
+                          async (usage) => {
+                              trace?.generation({
+                                  label: usage.label,
+                                  attempt: usage.attempt,
+                                  model: usage.model,
+                                  inputTokens: usage.inputTokens,
+                                  outputTokens: usage.outputTokens,
+                                  startedAt: usage.startedAt,
+                                  endedAt: usage.endedAt,
+                              });
+                              await spendGuard?.recordCall({
+                                  model: usage.model,
+                                  inputTokens: usage.inputTokens,
+                                  outputTokens: usage.outputTokens,
+                                  correlationId,
+                                  purpose: 'prep_game_plan',
+                              });
+                          },
+                      ),
+                  );
+        const finalContent: BriefContent = { ...content, game_plan: gamePlan };
+
         const brief = await runStage('save_brief', () =>
             deps.store.saveBrief({
                 patient_id: patientId,
                 correlation_id: correlationId,
-                content,
+                content: finalContent,
                 status: 'complete',
             }),
         );
@@ -195,7 +230,7 @@ export async function executePrep(deps: PrepDeps, ctx: PrepRunContext): Promise<
         await deps.store.finishPrepRun(prepRunId, 'complete');
         logger.info({ correlationId, prepRunId, patientId, briefId: brief.id }, 'prep run complete');
         await trace?.end({ status: 'complete', gateMetrics: metrics });
-        return { prepRunId, brief, content };
+        return { prepRunId, brief, content: finalContent };
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         logger.error({ correlationId, prepRunId, patientId, err: message }, 'prep run failed');

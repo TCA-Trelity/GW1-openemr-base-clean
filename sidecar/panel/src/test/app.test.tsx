@@ -383,18 +383,19 @@ describe('AI insights', () => {
         expect(await screen.findByRole('button', { name: /Refresh insights/i })).toBeInTheDocument();
         fireEvent.click(screen.getByRole('tab', { name: 'AI Insights' }));
         const tab = screen.getByTestId('ai-insights');
-        expect(within(tab).getByText('AI-prepared · citation-gated')).toBeInTheDocument();
-        expect(within(tab).getByText(/Prepared Dec 26, 2024/)).toBeInTheDocument();
-        expect(within(tab).getByText(/13\/14 claims verified/)).toBeInTheDocument();
-        // Urgency banner, red for high
+        // Q4: provenance demoted to one quiet footer line — trust story intact, no chip wall.
+        expect(within(tab).getByText(/AI-prepared & citation-gated · 13\/14 claims verified/)).toBeInTheDocument();
+        expect(within(tab).getByText(/prepared Dec 26, 2024/)).toBeInTheDocument();
+        // Q4: urgency is one calm line — no red alarm box on a routine visit.
         const banner = within(tab).getByTestId('urgency-banner');
-        expect(banner.className).toContain('bg-red-50');
+        expect(banner.className).not.toContain('bg-red-50');
+        expect(banner).toHaveTextContent('High urgency');
         expect(banner).toHaveTextContent('Critical contradiction in the record');
-        // The LLM-derived sections
-        expect(within(tab).getByText(/Why They.re Here/i)).toBeInTheDocument();
-        expect(within(tab).getByText(/rule out the retinal detachment her mother had/)).toBeInTheDocument();
-        expect(within(tab).getByText(/Key Discussion Points \(3\)/)).toBeInTheDocument();
-        expect(within(tab).getByText(/Questions to Confirm \(2\)/)).toBeInTheDocument();
+        // Q4: consultative sections; the why/hoping duplicates are gone (they live on Overview).
+        expect(within(tab).getByText('Worth discussing')).toBeInTheDocument();
+        expect(within(tab).getByText('Questions you might ask')).toBeInTheDocument();
+        expect(within(tab).queryByText(/Why They.re Here/i)).not.toBeInTheDocument();
+        expect(within(tab).queryByText(/Hoping For/i)).not.toBeInTheDocument();
     });
 
     // Failure mode (R4): structured discussion points render as blobs (or crash on the
@@ -453,7 +454,7 @@ describe('AI insights', () => {
         render(<App />);
         await screen.findByRole('button', { name: /Refresh insights/i });
         fireEvent.click(screen.getByRole('tab', { name: 'AI Insights' }));
-        expect(screen.getByText(/Questions to Confirm \(6\)/)).toBeInTheDocument();
+        expect(screen.getByText('Questions you might ask')).toBeInTheDocument();
         expect(screen.getAllByTestId('question-item')).toHaveLength(4);
         fireEvent.click(screen.getByRole('button', { name: /Show all \(6\)/i }));
         expect(screen.getAllByTestId('question-item')).toHaveLength(6);
@@ -512,7 +513,7 @@ describe('AI insights', () => {
         fireEvent.click(await screen.findByRole('button', { name: /Generate AI insights/i }));
         expect(await screen.findByRole('button', { name: /Refresh insights/i })).toBeInTheDocument();
         fireEvent.click(screen.getByRole('tab', { name: 'AI Insights' }));
-        expect(await screen.findByText('AI-prepared · citation-gated')).toBeInTheDocument();
+        expect(await screen.findByText(/AI-prepared & citation-gated/)).toBeInTheDocument();
     });
 
     // Failure mode: a 429 guard rejection crashes the header control or takes the page
@@ -557,6 +558,45 @@ describe('AI insights', () => {
         fireEvent.click(screen.getByRole('tab', { name: 'AI Insights' }));
         expect(await screen.findByText(/extraction failed: model refused/)).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /Try again/i })).toBeInTheDocument();
+    });
+});
+
+describe('Diagnosis & Care game plan (Q3)', () => {
+    // Failure mode: the AI-drafted run sheet fails to render from the brief, loses its
+    // owner grouping, or renders without the confirm-before-acting caveat.
+    it('renders the game plan card from the brief, grouped by owner, with the proposal caveat', async () => {
+        const gamePlan = {
+            summary_line: 'Protect vision through the wedding: rule out a tear today, lock the screening cadence.',
+            items: [
+                { owner: 'physician', action: 'Complete dilated peripheral exam with scleral depression', timing: 'today', kind: 'order' },
+                { owner: 'nurse', action: 'Call in 2 weeks to check symptoms have not progressed', timing: 'within 2 weeks', kind: 'call_back' },
+            ],
+        };
+        stubApp({ brief: { status: 200, body: { ...storedBrief, content: { ...briefContent, game_plan: gamePlan } } } });
+        render(<App />);
+        await screen.findByRole('button', { name: /Refresh insights/i }); // brief loaded
+        fireEvent.click(screen.getByRole('tab', { name: 'Diagnosis & Care' }));
+        const card = screen.getByTestId('game-plan');
+        expect(within(card).getByText(/Protect vision through the wedding/)).toBeInTheDocument();
+        expect(within(card).getByText('Physician')).toBeInTheDocument();
+        expect(within(card).getByText('Nurse')).toBeInTheDocument();
+        expect(within(card).getByText(/scleral depression/)).toBeInTheDocument();
+        expect(within(card).getByText('within 2 weeks')).toBeInTheDocument();
+        expect(within(card).getByText(/AI-drafted proposal .* confirm before acting/i)).toBeInTheDocument();
+        // The insights tab carries the one-line frame pointing here.
+        fireEvent.click(screen.getByRole('tab', { name: 'AI Insights' }));
+        expect(screen.getByTestId('insights-game-plan-line')).toHaveTextContent(/full game plan on Diagnosis & Care/i);
+    });
+
+    // Failure mode: older briefs (no game_plan key) or failed compositions (null) must
+    // render the deterministic tab untouched — no crash, no empty card.
+    it('renders no game-plan card when the brief has none', async () => {
+        stubApp(); // storedBrief has no game_plan key (pre-Q3 shape)
+        render(<App />);
+        await screen.findByRole('button', { name: /Refresh insights/i });
+        fireEvent.click(screen.getByRole('tab', { name: 'Diagnosis & Care' }));
+        expect(screen.queryByTestId('game-plan')).not.toBeInTheDocument();
+        expect(screen.getByText(/Active Conditions/)).toBeInTheDocument();
     });
 });
 

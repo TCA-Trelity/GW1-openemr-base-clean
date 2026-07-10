@@ -8,6 +8,7 @@ import type { PrepTracer } from '../obs/langfuse.js';
 import { executePrep, type PrepDeps, type PrepSpendGuard, type PrepStore } from '../prep/pipeline.js';
 import type { DocumentSource } from '../prep/sources.js';
 import type { FactExtractor } from '../prep/extraction.js';
+import type { GamePlanComposer } from '../prep/gamePlan.js';
 import type { ProviderProfile } from '../schemas/index.js';
 import type { FactBundle, StoredBrief, StoredPrepRun } from '../store/index.js';
 
@@ -27,6 +28,8 @@ export interface PrepRouteDeps {
     store: PrepRouteStore;
     source: DocumentSource;
     extractor: FactExtractor;
+    /** Q3 game-plan composer — optional; briefs store game_plan: null without it. */
+    gamePlanComposer?: GamePlanComposer;
     /** Spend guardrails: budget precheck + GET /api/usage (absent only in bare scaffolds). */
     spendGuard?: PrepRouteSpendGuard;
     /** Langfuse tracing, passed through to the pipeline when configured. */
@@ -105,6 +108,7 @@ export function registerPrepRoutes(app: FastifyInstance, deps: PrepRouteDeps | u
             source: deps.source,
             extractor: deps.extractor,
             logger: request.log,
+            ...(deps.gamePlanComposer !== undefined ? { gamePlanComposer: deps.gamePlanComposer } : {}),
             ...(deps.spendGuard !== undefined ? { spendGuard: deps.spendGuard } : {}),
             ...(deps.tracer !== undefined ? { tracer: deps.tracer } : {}),
             ...(deps.clock !== undefined ? { clock: deps.clock } : {}),

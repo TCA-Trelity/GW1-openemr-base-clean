@@ -302,6 +302,18 @@ export interface DiscussionPoint {
     contradiction_id: string | null;
 }
 
+/** Q3 game plan — the visit's who-does-what, composed from the gated brief (read-only proposal). */
+export interface GamePlanItem {
+    owner: 'physician' | 'nurse' | 'front_desk' | 'patient';
+    action: string;
+    timing: string | null;
+    kind: 'order' | 'check_in' | 'form' | 'call_back' | 'prescription' | 'monitoring' | 'education';
+}
+export interface GamePlan {
+    summary_line: string;
+    items: GamePlanItem[];
+}
+
 export interface BriefContent {
     urgency: { level: 'high' | 'moderate'; reason: string } | null;
     contradiction_alerts: RuntimeContradiction[];
@@ -318,6 +330,8 @@ export interface BriefContent {
     };
     facts_by_type: Record<FactType, PatientFact[]>;
     gate_metrics: GateMetrics;
+    /** Q3: absent on briefs stored before the game plan shipped; null when composition failed. */
+    game_plan?: GamePlan | null;
     prepared_at: string;
     correlation_id: string;
 }

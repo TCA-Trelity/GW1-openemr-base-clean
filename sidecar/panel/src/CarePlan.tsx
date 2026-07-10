@@ -3,9 +3,10 @@
 // active conditions resolve fact ids against the overview facts (the shared condition row
 // with citation chips), and the protocol / monitoring / follow-up cards render the pure
 // engine outputs. Single-line rows — the whole tab reads in seconds.
-import { AlertTriangle, CalendarClock, Info, Stethoscope, Syringe } from 'lucide-react';
-import type { CarePlan as CarePlanData, PatientFact } from './types';
-import { Card, SectionLabel, formatDate } from './ui';
+import { AlertTriangle, CalendarClock, ClipboardList, Info, PhoneCall, Pill, Sparkles, Stethoscope, Syringe, UserRound } from 'lucide-react';
+import type { ComponentType } from 'react';
+import type { CarePlan as CarePlanData, GamePlan, GamePlanItem, PatientFact } from './types';
+import { Card, SectionLabel, formatDate, titleCase } from './ui';
 import { FactRow } from './MedicalBackground';
 import { medicationLabel } from './imaging/badges';
 
@@ -21,13 +22,87 @@ const CONFIDENCE_BADGES: Record<'high' | 'medium' | 'low', string> = {
     low: 'border-slate-300 text-slate-500',
 };
 
+// ---- Q3: the game plan — who does what, composed from the citation-gated brief ----
+
+const OWNER_LABELS: Record<GamePlanItem['owner'], string> = {
+    physician: 'Physician',
+    nurse: 'Nurse',
+    front_desk: 'Front desk',
+    patient: 'Patient',
+};
+const OWNER_ORDER: GamePlanItem['owner'][] = ['physician', 'nurse', 'front_desk', 'patient'];
+
+const KIND_ICONS: Record<GamePlanItem['kind'], ComponentType<{ className?: string }>> = {
+    order: Stethoscope,
+    check_in: UserRound,
+    form: ClipboardList,
+    call_back: PhoneCall,
+    prescription: Pill,
+    monitoring: CalendarClock,
+    education: Info,
+};
+
+/** The run-sheet card: grouped by owner, one concrete action per row, timing at the right. */
+export function GamePlanCard({ gamePlan }: { gamePlan: GamePlan }) {
+    const byOwner = OWNER_ORDER.map((owner) => ({
+        owner,
+        items: gamePlan.items.filter((item) => item.owner === owner),
+    })).filter((group) => group.items.length > 0);
+    return (
+        <section data-testid="game-plan">
+            <SectionLabel>
+                <Sparkles className="w-4 h-4" />
+                Today&rsquo;s Game Plan
+            </SectionLabel>
+            <Card className="p-5">
+                <p className="text-[15px] font-medium text-slate-800 leading-snug">{gamePlan.summary_line}</p>
+                <div className="mt-4 space-y-4">
+                    {byOwner.map(({ owner, items }) => (
+                        <div key={owner}>
+                            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{OWNER_LABELS[owner]}</p>
+                            <ul className="space-y-1">
+                                {items.map((item, index) => {
+                                    const Icon = KIND_ICONS[item.kind];
+                                    return (
+                                        <li key={index} className="flex items-start justify-between gap-3 py-1.5 border-b border-slate-100 last:border-0">
+                                            <span className="flex items-start gap-2 text-sm text-slate-700 min-w-0">
+                                                <Icon className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
+                                                <span>{item.action}</span>
+                                            </span>
+                                            <span className="flex items-center gap-1.5 flex-shrink-0">
+                                                {item.timing !== null && item.timing !== '' && (
+                                                    <span className="inline-flex px-2 py-0.5 rounded-full bg-slate-100 text-[11px] text-slate-600">{item.timing}</span>
+                                                )}
+                                                <span className="inline-flex px-1.5 py-0.5 rounded-md border border-slate-200 text-[10px] text-slate-400">
+                                                    {titleCase(item.kind)}
+                                                </span>
+                                            </span>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </div>
+                    ))}
+                </div>
+                <p className="mt-4 text-xs text-slate-400 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    AI-drafted proposal from the citation-gated brief — confirm before acting.
+                </p>
+            </Card>
+        </section>
+    );
+}
+
 export default function CarePlan({
     carePlan,
     conditions,
+    gamePlan = null,
 }: {
     carePlan: CarePlanData;
     /** The overview's condition facts — active_condition_fact_ids resolve against these. */
     conditions: PatientFact[];
+    /** Q3: from the latest brief when one exists; null renders the deterministic tab as before. */
+    gamePlan?: GamePlan | null;
 }) {
     const active = carePlan.active_condition_fact_ids
         .map((id) => conditions.find((fact) => fact.id === id))
@@ -37,6 +112,8 @@ export default function CarePlan({
 
     return (
         <div className="space-y-8">
+            {gamePlan !== null && <GamePlanCard gamePlan={gamePlan} />}
+
             <section>
                 <SectionLabel>
                     <Stethoscope className="w-4 h-4" />

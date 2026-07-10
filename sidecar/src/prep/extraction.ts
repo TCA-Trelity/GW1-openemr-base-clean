@@ -165,14 +165,14 @@ function stripFences(text: string): string {
     return fenced?.[1] ?? trimmed;
 }
 
-type Validation<T> = { ok: true; result: T } | { ok: false; issues: string[] };
+export type Validation<T> = { ok: true; result: T } | { ok: false; issues: string[] };
 
 // Models emit explicit nulls for unknown optional fields despite instructions (live
 // failure: "severity": null on six facts failed the whole prep run — .optional()
 // accepts absence, not null). Absent and null mean the same thing at this boundary,
 // so drop null-valued keys before validation; the contracts stay strict and a null
 // never reaches the store. Required-but-nulled fields still fail as 'Required'.
-function stripNullsDeep(value: unknown): unknown {
+export function stripNullsDeep(value: unknown): unknown {
     if (Array.isArray(value)) {
         return value.map(stripNullsDeep);
     }
@@ -298,8 +298,6 @@ export class FactExtractor {
         return { facts, contradictions: contradictionResponse.contradictions };
     }
 
-    // One schema-validated JSON call: 1 feedback retry for validation failures, 1 fresh
-    // retry for transient failures OR truncation (feedback cannot fix a structural cap hit).
     private async jsonCall<T>(
         system: string,
         userContent: string,
@@ -309,6 +307,25 @@ export class FactExtractor {
         logger: PrepLogger,
         onUsage?: OnUsage,
     ): Promise<T> {
+        return schemaValidatedJsonCall(this.client, system, userContent, label, validate, correlationId, logger, onUsage);
+    }
+}
+
+// One schema-validated JSON call: 1 feedback retry for validation failures, 1 fresh
+// retry for transient failures OR truncation (feedback cannot fix a structural cap hit).
+// Module-level so other single-call composers (prep/gamePlan.ts) reuse the exact retry
+// discipline instead of growing their own.
+export async function schemaValidatedJsonCall<T>(
+    client: AnthropicClient,
+    system: string,
+    userContent: string,
+    label: string,
+    validate: (text: string) => Validation<T>,
+    correlationId: string,
+    logger: PrepLogger,
+    onUsage?: OnUsage,
+): Promise<T> {
+    {
         const messages: AnthropicMessage[] = [{ role: 'user', content: userContent }];
         let lastIssues: string[] = [];
         let freshRetries = 0;
@@ -320,7 +337,7 @@ export class FactExtractor {
             try {
                 // Streaming heartbeat: a long call logs progress every ~15s, so a silent
                 // Railway log means hung (and the client's idle timeout will kill it), not slow.
-                completion = await this.client.complete(system, messages, correlationId, {
+                completion = await client.complete(system, messages, correlationId, {
                     onProgress: (progress) =>
                         logger.info(
                             { correlationId, label, attempt, text_chars: progress.textChars, elapsed_ms: progress.elapsedMs },

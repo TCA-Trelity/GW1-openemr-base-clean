@@ -10,13 +10,11 @@ import {
     AlertTriangle,
     ArrowDown,
     CalendarRange,
-    Clock,
     GitMerge,
     HelpCircle,
     Pill,
     RefreshCw,
     Scan,
-    ShieldCheck,
     Sparkles,
 } from 'lucide-react';
 import { fetchBrief, fetchPrepRuns, startPrep } from './api';
@@ -30,10 +28,11 @@ const FIRST_POLL_DELAY_MS = 250; // the POST already opened the prep_run row —
 const POLL_LIMIT = 60; // ~5 minutes
 const MAX_VISIBLE_QUESTIONS = 4;
 
-// Urgency banner colors: high=red, moderate=amber (ContradictionAlert.jsx palette).
-const URGENCY_STYLES: Record<'high' | 'moderate', { container: string; icon: string; label: string }> = {
-    high: { container: 'bg-red-50 border-red-300 text-red-800', icon: 'text-red-600', label: 'High urgency' },
-    moderate: { container: 'bg-amber-50 border-amber-300 text-amber-800', icon: 'text-amber-600', label: 'Moderate urgency' },
+// Q4: urgency reads as one calm line, not an alarm box — a consultative pointer with a
+// tinted dot; the doctor is doing a routine visit, not triaging a code.
+const URGENCY_STYLES: Record<'high' | 'moderate', { dot: string; label: string }> = {
+    high: { dot: 'bg-amber-500', label: 'High urgency' },
+    moderate: { dot: 'bg-amber-400', label: 'Moderate urgency' },
 };
 
 export function UrgencyBanner({ urgency }: { urgency: BriefContent['urgency'] }) {
@@ -42,13 +41,13 @@ export function UrgencyBanner({ urgency }: { urgency: BriefContent['urgency'] })
     }
     const styles = URGENCY_STYLES[urgency.level];
     return (
-        <div data-testid="urgency-banner" className={`rounded-xl border-2 p-4 flex items-start gap-3 ${styles.container}`}>
-            <AlertTriangle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${styles.icon}`} />
-            <div>
-                <p className="font-semibold">{styles.label}</p>
-                <p className="text-sm mt-0.5">{urgency.reason}</p>
-            </div>
-        </div>
+        <p data-testid="urgency-banner" className="flex items-baseline gap-2 text-sm text-slate-700">
+            <span className={`w-2 h-2 rounded-full flex-shrink-0 relative top-[-1px] ${styles.dot}`} />
+            <span>
+                <span className="font-semibold">{styles.label}</span>
+                <span className="text-slate-500"> — {urgency.reason}</span>
+            </span>
+        </p>
     );
 }
 
@@ -347,15 +346,18 @@ function DiscussionPointRow({
     );
 }
 
-// ---- The LLM-derived sections (urgency, alerts, why, hoping, discussion points, questions) ----
+// ---- Q4 redesign: the doctor's thought partner, not a data dump ----
+// A brief that reads in ~20 seconds: one calm urgency line, the game-plan frame, at most
+// six worth-discussing bullets, a short list of questions to ask, conflicts collapsed to a
+// row, and the provenance/gate story demoted to a one-line footer. The removed why/hoping
+// sections live on the Overview's "Why are we here today?" card — never duplicated here.
+
+const MAX_VISIBLE_POINTS = 6;
 
 function InsightsBody({ brief }: { brief: StoredBrief }) {
     const content = brief.content;
     const [showAllQuestions, setShowAllQuestions] = useState(false);
-    const whyFact = content.facts_by_type.chief_complaint.find((fact) => fact.id === content.why_they_are_here?.fact_id);
-    const goalFact = content.facts_by_type.patient_goal.find((fact) => fact.id === content.what_they_are_hoping_for?.fact_id);
-    const why = content.why_they_are_here;
-    const hoping = content.what_they_are_hoping_for;
+    const [showAllPoints, setShowAllPoints] = useState(false);
     const metrics = content.gate_metrics;
     const factById = useMemo(() => {
         const map = new Map<string, PatientFact>();
@@ -368,82 +370,39 @@ function InsightsBody({ brief }: { brief: StoredBrief }) {
     }, [content]);
     const questions = content.questions_to_confirm;
     const visibleQuestions = showAllQuestions ? questions : questions.slice(0, MAX_VISIBLE_QUESTIONS);
+    const points = content.key_discussion_points;
+    const visiblePoints = showAllPoints ? points : points.slice(0, MAX_VISIBLE_POINTS);
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-violet-50 text-violet-700 border-violet-200 font-medium">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    AI-prepared · citation-gated
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-slate-50 text-slate-600 border-slate-200">
-                    <Clock className="w-3.5 h-3.5" />
-                    Prepared {formatDate(brief.prepared_at)}
-                </span>
-                <span
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200"
-                    title={`${metrics.citationsChecked} citations checked, ${metrics.citationsFailed} failed`}
-                >
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    {metrics.verified}/{metrics.claims} claims verified
-                    {metrics.blocked > 0 && ` · ${metrics.blocked} blocked`}
-                </span>
-            </div>
-
             <UrgencyBanner urgency={content.urgency} />
 
-            <ContradictionAlerts alerts={content.contradiction_alerts} anchorPrefix={ALERT_ANCHOR_PREFIX} />
-
-            {why !== null && (
-                <section>
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Why They&rsquo;re Here</h3>
-                    <div className="text-slate-700 leading-relaxed">
-                        {why.content.statement}
-                        {whyFact !== undefined && <CitationChips citations={whyFact.sources} />}
-                    </div>
-                    <div className="mt-1.5 text-sm text-slate-500 space-y-0.5">
-                        {why.content.onset !== undefined && <p>Onset: {why.content.onset}</p>}
-                        {why.content.progression !== undefined && <p>Progression: {why.content.progression}</p>}
-                        {why.content.pertinent_negatives !== undefined && why.content.pertinent_negatives.length > 0 && (
-                            <p>Pertinent negatives: {why.content.pertinent_negatives.join('; ')}</p>
-                        )}
-                    </div>
-                </section>
+            {content.game_plan != null && (
+                <p data-testid="insights-game-plan-line" className="text-sm text-slate-600">
+                    <span className="font-medium text-slate-700">The plan:</span> {content.game_plan.summary_line}
+                    <span className="text-slate-400"> — full game plan on Diagnosis &amp; Care.</span>
+                </p>
             )}
 
-            {hoping !== null && (
-                <section className="bg-gradient-to-br from-blue-50 to-white rounded-xl p-4 border border-blue-200">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-blue-700 mb-2">What They&rsquo;re Hoping For</h3>
-                    <div className="text-slate-800 leading-relaxed font-medium">
-                        {hoping.content.goal}
-                        {goalFact !== undefined && <CitationChips citations={goalFact.sources} />}
-                    </div>
-                    {hoping.content.specific_concerns !== undefined && hoping.content.specific_concerns.length > 0 && (
-                        <ul className="mt-2 space-y-1">
-                            {hoping.content.specific_concerns.map((concern, i) => (
-                                <li key={i} className="flex items-start gap-2 text-sm text-slate-600">
-                                    <span className="text-blue-500 mt-0.5">•</span>
-                                    {concern}
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                    {hoping.content.verbatim_quotes !== undefined && hoping.content.verbatim_quotes.length > 0 && (
-                        <p className="mt-2 text-sm text-slate-500 italic">&ldquo;{hoping.content.verbatim_quotes[0]}&rdquo;</p>
-                    )}
-                </section>
-            )}
-
-            {content.key_discussion_points.length > 0 && (
+            {points.length > 0 && (
                 <section>
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                        Key Discussion Points ({content.key_discussion_points.length})
+                        Worth discussing
                     </h3>
                     <ol className="space-y-1.5">
-                        {content.key_discussion_points.map((point, i) => (
+                        {visiblePoints.map((point, i) => (
                             <DiscussionPointRow key={i} point={point} index={i} factById={factById} />
                         ))}
                     </ol>
+                    {!showAllPoints && points.length > MAX_VISIBLE_POINTS && (
+                        <button
+                            type="button"
+                            onClick={() => setShowAllPoints(true)}
+                            className="mt-2 text-xs font-medium text-blue-600 hover:text-blue-700"
+                        >
+                            Show all ({points.length})
+                        </button>
+                    )}
                 </section>
             )}
 
@@ -451,7 +410,7 @@ function InsightsBody({ brief }: { brief: StoredBrief }) {
                 <section>
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-2">
                         <HelpCircle className="w-4 h-4" />
-                        Questions to Confirm ({questions.length})
+                        Questions you might ask
                     </h3>
                     <ul className="space-y-1.5">
                         {visibleQuestions.map((question, i) => (
@@ -476,6 +435,20 @@ function InsightsBody({ brief }: { brief: StoredBrief }) {
                     )}
                 </section>
             )}
+
+            {/* Expanded (not collapsed): discussion points deep-link into these rows by anchor. */}
+            <ContradictionAlerts alerts={content.contradiction_alerts} anchorPrefix={ALERT_ANCHOR_PREFIX} />
+
+            {/* Provenance footer: the whole trust story in one quiet line. */}
+            <p className="pt-2 border-t border-slate-100 text-xs text-slate-400 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                <Sparkles className="w-3.5 h-3.5" />
+                AI-prepared &amp; citation-gated · {metrics.verified}/{metrics.claims} claims verified
+                {metrics.blocked > 0 && ` · ${metrics.blocked} blocked`}
+                <span title={`${metrics.citationsChecked} citations checked, ${metrics.citationsFailed} failed`}>
+                    · {metrics.citationsChecked} citations checked
+                </span>
+                · prepared {formatDate(brief.prepared_at)}
+            </p>
         </div>
     );
 }

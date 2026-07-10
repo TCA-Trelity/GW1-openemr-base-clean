@@ -326,7 +326,11 @@ export default function App() {
                                     )}
                                     {activeTab === 'insights' && <AiInsightsTab state={insights.state} onRetry={insights.retry} />}
                                     {activeTab === 'careplan' && (
-                                        <CarePlan carePlan={overview.care_plan} conditions={overview.facts_by_type.condition ?? []} />
+                                        <CarePlan
+                                            carePlan={overview.care_plan}
+                                            conditions={overview.facts_by_type.condition ?? []}
+                                            gamePlan={insights.state.kind === 'ready' ? (insights.state.brief.content.game_plan ?? null) : null}
+                                        />
                                     )}
                                     {activeTab === 'sources' && (
                                         <>

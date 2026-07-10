@@ -23,6 +23,7 @@ import { LangfuseTracer } from './obs/langfuse.js';
 import { AnthropicClient } from './prep/anthropic.js';
 import { SpendGuard } from './prep/budget.js';
 import { FactExtractor } from './prep/extraction.js';
+import { GamePlanComposer } from './prep/gamePlan.js';
 import { StoreDocumentSource } from './prep/sources.js';
 import { registerChatRoutes, type ChatRouteDeps } from './routes/chat.js';
 import { registerEhrRoutes, type EhrRouteDeps } from './routes/ehr.js';
@@ -61,13 +62,14 @@ export function buildDeps(config: Config): AppDeps | undefined {
     }
     const pool = createPool(config);
     const store = new FactStore(pool);
-    const extractor = new FactExtractor(
-        new AnthropicClient({
-            apiKey: config.ANTHROPIC_API_KEY ?? '',
-            model: config.ANTHROPIC_MODEL_PREP,
-            maxTokens: config.LLM_MAX_OUTPUT_TOKENS,
-        }),
-    );
+    const prepLlmClient = new AnthropicClient({
+        apiKey: config.ANTHROPIC_API_KEY ?? '',
+        model: config.ANTHROPIC_MODEL_PREP,
+        maxTokens: config.LLM_MAX_OUTPUT_TOKENS,
+    });
+    const extractor = new FactExtractor(prepLlmClient);
+    // Q3: the game-plan composer shares the prep model/budget — one extra bounded call per prep.
+    const gamePlanComposer = new GamePlanComposer(prepLlmClient);
     // Spend guardrails share the store's pool: llm_calls ledger + rolling 24h budget gate.
     const spendGuard = new SpendGuard(pool, {
         dailyBudgetUsd: config.LLM_DAILY_BUDGET_USD,
@@ -123,6 +125,7 @@ export function buildDeps(config: Config): AppDeps | undefined {
             // once the live FHIR client credentials land with S1.9.
             source: new StoreDocumentSource(store, pool),
             extractor,
+            gamePlanComposer,
             spendGuard,
             ...(tracer !== undefined ? { tracer } : {}),
             reuseWindowMinutes: config.PREP_REUSE_WINDOW_MINUTES,

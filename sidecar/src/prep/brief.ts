@@ -106,6 +106,21 @@ const factsByTypeShape = Object.fromEntries(
 // Discussion points are structured items (R4/R5): terse one-line text a physician reads
 // in seconds, plus refs the panel renders as citation chips (fact ids resolve against
 // facts_by_type; contradiction ids link to the alert card carrying the full detail).
+// Q3 game plan: the visit's who-does-what, composed by ONE bounded Haiku call over the
+// already-gated brief content (prep/gamePlan.ts). A read-only PROPOSAL — never a gate:
+// composition failure stores null and the brief completes without it.
+export const GamePlanItemSchema = z.object({
+    owner: z.enum(['physician', 'nurse', 'front_desk', 'patient']),
+    action: z.string().min(3).max(160),
+    timing: z.string().max(60).nullable().default(null),
+    kind: z.enum(['order', 'check_in', 'form', 'call_back', 'prescription', 'monitoring', 'education']),
+});
+export const GamePlanSchema = z.object({
+    summary_line: z.string().min(3).max(200),
+    items: z.array(GamePlanItemSchema).min(2).max(8),
+});
+export type GamePlan = z.infer<typeof GamePlanSchema>;
+
 export const DiscussionPointSchema = z.object({
     text: z.string(),
     kind: z.enum(['med_change', 'risk_flag', 'contradiction', 'imaging', 'interval']),
@@ -129,6 +144,8 @@ export const BriefContentSchema = z.object({
     }),
     facts_by_type: z.object(factsByTypeShape),
     gate_metrics: GateMetricsSchema,
+    /** Q3: attached by the pipeline after assembly; null when composition failed or is off. */
+    game_plan: GamePlanSchema.nullable().default(null),
     prepared_at: z.string(),
     correlation_id: z.string(),
 });
