@@ -1,27 +1,16 @@
-// Overview landing (S2.11, R2 IA, R7 order, P5/P6 restructure) — rendered instantly from
-// GET /api/overview, no LLM in the path: "Why are we here today?" (patient goal + chief
-// complaint), the recent-scans workspace with its at-hand analytics rail, the compact
-// facts-to-resolve card, then risk flags above collapsed meds, allergies, conditions. The
+// Overview landing (S2.11, R2 IA, P5/P6, Q8 minimalism) — rendered instantly from
+// GET /api/overview, no LLM in the path, and deliberately spare: "Why are we here
+// today?" (patient goal + chief complaint), the recent-scans workspace with its at-hand
+// analytics rail, and the compact facts-to-resolve card. Medications, risk alerts,
+// allergies, and conditions live on Medical Background (Q7/Q8) — not repeated here. The
 // patient header band is exported for App to mount above the tab bar (it hosts the AI
 // insights control); AI insights itself lives on its own tab.
-import { useState, type ComponentType, type ReactNode } from 'react';
-import {
-    AlertTriangle,
-    ChevronDown,
-    Clock,
-    ExternalLink,
-    GitMerge,
-    Info,
-    MessageSquare,
-    Pill,
-    Scan,
-    Stethoscope,
-} from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import { ChevronDown, Clock, ExternalLink, GitMerge, MessageSquare, Scan } from 'lucide-react';
 import type {
     CitationRef,
     ContradictionSeverity,
     ImageRecord,
-    MedicationRiskFlag,
     OverviewPayload,
     PatientFact,
     PatientRecord,
@@ -32,7 +21,6 @@ import type {
 import { Card, SectionLabel, VisitTypeChip, asSourceType, computeAge, formatAppointmentTime, formatDate, titleCase } from './ui';
 import { CitationChip, CitationChips } from './CitationChip';
 import { OriginBadge, citationOrigin } from './OriginBadge';
-import { FactRow } from './MedicalBackground';
 import ScanImage, { modalityLabel } from './imaging/ScanImage';
 
 // ---- Stored contradiction rows -> the runtime shape the alert banner renders ----
@@ -245,94 +233,6 @@ export function ContradictionAlerts({
     );
 }
 
-// ---- Medication risk flags (port of MedicationRiskFlags.jsx getSeverityStyles) ----
-
-const FLAG_STYLES: Record<MedicationRiskFlag['severity'], { container: string; icon: string; title: string; badge: string }> = {
-    high: { container: 'bg-red-50 border-red-200', icon: 'text-red-600', title: 'text-red-800', badge: 'bg-red-100 text-red-700 border-red-200' },
-    medium: { container: 'bg-amber-50 border-amber-200', icon: 'text-amber-600', title: 'text-amber-800', badge: 'bg-amber-100 text-amber-700 border-amber-200' },
-    low: { container: 'bg-blue-50 border-blue-200', icon: 'text-blue-600', title: 'text-blue-800', badge: 'bg-blue-100 text-blue-700 border-blue-200' },
-};
-
-/** Compact severity-styled badge shown inline on the medication row. */
-function RiskFlagBadge({ flag }: { flag: MedicationRiskFlag }) {
-    const styles = FLAG_STYLES[flag.severity];
-    return (
-        <span
-            data-testid="med-risk-badge"
-            title={flag.message}
-            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-xs font-semibold ${styles.badge}`}
-        >
-            <AlertTriangle className="w-3 h-3" />
-            {titleCase(flag.flag_type)} · {flag.severity.toUpperCase()}
-        </span>
-    );
-}
-
-/** Flags matched to a medication row by name (flag.medication mirrors the fact's name). */
-function flagsForMedication(name: string, flags: MedicationRiskFlag[]): MedicationRiskFlag[] {
-    const lower = name.toLowerCase();
-    return flags.filter((flag) => {
-        const flagName = flag.medication.toLowerCase();
-        return flagName === lower || lower.includes(flagName) || flagName.includes(lower);
-    });
-}
-
-function MedicationRiskFlags({ flags }: { flags: MedicationRiskFlag[] }) {
-    if (flags.length === 0) {
-        return null;
-    }
-    return (
-        <section>
-            <SectionLabel>
-                <Pill className="w-4 h-4" />
-                Medication Risk Alerts ({flags.length})
-            </SectionLabel>
-            <div className="space-y-3">
-                {flags.map((flag, index) => {
-                    const styles = FLAG_STYLES[flag.severity];
-                    const Icon = flag.severity === 'high' ? AlertTriangle : Info;
-                    return (
-                        <div key={index} className={`p-4 rounded-lg border ${styles.container}`}>
-                            <div className="flex items-start gap-3">
-                                <Icon className={`w-5 h-5 ${styles.icon} flex-shrink-0 mt-0.5`} />
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className={`font-medium ${styles.title}`}>{flag.medication}</span>
-                                        <span className={`inline-flex px-2 py-0.5 rounded-md border text-xs font-medium ${styles.badge}`}>
-                                            {flag.flag_type.replace(/_/g, ' ')}
-                                        </span>
-                                        <span className={`inline-flex px-2 py-0.5 rounded-md border text-xs font-semibold uppercase ${styles.badge}`}>
-                                            {flag.severity}
-                                        </span>
-                                    </div>
-                                    <p className="text-sm text-slate-700">{flag.message}</p>
-                                    {flag.recommendation !== '' && (
-                                        <p className="text-sm text-slate-600 mt-2">
-                                            <span className="font-medium">Recommendation:</span> {flag.recommendation}
-                                        </p>
-                                    )}
-                                    {flag.details !== undefined && (
-                                        <p className="mt-2 text-xs text-slate-500">
-                                            Duration: {flag.details.duration_years} years · Cumulative: ~{flag.details.cumulative_dose_grams}g ·{' '}
-                                            {flag.details.daily_dose_mg} mg/day
-                                        </p>
-                                    )}
-                                    {flag.source !== '' && (
-                                        <p className="text-xs text-slate-400 mt-2 italic flex items-center gap-1">
-                                            <ExternalLink className="w-3 h-3" />
-                                            {flag.source}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        </section>
-    );
-}
-
 // ---- Patient header band ----
 
 const SEX_LABELS: Record<string, string> = { F: 'Female', M: 'Male' };
@@ -421,68 +321,6 @@ function WhyHereCard({ goal, complaint }: { goal: PatientFact | undefined; compl
                     </>
                 )}
             </Card>
-        </section>
-    );
-}
-
-// ---- Fact group cards (meds / allergies / conditions) ----
-
-function FactGroupCard({
-    title,
-    icon: Icon,
-    facts,
-    badgesFor,
-    collapsible = false,
-    collapsedSummary,
-}: {
-    title: string;
-    icon: ComponentType<{ className?: string }>;
-    facts: PatientFact[];
-    badgesFor?: (fact: PatientFact) => ReactNode;
-    /** P5: start as a one-line summary row; the chevron expands to the full rows. */
-    collapsible?: boolean;
-    collapsedSummary?: string;
-}) {
-    const [open, setOpen] = useState(!collapsible);
-    if (facts.length === 0) {
-        return null;
-    }
-    return (
-        <section>
-            <SectionLabel>
-                <Icon className="w-4 h-4" />
-                {title} ({facts.length})
-            </SectionLabel>
-            {collapsible ? (
-                <Card>
-                    <button
-                        type="button"
-                        aria-expanded={open}
-                        onClick={() => setOpen((current) => !current)}
-                        className="w-full flex items-center gap-2.5 px-5 py-3 text-left"
-                    >
-                        <span className="flex-1 min-w-0 truncate text-sm text-slate-600">
-                            {collapsedSummary ?? `${facts.length} on record`}
-                        </span>
-                        <ChevronDown
-                            className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
-                        />
-                    </button>
-                    {open && (
-                        <div className="px-5 pb-1 border-t border-slate-100">
-                            {facts.map((fact) => (
-                                <FactRow key={fact.id} fact={fact} badges={badgesFor?.(fact)} />
-                            ))}
-                        </div>
-                    )}
-                </Card>
-            ) : (
-                <Card className="px-5 py-1">
-                    {facts.map((fact) => (
-                        <FactRow key={fact.id} fact={fact} badges={badgesFor?.(fact)} />
-                    ))}
-                </Card>
-            )}
         </section>
     );
 }
@@ -654,12 +492,10 @@ export default function Overview({
     onOpenImaging: () => void;
 }) {
     const facts = overview.facts_by_type;
-    const medications = facts.medication ?? [];
     const alerts = overview.contradictions.filter((row) => row.status !== 'resolved').map(projectContradictionRow);
 
-    const medicationNames = medications
-        .map((fact) => (fact.fact_type === 'medication' ? fact.content.name : null))
-        .filter((name): name is string => name !== null);
+    // Q8 minimalism: the landing holds only what the doctor needs walking in — the why,
+    // the scans, and what needs reconciling. The full record lives on Medical Background.
     return (
         <div className="space-y-10">
             <WhyHereCard goal={(facts.patient_goal ?? [])[0]} complaint={(facts.chief_complaint ?? [])[0]} />
@@ -667,28 +503,6 @@ export default function Overview({
             <RecentScans images={overview.images} imaging={overview.imaging} onOpenImaging={onOpenImaging} />
 
             <ContradictionAlerts alerts={alerts} collapsible />
-
-            {/* P5 order: the deterministic risk story reads before the raw med list it flags. */}
-            <MedicationRiskFlags flags={overview.medication_risk_flags} />
-
-            <FactGroupCard
-                title="Medications"
-                icon={Pill}
-                facts={medications}
-                collapsible
-                collapsedSummary={medicationNames.join(' · ')}
-                badgesFor={(fact) =>
-                    fact.fact_type === 'medication'
-                        ? flagsForMedication(fact.content.name, overview.medication_risk_flags).map((flag, i) => (
-                              <RiskFlagBadge key={i} flag={flag} />
-                          ))
-                        : null
-                }
-            />
-
-            <FactGroupCard title="Allergies" icon={AlertTriangle} facts={facts.allergy ?? []} />
-
-            <FactGroupCard title="Conditions" icon={Stethoscope} facts={facts.condition ?? []} />
         </div>
     );
 }

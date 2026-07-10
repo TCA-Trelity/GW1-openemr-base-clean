@@ -115,14 +115,39 @@ export default function SourcesTab({
     onClearFocus: () => void;
 }) {
     const [selectedId, setSelectedId] = useState<string | null>(null);
+    // Q1: closing the viewer must stick — without this flag the auto-select below would
+    // instantly reopen the document the user just dismissed.
+    const [dismissed, setDismissed] = useState(false);
+    // Q2: one type chip at a time; null = all documents.
+    const [typeFilter, setTypeFilter] = useState<string | null>(null);
     const contentRef = useRef<HTMLDivElement>(null);
 
-    // A citation deep-link opens its document; unknown ids fall through to the notice below.
+    // A citation deep-link opens its document (and clears any filter hiding it); unknown ids
+    // fall through to the notice below.
     useEffect(() => {
         if (focus?.documentId != null && documents.some((doc) => docId(doc) === focus.documentId)) {
             setSelectedId(focus.documentId);
+            setTypeFilter(null);
         }
     }, [focus, documents]);
+
+    // Q1: the viewer never opens empty — land on the first document in the rail. A pending
+    // citation deep-link wins: both effects flush in the same pass with the same stale null,
+    // so without this guard the auto-select would stomp the focus target (last write wins).
+    useEffect(() => {
+        if (!dismissed && selectedId === null && documents.length > 0 && focus?.documentId == null) {
+            setSelectedId(docId(documents[0]!));
+        }
+    }, [dismissed, selectedId, documents, focus]);
+
+    // Patient switch: the old selection is not in the new document set — start fresh.
+    useEffect(() => {
+        if (selectedId !== null && !documents.some((doc) => docId(doc) === selectedId)) {
+            setSelectedId(null);
+            setDismissed(false);
+            setTypeFilter(null);
+        }
+    }, [documents, selectedId]);
 
     // Scroll the highlight into view once the full text is on screen.
     useEffect(() => {
@@ -137,6 +162,16 @@ export default function SourcesTab({
         [documents, selectedId],
     );
     const focusMissing = focus?.documentId != null && !documents.some((doc) => docId(doc) === focus.documentId);
+
+    // Q2: filter chips by document type, labeled via the same config as the type badges.
+    const typeCounts = useMemo(() => {
+        const counts = new Map<string, number>();
+        for (const doc of documents) {
+            counts.set(doc.document_type, (counts.get(doc.document_type) ?? 0) + 1);
+        }
+        return [...counts.entries()];
+    }, [documents]);
+    const visibleDocuments = typeFilter === null ? documents : documents.filter((doc) => doc.document_type === typeFilter);
 
     if (documents.length === 0) {
         return (
@@ -166,10 +201,42 @@ export default function SourcesTab({
                 </p>
             )}
 
+            {/* Q2: type filter — 13 documents is a real list to navigate. */}
+            {typeCounts.length > 1 && (
+                <div role="group" aria-label="Filter documents by type" className="flex flex-wrap items-center gap-1.5">
+                    <button
+                        type="button"
+                        aria-pressed={typeFilter === null}
+                        onClick={() => setTypeFilter(null)}
+                        className={`px-2.5 py-1 rounded-full border text-xs font-medium transition-colors ${
+                            typeFilter === null ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                        }`}
+                    >
+                        All ({documents.length})
+                    </button>
+                    {typeCounts.map(([type, count]) => (
+                        <button
+                            key={type}
+                            type="button"
+                            aria-pressed={typeFilter === type}
+                            onClick={() => setTypeFilter(typeFilter === type ? null : type)}
+                            className={`px-2.5 py-1 rounded-full border text-xs font-medium transition-colors ${
+                                typeFilter === type ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                            }`}
+                        >
+                            {sourceTypeConfig(type).label} ({count})
+                        </button>
+                    ))}
+                </div>
+            )}
+
             <div className="grid gap-4 md:grid-cols-[280px,1fr] items-start">
                 {/* Document list */}
                 <div className="space-y-2">
-                    {documents.map((doc) => {
+                    {visibleDocuments.length === 0 && (
+                        <p className="text-sm text-slate-400 p-3">No documents of this type.</p>
+                    )}
+                    {visibleDocuments.map((doc) => {
                         const config = sourceTypeConfig(doc.document_type);
                         const Icon = config.icon;
                         const id = docId(doc);
@@ -222,7 +289,10 @@ export default function SourcesTab({
                             <button
                                 type="button"
                                 aria-label="Close document"
-                                onClick={() => setSelectedId(null)}
+                                onClick={() => {
+                                    setSelectedId(null);
+                                    setDismissed(true); // Q1: dismissal sticks; auto-select must not reopen it
+                                }}
                                 className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100"
                             >
                                 <X className="w-4 h-4" />

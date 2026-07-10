@@ -222,22 +222,16 @@ describe('EHR Record tab', () => {
 describe('Origin badges', () => {
     // Failure mode: origin badges only appear on the EHR tab — they must also mark provenance
     // on the Overview fact rows and the Medical Background rows.
-    it('marks fact origin on Overview and Medical Background rows', async () => {
+    it('marks fact origin on Medical Background rows (the record home after Q8)', async () => {
         stubEhr();
         render(<App />);
         await screen.findByRole('tab', { name: 'EHR Record' }); // landing ready (Overview active)
-        // P5 collapses meds + facts-to-resolve to summary rows — expand them to reach the badges.
-        for (const toggle of screen.getAllByRole('button', { expanded: false })) {
-            fireEvent.click(toggle);
-        }
-        const overviewBadges = screen.getAllByTestId('origin-badge');
-        expect(overviewBadges.some((b) => b.getAttribute('data-origin') === 'ehr')).toBe(true);
-        expect(overviewBadges.some((b) => b.getAttribute('data-origin') === 'external')).toBe(true);
-
+        // Q8 moved the fact groups off the Overview — the badge surface is Medical Background.
         fireEvent.click(screen.getByRole('tab', { name: 'Medical Background' }));
         const mbBadges = screen.getAllByTestId('origin-badge');
         expect(mbBadges.length).toBeGreaterThan(0);
         expect(mbBadges.some((b) => b.getAttribute('data-origin') === 'ehr')).toBe(true);
+        expect(mbBadges.some((b) => b.getAttribute('data-origin') === 'external')).toBe(true);
     });
 
     // Failure mode: an EHR-vs-external conflict reads as one undifferentiated dispute — both

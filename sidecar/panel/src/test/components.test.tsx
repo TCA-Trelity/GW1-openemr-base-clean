@@ -139,17 +139,35 @@ describe('MedicalBackground', () => {
 });
 
 describe('SourcesTab', () => {
-    // Failure mode: the document list loses its type badge / date / filename triple,
-    // or clicking a document no longer surfaces its full text.
-    it('lists documents with type badge, date, and filename, and opens full text on click', () => {
+    // Failure mode: the document list loses its type badge / date / filename triple; the
+    // viewer opens empty (Q1 regression); or dismissal bounces back open via the auto-select.
+    it('lists documents, auto-opens the first (Q1), switches on click, and stays closed on dismiss', () => {
         render(<SourcesTab documents={documents} focus={null} onClearFocus={() => undefined} />);
         expect(screen.getByText('2 Documents')).toBeInTheDocument();
         expect(screen.getByText('Clinical Note')).toBeInTheDocument(); // type badge
-        expect(screen.getByText('rheum_note_sept2024.pdf')).toBeInTheDocument(); // filename
+        expect(screen.getAllByText('rheum_note_sept2024.pdf').length).toBeGreaterThanOrEqual(1); // filename (list + auto-opened viewer)
         expect(screen.getAllByText('Sep 10, 2024').length).toBeGreaterThanOrEqual(1); // date
 
-        fireEvent.click(screen.getByRole('button', { name: /rheum_note_sept2024\.pdf/ }));
+        // Q1: the first document (Margaret's rheumatology note) is already open on landing.
         expect(screen.getByText(/ORLANDO RHEUMATOLOGY ASSOCIATES/)).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: /intake-transcript-2024-12-26\.txt/ }));
+        expect(screen.getByText(/CONVERSATIONAL INTAKE TRANSCRIPT/)).toBeInTheDocument();
+
+        // Dismissal sticks — the auto-select must not instantly reopen what the user closed.
+        fireEvent.click(screen.getByRole('button', { name: 'Close document' }));
+        expect(screen.queryByText(/CONVERSATIONAL INTAKE TRANSCRIPT/)).not.toBeInTheDocument();
+        expect(screen.getByText('Select a document to view its full text')).toBeInTheDocument();
+    });
+
+    // Failure mode (Q2): the type chips filter nothing, or "All" cannot restore the rail.
+    it('filters the document list by type chips (Q2)', () => {
+        render(<SourcesTab documents={documents} focus={null} onClearFocus={() => undefined} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Intake (1)' }));
+        expect(screen.queryByRole('button', { name: /rheum_note_sept2024\.pdf/ })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /intake-transcript-2024-12-26\.txt/ })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'All (2)' }));
+        expect(screen.getByRole('button', { name: /rheum_note_sept2024\.pdf/ })).toBeInTheDocument();
     });
 
     // Failure mode: the character-range highlight drifts (wrong offsets, mutated text)

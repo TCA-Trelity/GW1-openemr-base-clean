@@ -88,7 +88,9 @@ async function main(): Promise<void> {
         };
         const payload = buildOverview(bundle, null, new Date('2024-12-26T09:55:00Z'));
         await writeFile(join(outDir, `overview-${patient.id}.json`), JSON.stringify(payload, null, 1));
-        console.log(`${file} -> overview-${patient.id}.json (${bundle.facts.length} facts, ${bundle.images.length} images)`);
+        // GET /api/facts/:id serves the raw bundle (prep.ts) — Sources/Imaging read it.
+        await writeFile(join(outDir, `facts-${patient.id}.json`), JSON.stringify(bundle, null, 1));
+        console.log(`${file} -> overview/facts-${patient.id}.json (${bundle.facts.length} facts, ${bundle.documents.length} docs, ${bundle.images.length} images)`);
     }
     await writeFile(join(outDir, 'patients.json'), JSON.stringify({ patients }, null, 1));
     console.log(`patients.json (${patients.length}) -> ${outDir}`);

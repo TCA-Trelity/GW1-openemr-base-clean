@@ -51,12 +51,18 @@ function patientIdFromUrl(): string | null {
     return new URLSearchParams(window.location.search).get('patient');
 }
 
+/** ?tab= deep link (Q-wave): lands on a named tab — demo links and the screenshot harness. */
+function tabFromUrl(): TabId {
+    const requested = new URLSearchParams(window.location.search).get('tab');
+    return TABS.some((tab) => tab.id === requested) ? (requested as TabId) : 'overview';
+}
+
 export default function App() {
     const [patientId, setPatientId] = useState<string | null>(patientIdFromUrl);
     const [patientsState, setPatientsState] = useState<PatientsFetchResult | { kind: 'loading' }>({ kind: 'loading' });
     const [overviewState, setOverviewState] = useState<OverviewFetchResult | { kind: 'loading' }>({ kind: 'loading' });
     const [factsState, setFactsState] = useState<FactsFetchResult | { kind: 'loading' }>({ kind: 'loading' });
-    const [activeTab, setActiveTab] = useState<TabId>('overview');
+    const [activeTab, setActiveTab] = useState<TabId>(tabFromUrl);
     const [sourceFocus, setSourceFocus] = useState<SourceFocus | null>(null);
     const [reloadNonce, setReloadNonce] = useState(0);
     const [chatOpen, setChatOpen] = useState(false);
@@ -299,7 +305,7 @@ export default function App() {
                                         <Overview key={patientId} overview={overview} onOpenImaging={() => setActiveTab('imaging')} />
                                     )}
                                     {activeTab === 'background' && (
-                                        <MedicalBackground factsByType={overview.facts_by_type} canVerify={canVerify} onVerify={handleVerify} />
+                                        <MedicalBackground factsByType={overview.facts_by_type} riskFlags={overview.medication_risk_flags} canVerify={canVerify} onVerify={handleVerify} />
                                     )}
                                     {activeTab === 'imaging' && (
                                         <>

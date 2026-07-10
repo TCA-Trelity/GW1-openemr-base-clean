@@ -167,6 +167,16 @@ describe('App auth (role switcher, AZ4)', () => {
 });
 
 describe('App landing (deterministic overview)', () => {
+    // Failure mode: ?tab= deep links (demo links + the screenshot harness) stop landing
+    // on the named tab, or an unknown value breaks the default.
+    it('lands on the tab named by ?tab= and defaults on unknown values', async () => {
+        window.history.replaceState(null, '', '/?patient=margaret-chen&tab=background');
+        stubApp({ overview: overviewNoBrief });
+        render(<App />);
+        expect(await screen.findByRole('tab', { name: 'Medical Background' })).toHaveAttribute('aria-selected', 'true');
+    });
+
+
     // Failure mode: the landing regresses to gating on the LLM — any /api/brief call
     // before the doctor asks for insights breaks the "instant render" invariant.
     it('renders the full landing from /api/overview without ever calling /api/brief', async () => {
@@ -192,28 +202,32 @@ describe('App landing (deterministic overview)', () => {
         expect(screen.getByText(/Referral letter documents NKDA/)).toBeInTheDocument();
         expect(screen.getByText(/HCQ duration conflicts across sources/)).toBeInTheDocument();
         expect(screen.getByText(/How long have you actually been taking hydroxychloroquine\?/)).toBeInTheDocument();
-        // Medications starts as a one-line summary (P5); expanding shows rows + risk badge
+        // Q8 minimalism: meds / risk alerts / allergies / conditions are NOT on the landing
         expect(screen.queryByText(/Hydroxychloroquine \(Plaquenil\) · 200mg · daily · PO/)).not.toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: /^Hydroxychloroquine/, expanded: false }));
+        expect(screen.queryByTestId('med-risk-badge')).not.toBeInTheDocument();
+        expect(screen.queryByText('Sulfa antibiotics')).not.toBeInTheDocument();
+        // Landing order: why-here -> recent scans -> facts to resolve, and nothing after
+        const strip = screen.getByTestId('recent-scans');
+        const complaint = screen.getByText(/Floaters and flashes x 2-3 weeks, worse OD/);
+        const conflicts = screen.getByText('2 facts to resolve');
+        expect(complaint.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(strip.compareDocumentPosition(conflicts) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+        // Q7/Q8 home: the full record lives on Medical Background — meds with risk badges,
+        // the risk detail beside them, allergies, and conditions as Medical History.
+        fireEvent.click(screen.getByRole('tab', { name: 'Medical Background' }));
         expect(screen.getByText(/Hydroxychloroquine \(Plaquenil\) · 200mg · daily · PO/)).toBeInTheDocument();
         const riskBadge = screen.getByTestId('med-risk-badge');
         expect(riskBadge).toHaveTextContent(/Retinal Toxicity · HIGH/);
         expect(riskBadge.className).toContain('text-red-700');
-        // Risk detail section still carries the AAO source string
         expect(screen.getByText('AAO HCQ Screening Guidelines 2016 (revised 2020)')).toBeInTheDocument();
-        // Allergies + conditions
         expect(screen.getByText('Sulfa antibiotics')).toBeInTheDocument();
+        expect(screen.getByText('Medical History')).toBeInTheDocument();
         expect(screen.getByText(/Rheumatoid arthritis \(M06\.9\)/)).toBeInTheDocument();
-        // P5 section order: why-here -> recent scans -> facts to resolve -> risk story -> meds
-        const strip = screen.getByTestId('recent-scans');
-        const complaint = screen.getByText(/Floaters and flashes x 2-3 weeks, worse OD/);
-        const conflicts = screen.getByText('2 facts to resolve');
-        const riskSource = screen.getByText('AAO HCQ Screening Guidelines 2016 (revised 2020)');
-        const meds = screen.getByText(/Hydroxychloroquine \(Plaquenil\) · 200mg · daily · PO/);
-        expect(complaint.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect(strip.compareDocumentPosition(conflicts) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect(conflicts.compareDocumentPosition(riskSource) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect(riskSource.compareDocumentPosition(meds) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        // Q7 curation: no duplicated goal/complaint dumps down here
+        expect(screen.queryByText('Chief Complaint')).not.toBeInTheDocument();
+        expect(screen.queryByText('Patient Goals')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('tab', { name: 'Overview' }));
         // The Generate control lives in the patient header band, left of the time chip (R2)
         expect(screen.getByRole('button', { name: /Generate AI insights/i })).toBeInTheDocument();
         // The invariant itself: zero /api/brief traffic
