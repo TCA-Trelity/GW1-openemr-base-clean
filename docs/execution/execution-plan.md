@@ -183,6 +183,28 @@ still passes the citation contract. All six approved.*
 | G3 | Doc alignment to verbatim PDF: PRD tiers, `presearch.md`, `ARCHITECTURE.md`/`AUDIT.md` authz sections reflect the honest built status (no overclaim) | main | AZ2 | review | ☑ |
 | G4 | Demo video (Early: brief → cited chat with tool use → imaging → EHR Record + origin badges → cross-patient 403) *(submitted 2026-07-10)* | user | AZ,TC | — | ☑ |
 
+## Wave P — Production polish (user-approved 2026-07-10)
+
+*Post-submission "icing" scoped with the user after the early submission locked
+(baselines committed, video submitted). Decisions locked: interactive login is
+the **full-redirect SMART standalone flow** (panel → OpenEMR login page → PKCE
+code exchange → Bearer); sample users are created via the **admin-UI click
+path** (no standard-API route creates login-capable users; SQL into
+`users_secure` rejected as hash-coupled); the five patient **goal one-liners
+are agent-authored** to fit each storyline. Build order: P5+P6 (pure UI) →
+P4 → P1–P3 → P7/P8 rolling.*
+
+| ID | Ticket | Agent | Depends | Verify | Done |
+|---|---|---|---|---|---|
+| P1 | Panel login gate + SMART standalone sign-in: unauthenticated panel shows "Sign in with OpenEMR" → real OpenEMR login → PKCE code exchange (public interactive client registered alongside the system client) → Bearer on every sidecar call; logout; dev-login demoted to a flag+`?dev=1` grader fallback (CI smoke keeps using it) | main | AZ2 | unit + screenshot + ci-live | ☐ |
+| P2 | Clinician directory + the real `resolveRole` the verifier anticipated: seeded username→{role, display name} mapping for the three sample logins; introspection `sub` resolves through it (fail-closed to nurse unchanged); clinician-wide (patient-unbound) tokens get role-gated access to the demo patients; header shows the signed-in name + role | main | P1 | unit | ☐ |
+| P3 | Three OpenEMR sample users — physician / nurse / resident — created via admin UI from an exact-values checklist (user clicks; passwords never in repo or chat); each login verified end-to-end incl. the capability differences (nurse: no prep trigger; resident: sign-off flag) | user + main | P1, P2 | screenshot | ☐ |
+| P4 | EHR seed depth for all five patients: full demographics (address, phones, email, emergency contact, language, ethnicity), primary insurance, 2–3 encounters each with vitals + SOAP notes, upcoming appointments — all via the standard REST API; ehr-sync reads + EHR Record tab render the new sections; immunizations documented as no-write-route rather than seeded via SQL | main + user (one reseed cmd) | E1 | unit + ci-live | ☐ |
+| P5 | Overview restructure: tab order Overview-first (EHR Record second); chief complaint becomes "Why are we here today?" with a centered one-line authored patient goal above the existing intake content (goal sentence also planted in each intake document so chat can cite it); "Data Conflicts" becomes a compact, collapsed-by-default, softened "Facts to resolve"; Medication Risk moves above a collapsed-by-default Medications card | sub | R-wave | unit + screenshot | ☐ |
+| P6 | Width + Recent Scans workspace: content width max-w-4xl → max-w-6xl (~14% wider per side); Recent Scans becomes a two-column workspace — scans stacked vertically (taller) on the left, an at-hand analytics rail on the right (alert level, GC-IPL delta, CRT delta, interval status) fed by a new deterministic `imaging_summary` on the overview payload | sub | P5 | unit + screenshot | ☐ |
+| P7 | Visual verification pass: panel built in-session and screenshotted with the pre-installed Chromium for all five patients (before/after) and attached to the PR; full panel suite green | ci | P5, P6 | screenshot | ☐ |
+| P8 | Docs sync: PRD Wave-P addendum, DECISIONS.md entries, demo-script notes for the login flow, dashboard tickets kept current | main | P1–P7 | review | ☐ |
+
 ## Standing rules
 
 - **Sequencing invariant:** platform (P0) before code; skeleton deployed before surface; the embed timebox decision falls at Phase-2 midpoint.

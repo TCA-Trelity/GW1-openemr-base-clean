@@ -62,3 +62,12 @@ architecture docs:
 - DECISION: Chat grounding = the Anthropic native Citations API (document content blocks, `citations_delta` streaming) over the `[[fact:id]]` token contract — the model no longer emits citation syntax to fumble; every cited span arrives with exact quoted text + char ranges, is re-verified verbatim against our stored copy server-side, and unverifiable spans are reported, never rendered. No vendor switch needed (supported on Haiku 4.5).
 - DECISION: Brevity is a hard contract, not a style hint — chat defaults to ≤3 short bullets (~50 words, expand on ask); brief discussion points are structured items capped at 90 chars whose detail lives in linked cards. Physicians read in seconds.
 - DECISION: Diagnosis & Care is deterministic on first load (care_plan block from stored facts + engines); LLM output never gates a care surface.
+
+## Wave P (2026-07-10, user approval of the production-polish plan)
+
+- DECISION: Interactive login = SMART **standalone launch with full redirect** to the OpenEMR login page (PKCE public client registered alongside the system client). User picked redirect over embedded options.
+- DECISION: Role resolution = a seeded **clinician directory** (username → role/display), supplying the real `resolveRole` the smart verifier deliberately left as an injection point. Fail-closed-to-nurse default unchanged for unknown users.
+- DECISION: The three sample users are created via the **admin-UI click path** from an exact-values checklist. No standard-API route creates login-capable users; writing SQL into `users_secure` was rejected as coupled to password-hash internals. Credentials never in repo or chat.
+- DECISION: dev-login is **demoted, not removed** — hidden behind its env flag plus `?dev=1`; CI smoke and graders keep a deterministic door that cannot rot the demo.
+- DECISION: Patient goal one-liners are **agent-authored for all five** patients to fit each arc (user delegated), rendered deterministically on the overview AND planted verbatim in the intake documents so chat citations can back the same sentence. Margaret's goal is phrased around stability through her daughter's wedding (her arc has no surgery).
+- DECISION: Labels per user wording: section title **"Why are we here today?"**; conflicts container **"Facts to resolve"**. Width target `max-w-6xl` (~14% wider each side, inside the requested 10–15%).

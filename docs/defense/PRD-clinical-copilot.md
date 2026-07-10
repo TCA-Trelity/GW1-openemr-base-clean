@@ -207,3 +207,47 @@ Multimodal scan interpretation (fills the reserved `imaging_finding` slot; repla
 | Synthetic loaders (temporal slicing) | `loaders/loadPatientSources.jsx` | ADAPT | U1.10 |
 | realtimeSync | `services/realtimeSync.jsx` | REBUILD-TO-SPEC (in-tab emitter only — not cross-user) | U1.7 (SSE) |
 | Intake suite (branching, safety flags, supervised modes) | `components/intake/*` (22 files) | SKIP now / mine later | T3 |
+
+## Addendum: Wave P — production polish (user-approved 2026-07-10)
+
+Scoped after the early submission locked (all PDF requirements traced, video
+submitted). Three workstreams; tickets P1–P8 in `docs/execution/execution-plan.md`.
+
+**A. Real OpenEMR login in front of the sidecar (P1–P3).** The panel gains a
+login gate: "Sign in with OpenEMR" redirects to the actual OpenEMR login page
+(SMART standalone launch, PKCE public client) and returns with a real OAuth
+token; the sidecar verifies it with the existing JWKS + introspection verifier
+and resolves the clinician's role through a seeded **clinician directory**
+(username → physician / nurse / resident) — the production-honest answer to
+OpenEMR having no single role enum. Three sample logins (one per role) make the
+capability differences demonstrable end-to-end: nurse loses the AI-prep
+trigger, resident verifications require attending sign-off, physician has full
+clinical access. Dev-login is demoted to a flag-gated grader/CI fallback.
+*Acceptance: opening the sidecar unauthenticated shows the gate; each sample
+login lands with the correct name, role, and capabilities; cross-patient and
+verb gates hold under real tokens.*
+
+**B. Robust EHR records for all five patients (P4).** The seed grows from
+demographics + problems + allergies + med list to everything the standard REST
+API can write: full demographics, primary insurance, 2–3 encounters each with
+vitals and SOAP notes consistent with the authored storylines, and upcoming
+appointments. EHR-sync and the EHR Record tab render the new sections. Seeded
+content stays inside each storyline so the authored contradiction ground truth
+is untouched; EHR imports remain excluded from extraction (evals and the
+citation gate are unaffected). *Acceptance: EHR Record tab shows the new
+sections populated for all five patients from a fresh sync.*
+
+**C. Panel UX (P5–P7).** Overview becomes the first tab (EHR Record second).
+Chief complaint becomes **"Why are we here today?"** — a centered one-line
+patient goal (agent-authored per storyline, also planted in the intake document
+so chat can cite it) above the existing intake content. "Data Conflicts
+Detected" becomes **"Facts to resolve"**: half the height, collapsed by
+default, expandable, palette softened to the panel's neutral/amber tones.
+Medication Risk moves above a collapsed-by-default Medications card. Content
+width widens max-w-4xl → max-w-6xl (~14%/side). Recent Scans becomes a
+two-column workspace — taller stacked scans left, an at-hand analytics rail
+right (alert level, GC-IPL delta, CRT delta, interval status) fed by a
+deterministic `imaging_summary` on the overview payload. Every UI change ships
+with in-session Chromium screenshots for all five patients. *Acceptance:
+screenshots match the approved layout; panel + sidecar suites green; smoke
+stays green on deploy.*
