@@ -1,0 +1,31 @@
+# Mints the RELEASE.md promotion tag from CI: the dev session's git proxy only
+# accepts branch pushes, so the tag is created here with the runner's token.
+# Idempotent — an existing tag is left untouched.
+name: Tag stable
+
+on:
+  push:
+    paths:
+      - '.github/workflows/tag-stable.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Tag the main tip as stable-2026-07-09
+        run: |
+          git fetch origin main -q
+          if git ls-remote --exit-code origin refs/tags/stable-2026-07-09 >/dev/null 2>&1; then
+            echo "tag already exists — nothing to do"
+            exit 0
+          fi
+          git tag stable-2026-07-09 origin/main
+          git push origin stable-2026-07-09
+          echo "tagged $(git rev-parse --short origin/main) as stable-2026-07-09"

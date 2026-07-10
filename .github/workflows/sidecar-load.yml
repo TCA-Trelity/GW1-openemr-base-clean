@@ -29,7 +29,7 @@ env:
   DURATION_SEC: ${{ github.event_name == 'push' && '20' || inputs.duration_sec }}
   P95_MAX_MS: ${{ github.event_name == 'push' && '1500' || inputs.p95_max_ms }}
 
-# One probe at a time — overlapping load runs would distort each other's numbers.
+# One probe at a time: overlapping load runs distort each other's numbers.
 concurrency:
   group: sidecar-load
   cancel-in-progress: false
