@@ -25,8 +25,13 @@ grounded in the seeded corpus, and every demo is a test run.*
 - On screen: Imaging tab — the full-viewport OCT workspace. Click
   **"Ask about this scan"** on the selected scan → the ask lands in the chat
   input, prefilled → send.
-- Watch and narrate the stream: **tool chips appear live** —
+- Watch and narrate the stream: the **opening move** lands first (a fresh
+  conversation opens with the agent's prepared digest — "I read the record
+  during check-in…"), then **tool chips appear live** —
   `get_measurement_trend`, then `compare_scans` — then the cited answer.
+- Say, over the opening move: "Notice the first message is the agent's, not
+  mine — the transcript literally opens with what it prepared. There is no
+  separate report; the brief is turn zero of this conversation."
 - Say: "Measurement trends don't live in any document I attached — the agent
   has six read-only, patient-scoped tools, and you can watch it use them. It
   pulled the CRT series across all seven scans, compared the two scans around
@@ -74,10 +79,13 @@ grounded in the seeded corpus, and every demo is a test run.*
 - On screen: the Bruno `04-chat` folder (one glance): "Graders can run this
   exact multi-turn workflow — follow-up, tool chain, replay — without reading
   a line of source."
-- On screen: the Langfuse trace of the thread you just ran.
-- Say: "And every turn you watched is one correlation ID in the traces —
-  every tool call, model call, token, and verification verdict, reconstructable
-  from logs alone."
+- On screen: the observability trail — the prep run's Langfuse trace (stages,
+  generations, gate scores), then `GET /api/usage` beside the Railway logs
+  filtered to one chat turn's correlation ID.
+- Say: "And everything you watched is reconstructable from logs alone: the
+  prep run is a Langfuse trace with a span per stage and gate verdicts as
+  scores, and every chat turn carries one correlation ID through the token
+  ledger, the tool calls, and the verification results."
 
 ### 3:35–4:00 — Close
 - On screen: the deployed URL; the role picker (physician / nurse / resident)

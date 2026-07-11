@@ -61,6 +61,8 @@ docs {
   **The raw stream looks like:**
 
   ```
+  data: {"type":"seed","conversation_id":"...","content":"I read the record during check-in (brief prepared ...)..."}
+
   data: {"type":"delta","text":"Margaret Chen is on"}
 
   data: {"type":"delta","text":" hydroxychloroquine ..."}
@@ -69,6 +71,12 @@ docs {
 
   data: {"type":"done","conversation_id":"...","citations":[...],"unverified_count":0,"tools_used":[]}
   ```
+
+  - The `seed` event (M9) appears only on a NEW conversation for a patient
+    whose prep has completed: the agent's **opening move** — a compact digest
+    of the already-gated brief — persisted server-side as the conversation's
+    first assistant message before your turn is processed. The transcript
+    (see the replay in `04`) literally opens with it.
 
   - `delta` events carry incremental answer text (what the panel renders
     token-by-token).

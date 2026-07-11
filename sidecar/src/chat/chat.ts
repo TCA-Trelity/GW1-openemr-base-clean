@@ -224,10 +224,15 @@ export class ChatService {
             })),
             { type: 'text', text: message },
         ];
-        const messages: AnthropicMessage[] = [
-            ...history.map((turn) => ({ role: turn.role, content: turn.content })),
-            { role: 'user' as const, content: latestContent },
-        ];
+        const historyMessages: AnthropicMessage[] = history.map((turn) => ({ role: turn.role, content: turn.content }));
+        // An M9-seeded conversation begins with the agent's opening move (assistant). The
+        // Messages API requires a user-first thread, so a synthetic user line — model-context
+        // only, never persisted or rendered — introduces it and keeps it referenceable
+        // ("expand point 2") in later turns.
+        if (historyMessages[0]?.role === 'assistant') {
+            historyMessages.unshift({ role: 'user', content: 'I have opened the chart — give me your prepared opening.' });
+        }
+        const messages: AnthropicMessage[] = [...historyMessages, { role: 'user' as const, content: latestContent }];
 
         const citations: ChatCitation[] = [];
         const toolsUsed: string[] = [];

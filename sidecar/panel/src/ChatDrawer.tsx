@@ -69,6 +69,8 @@ interface ChatBubble {
     id: string;
     role: 'user' | 'assistant';
     content: string;
+    /** M9: the agent's opening move — rendered with its prepared-during-check-in label. */
+    opening?: boolean;
     status: 'complete' | 'streaming' | 'error';
     /** Streamed citations in arrival order, deduped — replayed history carries none. */
     citations: ChatCitation[];
@@ -259,6 +261,11 @@ function AssistantBubble({ bubble, onRetry }: { bubble: ChatBubble; onRetry: (bu
     return (
         <div className="flex justify-start">
             <div className="max-w-[85%]">
+                {bubble.opening === true && (
+                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                        Opening move — prepared during check-in
+                    </p>
+                )}
                 <ToolActivityStrip activity={bubble.toolActivity} />
                 {(bubble.content !== '' || bubble.status === 'streaming' || chips.length > 0) && (
                     <div className="rounded-xl rounded-bl-sm bg-slate-100 px-3.5 py-2 text-[13px] text-slate-700 leading-snug whitespace-pre-wrap">
@@ -415,6 +422,25 @@ export default function ChatDrawer({
                         ...bubble,
                         toolActivity: resolveFirstRunning(bubble.toolActivity, tool.name, tool.ok ? 'ok' : 'error'),
                     }));
+                },
+                (seedContent) => {
+                    // M9 opening move: fires only on the first turn of a fresh conversation,
+                    // so prepending puts the agent's prepared digest at the top of the thread.
+                    setBubbles((prev) => [
+                        {
+                            id: bubbleId('opening'),
+                            role: 'assistant',
+                            content: seedContent,
+                            opening: true,
+                            status: 'complete',
+                            citations: [],
+                            unverifiedCount: 0,
+                            toolActivity: [],
+                            requestText: '',
+                            errorText: null,
+                        },
+                        ...prev,
+                    ]);
                 },
             );
             if (result.kind === 'done') {

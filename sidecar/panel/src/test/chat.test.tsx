@@ -465,3 +465,34 @@ describe('ChatDrawer ask-about-this seeding (M6)', () => {
         expect(post).toBeUndefined();
     });
 });
+
+describe('ChatDrawer opening move (M9)', () => {
+    // Failure mode: the seed event not rendering, or rendering below the first exchange —
+    // the transcript must open with the agent's prepared digest, labelled as such.
+    it('renders the seeded opening move above the first exchange', async () => {
+        stubFetch((url, init) => {
+            if (url.includes('/api/chat/') && init?.method === 'POST') {
+                return sseResponse([
+                    {
+                        type: 'seed',
+                        conversation_id: 'conv-9',
+                        content: 'I read the record during check-in (brief prepared 2026-07-11). Ask me to drill in.',
+                    },
+                    { type: 'delta', text: 'Plaquenil 200 mg daily.' },
+                    { type: 'done', conversation_id: 'conv-9', citations: [], unverified_count: 0 },
+                ]);
+            }
+            return undefined;
+        });
+        render(<Harness />);
+        openDrawer();
+        fireEvent.click(screen.getByRole('button', { name: 'Any medication risks?' }));
+
+        const opening = await screen.findByText(/I read the record during check-in/);
+        expect(screen.getByText('Opening move — prepared during check-in')).toBeInTheDocument();
+        expect(await screen.findByText('Plaquenil 200 mg daily.')).toBeInTheDocument();
+        // DOM order: the opening move precedes the user's first bubble.
+        const userBubble = screen.getByText('Any medication risks?');
+        expect(opening.compareDocumentPosition(userBubble) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+});

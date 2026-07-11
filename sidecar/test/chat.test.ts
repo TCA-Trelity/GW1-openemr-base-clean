@@ -16,7 +16,7 @@ import type { PrepLogger } from '../src/prep/extraction.js';
 import { registerChatRoutes, type ChatRouteDeps } from '../src/routes/chat.js';
 import { buildServer } from '../src/server.js';
 import type { RegisteredTool } from '../src/chat/tools/index.js';
-import type { FactBundle } from '../src/store/index.js';
+import type { FactBundle, StoredBrief } from '../src/store/index.js';
 import Fastify from 'fastify';
 
 const silentLogger: PrepLogger = { info: () => {}, warn: () => {}, error: () => {} };
@@ -106,10 +106,16 @@ function chatResponse(text: string): Response {
 
 class FakeChatStore {
     messages: (ChatMessageInput & { id: string })[] = [];
+    /** M9: the latest completed brief the opening move composes from (null = no seed). */
+    brief: StoredBrief | null = null;
     constructor(private readonly bundle: FactBundle | null = tinyBundle()) {}
 
     async getFactBundle(patientId: string): Promise<FactBundle | null> {
         return this.bundle !== null && this.bundle.patient.id === patientId ? this.bundle : null;
+    }
+
+    async getBrief(): Promise<StoredBrief | null> {
+        return this.brief;
     }
 
     async saveChatMessage(input: ChatMessageInput): Promise<string> {
@@ -425,9 +431,34 @@ describe('chat routes', () => {
     function routeDeps(overrides: Partial<{ spendGuard: FakeSpendGuard; responses: Response[] }> = {}) {
         const store = new FakeChatStore();
         const spendGuard = overrides.spendGuard ?? new FakeSpendGuard();
-        const { service } = chatService(store, spendGuard, ...(overrides.responses ?? [chatResponse(REPLY)]));
+        const { service, fetchMock } = chatService(store, spendGuard, ...(overrides.responses ?? [chatResponse(REPLY)]));
         const deps: ChatRouteDeps = { store, service, spendGuard };
-        return { deps, store };
+        return { deps, store, fetchMock };
+    }
+
+    function sseEvents(body: string): Record<string, unknown>[] {
+        return body
+            .split('\n\n')
+            .filter((chunk) => chunk.startsWith('data: '))
+            .map((chunk) => JSON.parse(chunk.slice(6)) as Record<string, unknown>);
+    }
+
+    function storedBrief(): StoredBrief {
+        return {
+            id: 'brief-1',
+            patient_id: 'margaret-chen',
+            prepared_at: '2026-07-11T08:00:00.000Z',
+            correlation_id: 'prep-1',
+            status: 'complete',
+            content: {
+                urgency: { level: 'high', reason: 'HCQ retinal toxicity risk at threshold' },
+                key_discussion_points: [
+                    { kind: 'risk_flag', text: 'Hydroxychloroquine: HIGH retinal toxicity risk', fact_ids: [], contradiction_id: null },
+                    'GC-IPL thinning 82→70 µm across six OCTs',
+                ],
+                questions_to_confirm: ['Any new visual symptoms since December?'],
+            },
+        };
     }
 
     // Guards: the SSE wire contract the panel parses — delta + citation events, then a
@@ -454,6 +485,63 @@ describe('chat routes', () => {
         expect(done['citations']).toHaveLength(2);
         expect(done['unverified_count']).toBe(0);
         expect(typeof done['conversation_id']).toBe('string');
+    });
+
+    // Guards (M9): a NEW conversation opens with the persisted opening move — the seed
+    // event leads the wire, the seed row leads the transcript, and the model reads it as
+    // history behind the synthetic user-first introducer the Messages API requires.
+    it('POST seeds a fresh conversation with the opening move when a brief exists', async () => {
+        const { deps, store, fetchMock } = routeDeps();
+        store.brief = storedBrief();
+        const res = await chatApp(deps).inject({
+            method: 'POST',
+            url: '/api/chat/margaret-chen',
+            payload: { message: 'What matters today?' },
+        });
+        expect(res.statusCode).toBe(200);
+        const events = sseEvents(res.body);
+        const seed = events[0]!;
+        expect(seed['type']).toBe('seed');
+        const seedText = String(seed['content']);
+        expect(seedText).toContain('I read the record during check-in (brief prepared 2026-07-11)');
+        expect(seedText).toContain('Urgency: high — HCQ retinal toxicity risk at threshold.');
+        expect(seedText).toContain('Worth discussing: 1) Hydroxychloroquine: HIGH retinal toxicity risk 2) GC-IPL thinning');
+        expect(seedText).toContain('1 question queued to ask the patient.');
+        // Persisted FIRST: the stored transcript opens with the opening move.
+        expect(store.messages.map((m) => m.role)).toEqual(['assistant', 'user', 'assistant']);
+        expect(store.messages[0]!.content).toBe(seedText);
+        // Model view: synthetic user introducer, then the seed as assistant history, then
+        // the latest user turn carrying the document blocks.
+        const request = JSON.parse(String((fetchMock.mock.calls[0]![1] as RequestInit).body)) as {
+            messages: { role: string; content: unknown }[];
+        };
+        expect(request.messages).toHaveLength(3);
+        expect(request.messages[0]).toEqual({ role: 'user', content: 'I have opened the chart — give me your prepared opening.' });
+        expect(request.messages[1]).toEqual({ role: 'assistant', content: seedText });
+        expect(request.messages[2]!.role).toBe('user');
+    });
+
+    it('POST does not seed a continued conversation or a patient without a brief', async () => {
+        // No completed brief -> no seed, plain two-row transcript.
+        const noBrief = routeDeps();
+        const resA = await chatApp(noBrief.deps).inject({
+            method: 'POST',
+            url: '/api/chat/margaret-chen',
+            payload: { message: 'What meds is she on?' },
+        });
+        expect(sseEvents(resA.body).some((event) => event['type'] === 'seed')).toBe(false);
+        expect(noBrief.store.messages.map((m) => m.role)).toEqual(['user', 'assistant']);
+
+        // Client-supplied conversation id -> continued conversation, never re-seeded.
+        const continued = routeDeps();
+        continued.store.brief = storedBrief();
+        const resB = await chatApp(continued.deps).inject({
+            method: 'POST',
+            url: '/api/chat/margaret-chen',
+            payload: { message: 'And the allergy?', conversation_id: 'conv-known' },
+        });
+        expect(sseEvents(resB.body).some((event) => event['type'] === 'seed')).toBe(false);
+        expect(continued.store.messages.map((m) => m.role)).toEqual(['user', 'assistant']);
     });
 
     // Guards: the tool-activity wire contract — tool_use + tool_result events stream and the
