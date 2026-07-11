@@ -326,6 +326,30 @@ describe('ChatService.turn', () => {
         expect(secondBody.messages[1]!.content).toBe(REPLY);
     });
 
+    // Guards (IC3): ephemeral UI context reaches the model on the latest turn only and
+    // never leaks into the persisted transcript.
+    it('appends uiContext to the model call but never persists it', async () => {
+        const store = new FakeChatStore();
+        const { service, fetchMock } = chatService(store, undefined, chatResponse(REPLY));
+        await service.turn(
+            {
+                bundle: tinyBundle(),
+                conversationId: 'c',
+                message: 'What about this scan?',
+                correlationId: 'x',
+                uiContext: '[UI context] Viewing scan img-mc-001.',
+            },
+            silentLogger,
+        );
+        const body = JSON.parse(String(fetchMock.mock.calls[0]![1]?.body)) as {
+            messages: { content: unknown }[];
+        };
+        const content = body.messages.at(-1)!.content as { type: string; text?: string }[];
+        expect(content.at(-1)!.text).toBe('What about this scan?\n\n[UI context] Viewing scan img-mc-001.');
+        // Persisted transcript keeps the physician's words verbatim.
+        expect(store.messages[0]!.content).toBe('What about this scan?');
+    });
+
     // Guards: a failed LLM call leaving a half-persisted turn in the conversation.
     it('persists nothing when the LLM call fails', async () => {
         const store = new FakeChatStore();
@@ -553,6 +577,61 @@ describe('chat routes', () => {
         });
         expect(sseEvents(resB.body).some((event) => event['type'] === 'seed')).toBe(false);
         expect(continued.store.messages.map((m) => m.role)).toEqual(['user', 'assistant']);
+    });
+
+    // Guards (IC3): the viewing-scan context — a valid id rides the model call as UI
+    // context, an unknown id is ignored (UI state must never fail a turn), and the
+    // persisted transcript stays verbatim either way.
+    it('POST folds a valid viewing_image_id into the model call and ignores unknown ids', async () => {
+        const bundleWithScan = (): FactBundle => {
+            const bundle = tinyBundle();
+            bundle.images = [
+                {
+                    id: 'img-mc-001',
+                    patient_id: 'margaret-chen',
+                    image_metadata: { capture_date: '2024-12-26T10:35:00Z', modality: 'oct', laterality: 'od' },
+                    ai_analysis: { findings: [], measurements: [] },
+                },
+            ];
+            return bundle;
+        };
+        const makeDeps = () => {
+            const store = new FakeChatStore(bundleWithScan());
+            const spendGuard = new FakeSpendGuard();
+            const { service, fetchMock } = chatService(store, spendGuard, chatResponse(REPLY));
+            const deps: ChatRouteDeps = { store, service, spendGuard };
+            return { deps, store, fetchMock };
+        };
+
+        // Valid id: the context line reaches the model; the transcript keeps the raw message.
+        const valid = makeDeps();
+        const resA = await chatApp(valid.deps).inject({
+            method: 'POST',
+            url: '/api/chat/margaret-chen',
+            payload: { message: 'What am I looking at?', viewing_image_id: 'img-mc-001' },
+        });
+        expect(resA.statusCode).toBe(200);
+        const bodyA = JSON.parse(String(valid.fetchMock.mock.calls[0]![1]?.body)) as {
+            messages: { content: unknown }[];
+        };
+        const textA = (bodyA.messages.at(-1)!.content as { text?: string }[]).at(-1)!.text!;
+        expect(textA.startsWith('What am I looking at?')).toBe(true);
+        expect(textA).toContain('img-mc-001');
+        expect(textA).toContain('oct, OD');
+        expect(valid.store.messages[0]!.content).toBe('What am I looking at?');
+
+        // Unknown id: ignored — the turn proceeds with no context appended.
+        const unknown = makeDeps();
+        const resB = await chatApp(unknown.deps).inject({
+            method: 'POST',
+            url: '/api/chat/margaret-chen',
+            payload: { message: 'What am I looking at?', viewing_image_id: 'img-nope' },
+        });
+        expect(resB.statusCode).toBe(200);
+        const bodyB = JSON.parse(String(unknown.fetchMock.mock.calls[0]![1]?.body)) as {
+            messages: { content: unknown }[];
+        };
+        expect((bodyB.messages.at(-1)!.content as { text?: string }[]).at(-1)!.text).toBe('What am I looking at?');
     });
 
     // Guards: the tool-activity wire contract — tool_use + tool_result events stream and the

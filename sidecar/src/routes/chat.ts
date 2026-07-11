@@ -27,7 +27,7 @@ export interface ChatRouteDeps {
 }
 
 type ChatParams = { Params: { patientId: string } };
-type ChatPost = ChatParams & { Body: { message?: unknown; conversation_id?: unknown } };
+type ChatPost = ChatParams & { Body: { message?: unknown; conversation_id?: unknown; viewing_image_id?: unknown } };
 type ChatGet = ChatParams & { Querystring: { conversation_id?: string } };
 
 const MAX_MESSAGE_CHARS = 2000;
@@ -64,6 +64,26 @@ export function registerChatRoutes(app: FastifyInstance, deps: ChatRouteDeps | u
                         .send({ error: 'llm_budget_exceeded', spent_usd: error.spentUsd, budget_usd: error.budgetUsd });
                 }
                 throw error;
+            }
+        }
+
+        // IC3 viewing context: the panel names the scan open in the imaging workspace so
+        // "this scan" resolves. Validated against the bundle — an unknown id is ignored
+        // (logged), never an error: UI state must not be able to fail a chat turn. The
+        // context rides the model call only; the persisted transcript keeps the
+        // physician's words verbatim.
+        let uiContext: string | undefined;
+        const rawViewing = request.body?.viewing_image_id;
+        if (typeof rawViewing === 'string' && rawViewing !== '') {
+            const viewed = bundle.images.find((image) => image.id === rawViewing);
+            if (viewed === undefined) {
+                request.log.warn({ viewingImageId: rawViewing }, 'unknown viewing_image_id ignored');
+            } else {
+                const meta = viewed.image_metadata;
+                uiContext =
+                    `[UI context — not part of the physician's message] The physician currently has scan ` +
+                    `${viewed.id} open in the imaging workspace (${meta.modality}, ${meta.laterality.toUpperCase()}, ` +
+                    `captured ${meta.capture_date}). Read "this scan" / "what I'm looking at" as that scan.`;
             }
         }
 
@@ -105,7 +125,7 @@ export function registerChatRoutes(app: FastifyInstance, deps: ChatRouteDeps | u
         }
         try {
             const result = await deps.service.turn(
-                { bundle, conversationId, message, correlationId: String(request.id) },
+                { bundle, conversationId, message, correlationId: String(request.id), ...(uiContext === undefined ? {} : { uiContext }) },
                 request.log,
                 {
                     onTextDelta: (text) => writeEvent({ type: 'delta', text }),

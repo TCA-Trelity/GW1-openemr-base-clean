@@ -496,3 +496,33 @@ describe('ChatDrawer opening move (M9)', () => {
         expect(opening.compareDocumentPosition(userBubble) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 });
+
+describe('ChatDrawer viewing-scan context (IC3)', () => {
+    // Failure mode: the drawer drops the viewing context so "this scan" never resolves
+    // server-side — every turn must carry the open scan's id in the POST body.
+    it('sends viewing_image_id with the turn when a scan is open', async () => {
+        const mock = stubFetch((url) =>
+            url.includes('/api/chat/')
+                ? sseResponse([
+                      { type: 'delta', text: 'The Dec 26 OCT.' },
+                      { type: 'done', conversation_id: 'conv-v1', citations: [], unverified_count: 0, tools_used: [] },
+                  ])
+                : undefined,
+        );
+        function ViewingHarness() {
+            const [open, setOpen] = useState(false);
+            return <ChatDrawer patientId="margaret-chen" open={open} onToggle={setOpen} viewingImageId="img-mc-001" />;
+        }
+        render(<ViewingHarness />);
+        openDrawer();
+        sendMessage('What am I looking at?');
+
+        await screen.findByText('The Dec 26 OCT.');
+        const post = mock.mock.calls.find((call) => String(call[0]).includes('/api/chat/'));
+        expect(post).toBeDefined();
+        expect(JSON.parse(String((post![1] as RequestInit).body))).toEqual({
+            message: 'What am I looking at?',
+            viewing_image_id: 'img-mc-001',
+        });
+    });
+});

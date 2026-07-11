@@ -404,13 +404,24 @@ export async function sendChatMessage(
     onToolUse?: (tool: ChatToolUse) => void,
     onToolResult?: (tool: ChatToolResult) => void,
     onSeed?: (content: string) => void,
+    options?: {
+        /** IC3: the scan open in the imaging workspace, so "this scan" resolves server-side. */
+        viewingImageId?: string | null;
+    },
 ): Promise<ChatSendResult> {
+    const body: Record<string, string> = { message };
+    if (conversationId !== null) {
+        body['conversation_id'] = conversationId;
+    }
+    if (options?.viewingImageId != null) {
+        body['viewing_image_id'] = options.viewingImageId;
+    }
     let res: Response;
     try {
         res = await apiFetch(`/api/chat/${encodeURIComponent(patientId)}`, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(conversationId !== null ? { message, conversation_id: conversationId } : { message }),
+            body: JSON.stringify(body),
         });
     } catch {
         return { kind: 'error', message: UNREACHABLE };

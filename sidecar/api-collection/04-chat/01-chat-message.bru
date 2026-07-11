@@ -95,9 +95,15 @@ docs {
   (missing/empty/oversized message), `404 {"error":"patient_not_found"}`,
   `429 {"error":"llm_budget_exceeded","spent_usd":...,"budget_usd":...}`.
 
-  **Request body:** `{"message": "...", "conversation_id": "..."}` —
+  **Request body:** `{"message": "...", "conversation_id": "...", "viewing_image_id": "..."}` —
   `conversation_id` is optional; omit it (as here) to start a new
   conversation, or pass a previous `done` event's id to continue one.
+  `viewing_image_id` (IC3, also optional) names the scan the physician has
+  open in the imaging workspace so "this scan" resolves: a valid id is
+  folded into the model call as ephemeral UI context (the persisted
+  transcript keeps your words verbatim — compare the replay in `04`); an
+  unknown id is ignored and logged, never an error. Try it here with
+  `"viewing_image_id": "img-mc-006"` and `"message": "Summarize this scan"`.
 
   **Post-response script:** captures `conversation_id` from the `done`
   event into the `conversationId` variable, so every following request in

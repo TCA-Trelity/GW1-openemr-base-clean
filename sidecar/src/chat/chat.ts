@@ -50,6 +50,13 @@ export interface ChatTurnInput {
     conversationId: string;
     message: string;
     correlationId: string;
+    /**
+     * Ephemeral UI state (IC3), e.g. which scan the physician has open, so "this scan"
+     * resolves. Appended to the latest user text block ONLY — model context for this one
+     * call, never persisted and never rendered; the transcript keeps the physician's
+     * words verbatim.
+     */
+    uiContext?: string;
 }
 
 export interface ChatTurnResult {
@@ -212,7 +219,7 @@ export class ChatService {
     }
 
     async turn(input: ChatTurnInput, logger: PrepLogger, hooks?: ChatTurnHooks): Promise<ChatTurnResult> {
-        const { bundle, conversationId, message, correlationId } = input;
+        const { bundle, conversationId, message, correlationId, uiContext } = input;
         const patientId = bundle.patient.id;
         const documents = citableDocuments(bundle);
         const history = await this.store.getChatMessages(patientId, conversationId, 20);
@@ -226,7 +233,7 @@ export class ChatService {
                 title: doc.title,
                 citations: { enabled: true },
             })),
-            { type: 'text', text: message },
+            { type: 'text', text: uiContext === undefined ? message : `${message}\n\n${uiContext}` },
         ];
         const historyMessages: AnthropicMessage[] = history.map((turn) => ({ role: turn.role, content: turn.content }));
         // An M9-seeded conversation begins with the agent's opening move (assistant). The

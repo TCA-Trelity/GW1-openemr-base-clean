@@ -5,7 +5,7 @@
 // charts beneath; the Timeline keeps the merged image+injection stream. Timeline merging, series
 // extraction, and the visit summary are display math only; the clinical judgments (interval
 // recommendation, HCQ progression) render from the overview's server-computed imaging block.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle, CalendarRange, CheckCircle, Clock, GitCompare, LayoutDashboard, Syringe, TrendingUp } from 'lucide-react';
 import type {
     BriefContent,
@@ -273,12 +273,15 @@ export default function Imaging({
     images,
     treatments,
     onAsk,
+    onViewScan,
 }: {
     imaging: BriefContent['imaging'];
     images: ImageRecord[];
     treatments: TreatmentWireRecord[];
     /** Ask-about-this-scan (M6): threaded to the Workspace's seed button. */
     onAsk?: (text: string) => void;
+    /** IC3: reports the scan open in the Workspace so chat turns can say "this scan". */
+    onViewScan?: (id: string | null) => void;
 }) {
     const hasImages = images.length > 0;
     // Land on the image-first Workspace when there are scans; fall back to Timeline otherwise.
@@ -290,6 +293,13 @@ export default function Imaging({
     const [fromTimeline, setFromTimeline] = useState(false);
 
     const summary = computeVisitSummary(images, imaging.interval_analysis, imaging.hcq_progression);
+
+    // IC3: report the viewed scan upward — on mount (the workspace defaults to the latest
+    // scan) and on every selection. Deliberately not cleared on unmount: "the scan I was
+    // just looking at" should still resolve after the physician switches tabs to ask.
+    useEffect(() => {
+        onViewScan?.(selectedImageId);
+    }, [selectedImageId, onViewScan]);
 
     const selectTab = (id: SubTabId) => {
         setFromTimeline(false);

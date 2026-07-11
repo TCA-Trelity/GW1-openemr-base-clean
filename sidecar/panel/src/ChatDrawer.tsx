@@ -313,12 +313,15 @@ export default function ChatDrawer({
     open,
     onToggle,
     seed = null,
+    viewingImageId = null,
 }: {
     patientId: string;
     open: boolean;
     onToggle: (open: boolean) => void;
     /** Ask-about-this seeding (M6): prefills the input (never auto-sends) and focuses it. */
     seed?: { text: string; nonce: number } | null;
+    /** IC3: the scan open in the imaging workspace — sent with each turn so "this scan" resolves. */
+    viewingImageId?: string | null;
 }) {
     const [bubbles, setBubbles] = useState<ChatBubble[]>([]);
     const [draft, setDraft] = useState('');
@@ -445,6 +448,7 @@ export default function ChatDrawer({
                         ...prev,
                     ]);
                 },
+                { viewingImageId },
             );
             if (result.kind === 'done') {
                 conversationIdRef.current = result.done.conversationId;
@@ -475,7 +479,7 @@ export default function ChatDrawer({
             sendingRef.current = false;
             setSending(false);
         },
-        [patientId, patch],
+        [patientId, patch, viewingImageId],
     );
 
     const send = useCallback(
