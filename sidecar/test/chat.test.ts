@@ -227,6 +227,17 @@ describe('buildChatSystemPrompt + citableDocuments', () => {
     // prompt — the same pin-the-load-bearing-phrases discipline injection-resistance uses
     // for the extraction fence. Each phrase carries one leg of the contract: the ban, the
     // attributed reframe, where the decision sits, and the relay carve-out.
+    // Guards (IC0): the capability-wrong failure seen live — the model answering a trends
+    // question from document prose, claiming the longitudinal data doesn't exist (it is one
+    // tool call away), and asking permission to act. The prompt must forbid all three.
+    it('states the imaging tool-use contract: consult before absence claims, never ask permission', () => {
+        const prompt = buildChatSystemPrompt(tinyBundle());
+        expect(prompt).toContain('lives ONLY in the stored image');
+        expect(prompt).toContain('Consult the imaging tools BEFORE stating any imaging data');
+        expect(prompt).toContain('an absence claim without a tool check is a wrong answer');
+        expect(prompt).toContain('without asking');
+    });
+
     it('states the non-prescriptiveness contract: ban, attributed reframe, carve-out', () => {
         const prompt = buildChatSystemPrompt(tinyBundle());
         expect(prompt).toContain('thought partner, not a prescriber');

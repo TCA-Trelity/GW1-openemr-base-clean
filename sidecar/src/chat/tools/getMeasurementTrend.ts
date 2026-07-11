@@ -66,7 +66,9 @@ export const getMeasurementTrend = defineTool<Input, Output>({
     name: 'get_measurement_trend',
     description:
         "Return the time series of one OCT measurement (e.g. 'CST', 'GC-IPL', 'RNFL') for THIS patient, " +
-        'optionally filtered to one eye (OD/OS). Values come from the stored image analyses.',
+        'optionally filtered to one eye (OD/OS). Values come from the stored image analyses — the ONLY source ' +
+        'of longitudinal measurements (documents do not carry the series). Use for any trend or progression ' +
+        'question before concluding data is missing.',
     inputSchema: InputSchema,
     outputSchema: getMeasurementTrendOutputSchema,
     inputJsonSchema: {

@@ -54,7 +54,8 @@ export const compareScans = defineTool<Input, Output>({
     name: 'compare_scans',
     description:
         "Compare two of THIS patient's OCT/imaging scans by id and return the deterministic diff " +
-        '(resolved/new findings, CRT delta, overall change, treatment response). The later scan is treated as current.',
+        '(resolved/new findings, CRT delta, overall change, treatment response). The later scan is treated as ' +
+        "current. This is the ONLY way to diff scans — use for any 'what changed between scans' question.",
     inputSchema: InputSchema,
     outputSchema: compareScansOutputSchema,
     inputJsonSchema: {
