@@ -140,7 +140,7 @@
   <div class="eyebrow">TCA-Trelity / GW1-openemr-base-clean · AgentForge Week 1</div>
   <h1>Clinical Co-Pilot — Build Status</h1>
   <div class="statusline">
-    Hand-refreshed <b>2026-07-11</b> UTC · main = <b>e1d8f32</b> · early submission <b>100%</b> ·
+    Hand-refreshed <b>2026-07-11</b> UTC · main = <b>b1b9346</b> (Wave M merged) · early submission <b>100%</b> ·
     Wave&nbsp;Q 8/8 · P4 awaiting EHR deploy ·
     <span class="new">Wave&nbsp;M complete: 9/9</span> — multi-turn agent emphasis + thought-partner guardrails
     (branch <b>b5bf45e</b>, <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/pull/4">PR&nbsp;#4 draft</a>; evals 18/18 · sidecar 368 · panel 82, all green) ·
@@ -149,7 +149,7 @@
   <div class="toplinks">
     <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean">Repository</a>
     <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/pull/3">PR #3 — deploy fix (merged)</a>
-    <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/pull/4">PR #4 — Wave M plan (draft)</a>
+    <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/pull/4">PR #4 — Wave M (merged)</a>
     <a href="https://gw1-openemr-base-clean-production.up.railway.app">Live EHR</a>
     <a href="https://enchanting-mercy-production-5d32.up.railway.app">Live sidecar + panel</a>
     <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions">CI runs</a>
@@ -205,7 +205,7 @@
         <p class="sub">GitHub is the working repo; GitLab is the graded mirror (synced on every push).</p>
         <div class="item">
           <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean">GitHub — GW1-openemr-base-clean</a></div>
-          <div class="d">source of truth; branch <code>main</code> · Wave M plan on <code>claude/multi-turn-agent-emphasis-kngq9p</code></div>
+          <div class="d">source of truth; branch <code>main</code> (Wave M merged via PR #4)</div>
         </div>
         <div class="item">
           <div class="t">GitLab mirror</div>
@@ -249,7 +249,7 @@
     <div class="panel">
       <div class="panel-head">
         <h2>Wave M — multi-turn agent emphasis + thought-partner guardrails</h2>
-        <span class="pill">Complete 2026-07-11 · 9/9 · PR #4 draft</span>
+        <span class="pill">Merged to main 2026-07-11 · 9/9</span>
       </div>
       <blockquote>Early-submission feedback: "the eval suite is one of the strongest in the batch … however, the rubric explicitly excludes a 'report generator' as the core interface, and the ARCHITECTURE emphasis on a pre-assembled one-page brief … reads closer to that pattern than to the multi-turn tool-invoking agent the rubric asks for; … promoting that conversational surface to a primary role in both the doc and the demo would make that clear."</blockquote>
       <p class="muted">The chat already <em>is</em> that agent — persisted history, 4-round tool loop, six patient-scoped tools, verbatim-verified citations — but every graded artifact points at the brief: 0 of 11 evals exercise a conversation, Bruno never sends a second message, the panel ships chat closed behind a floating button, and USERS.md traces multi-turn to one use case. Wave M moves the weight, and adds the guardrail the prompt layer lacks: <b>thought partner, never prescriber</b> — cited record facts · engine/guideline output with attribution · questions worth considering. The decision stays with the physician.</p>
@@ -318,7 +318,7 @@
   <section>
     <div class="seclabel">Needs you <span>— actions only the human can take, in priority order</span></div>
     <div class="panel">
-      <div class="checkline"><span class="g part">◐</span><span><b>P4</b> — re-register the OAuth client + reseed on Railway (commands in the turn report and the <code>seed-ehr.ts</code> runbook) — unblocks "awaiting EHR deploy"</span></div>
+      <div class="checkline"><span class="g part">◐</span><span><b>P4</b> — the merge is rebuilding the OpenEMR service (insurance-route fixes ride it); once deployed, re-run the seed command — expect <code>insurance +1</code> for all five patients (everything else already landed)</span></div>
       <div class="checkline"><span class="g open">☐</span><span><b>G2</b> — Langfuse live on Railway + the 3 alerts configured (spec in <code>docs/execution/observability.md</code>)</span></div>
             <div class="checkline"><span class="g open">☐</span><span><b>P3</b> — create the 3 sample users via the admin-UI checklist (after P1/P2 land)</span></div>
       <div class="checkline"><span class="g open">☐</span><span><b>S3.6</b> — record the final demo video (conversation-led script is ready: <code>docs/defense/demo-script.md</code>) + social post before Sun 12:00 CT</span></div>
@@ -326,7 +326,7 @@
   </section>
 
   <footer>
-    Refreshed 2026-07-11 by the working session · source of truth: <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/execution-plan.md">docs/execution/execution-plan.md</a> · this refresh: Wave M complete 9/9 (<a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/pull/4">PR #4</a> — evals, guardrails, panel promotion, docs reframe, demo script, opening move; awaiting review).<br>
+    Refreshed 2026-07-11 by the working session · source of truth: <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/execution-plan.md">docs/execution/execution-plan.md</a> · this refresh: Wave M merged to main (b1b9346) (<a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/pull/4">PR #4</a> — evals, guardrails, panel promotion, docs reframe, demo script, opening move; awaiting review).<br>
     Page rebuilt this refresh from the execution plan + prior layout; earlier versions remain in the artifact version picker.
   </footer>
 </div>
