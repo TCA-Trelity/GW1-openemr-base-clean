@@ -344,7 +344,7 @@ describe('multi-turn-conversation', () => {
             silentLogger,
         );
 
-        const offeredTools = requests.slice(0, 4).every((request) => Array.isArray(request['tools']) && (request['tools'] as unknown[]).length === 6);
+        const offeredTools = requests.slice(0, 4).every((request) => Array.isArray(request['tools']) && (request['tools'] as unknown[]).length === 7);
         const finalWithoutTools = requests[4] !== undefined && requests[4]['tools'] === undefined;
         const pass =
             requests.length === 5 &&

@@ -18,6 +18,7 @@ import {
     Loader2,
     MessageCircle,
     RefreshCw,
+    ScanEye,
     Search,
     Send,
     ShieldAlert,
@@ -160,11 +161,12 @@ function toolActivityId(): string {
     return `tool-${nextToolSeq}`;
 }
 
-// Friendly labels + icons for the six read-only tools; unknown names humanize gracefully.
+// Friendly labels + icons for the seven read-only tools; unknown names humanize gracefully.
 const TOOL_LABELS: Record<string, string> = {
     get_full_document: 'Read full document',
     get_measurement_trend: 'Traced measurement trend',
     compare_scans: 'Compared scans',
+    get_imaging_overview: 'Summarized imaging history',
     check_med_risk: 'Checked medication risk',
     search_record: 'Searched the record',
     get_open_questions: 'Reviewed open questions',
@@ -174,6 +176,7 @@ const TOOL_ICONS: Record<string, LucideIcon> = {
     get_full_document: FileText,
     get_measurement_trend: TrendingUp,
     compare_scans: GitCompare,
+    get_imaging_overview: ScanEye,
     check_med_risk: ShieldAlert,
     search_record: Search,
     get_open_questions: HelpCircle,
