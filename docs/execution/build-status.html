@@ -140,10 +140,10 @@
   <div class="eyebrow">TCA-Trelity / GW1-openemr-base-clean · AgentForge Week 1</div>
   <h1>Clinical Co-Pilot — Build Status</h1>
   <div class="statusline">
-    Hand-refreshed <b>2026-07-11</b> UTC · main = <b>b1b9346</b> (Wave M merged) · early submission <b>100%</b> ·
+    Hand-refreshed <b>2026-07-11</b> UTC (late evening) · Wave&nbsp;M merged to main · early submission <b>100%</b> ·
     Wave&nbsp;Q 8/8 · P4 complete — EHR depth live, insurance ×5 (reseed 2026-07-11) ·
-    <span class="new">Wave&nbsp;M complete: 9/9</span> — multi-turn agent emphasis + thought-partner guardrails
-    (branch <b>b5bf45e</b>, <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/pull/4">PR&nbsp;#4 draft</a>; evals 18/18 · sidecar 368 · panel 82, all green) ·
+    <span class="new">Wave&nbsp;IC complete: 5/5</span> — imaging↔chat cohesion, all five layers stacked
+    (<a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/pull/6">PR&nbsp;#6</a>; evals 21/21 · sidecar 380 · panel 88, all green; Chromium-verified) ·
     renders <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/execution-plan.md">docs/execution/execution-plan.md</a> (the source of truth)
   </div>
   <div class="toplinks">
@@ -283,6 +283,36 @@
   <section>
     <div class="panel">
       <div class="panel-head">
+        <h2>Wave IC — imaging↔chat cohesion (all five options, stacked)</h2>
+        <span class="pill">Built 2026-07-11 evening · 5/5</span>
+      </div>
+      <p class="muted">Observed failure: chat claimed it had no access to prior OCT trends while the analytics rail displayed them beside it. User directive: build options 0–4, all of them. The result is one loop — the agent consults the imaging tools before any absence claim, quotes the rail's own derived object, knows which scan is on screen, draws what it saw in the bubble with deep links back into the viewer, and can look at the pixels themselves under a hard quarantine.</p>
+      <div class="wgroups">
+        <div class="wg">
+          <h4>Ground</h4>
+          <div class="tk"><span class="g done">☑</span><span class="id">IC0</span><span>tool-use contract: imaging data lives ONLY in the stored analyses — consult tools before absence claims, never ask permission (prompt rule 4 + descriptions + pins + opt-in live eval)</span></div>
+          <div class="tk"><span class="g done">☑</span><span class="id">IC1</span><span><code>get_imaging_overview</code> — the analytics rail's own derived block as one tool call; deep-equal cohesion eval on both corpora</span></div>
+        </div>
+        <div class="wg">
+          <h4>Context</h4>
+          <div class="tk"><span class="g done">☑</span><span class="id">IC3</span><span>viewing-scan context: <code>viewing_image_id</code> rides each turn (validated, model-only, transcript stays verbatim) so "this scan" resolves</span></div>
+        </div>
+        <div class="wg">
+          <h4>Loop</h4>
+          <div class="tk"><span class="g done">☑</span><span class="id">IC2</span><span>chat↔viewer loop: trend sparkline + prior/current compare thumbnails render in the bubble; every point/thumb deep-links into the imaging workspace</span></div>
+        </div>
+        <div class="wg">
+          <h4>Vision</h4>
+          <div class="tk"><span class="g done">☑</span><span class="id">IC4</span><span><code>describe_scan</code> — the model looks at the actual B-scan; observation quarantined ("AI visual observation (not from the record)", never cited, morphology-only, panel banner)</span></div>
+        </div>
+      </div>
+      <div class="order">shipped 2026-07-11 evening: IC0 → IC1 → IC3 → IC2 → IC4 (Chromium-verified: sparkline click lands on the exact scan in the workspace) · toolset 6→8 · eval suite 18→21 cases</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="panel">
+      <div class="panel-head">
         <h2>Deploy pipeline — converged: e2e green, tagged, baselines committed</h2>
         <span class="pill">Submission-ready</span>
       </div>
@@ -311,6 +341,7 @@
           <tr><td><b>Q</b></td><td>UI refinement round 2</td><td class="num">8/8</td><td class="note">—</td></tr>
           <tr><td><b>Phase 3</b></td><td>Final hardening (S3.x)</td><td class="num">3/7</td><td class="note">S3.2 ◐ · S3.5 ◐ · S3.4 ☐ · S3.6 final video ☐</td></tr>
           <tr><td><b>M</b></td><td>Multi-turn emphasis + guardrails</td><td class="num">9/9</td><td class="note">complete 2026-07-11 — see above</td></tr>
+          <tr><td><b>IC</b></td><td>Imaging↔chat cohesion</td><td class="num">5/5</td><td class="note">complete 2026-07-11 evening — see above</td></tr>
         </tbody>
       </table>
     </div>
@@ -326,7 +357,7 @@
   </section>
 
   <footer>
-    Refreshed 2026-07-11 by the working session · source of truth: <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/execution-plan.md">docs/execution/execution-plan.md</a> · this refresh: Wave M merged to main (b1b9346) (<a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/pull/4">PR #4</a> — evals, guardrails, panel promotion, docs reframe, demo script, opening move; awaiting review).<br>
+    Refreshed 2026-07-11 (late evening) by the working session · source of truth: <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/execution-plan.md">docs/execution/execution-plan.md</a> · this refresh: Wave IC built 5/5 (<a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/pull/6">PR #6</a> — imaging↔chat cohesion: tool-use contract, imaging overview tool, viewing context, chat↔viewer loop, describe_scan with quarantine).<br>
     Page rebuilt this refresh from the execution plan + prior layout; earlier versions remain in the artifact version picker.
   </footer>
 </div>
