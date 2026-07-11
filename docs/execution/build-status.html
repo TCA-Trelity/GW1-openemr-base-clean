@@ -1,0 +1,333 @@
+<!--
+  SOURCE OF TRUTH for the live build-status dashboard artifact.
+  Live URL: https://claude.ai/code/artifact/1233bba0-f8df-4b68-bf32-cef52531ffa6
+  Refresh flow (any session): edit THIS file, then republish it via the Artifact
+  tool passing url: <the URL above> so the link never changes. Favicon stays 🩺.
+  The page is a visual read of docs/execution/execution-plan.md - when ticket
+  state changes there, update the board/wave sections here in the same commit.
+-->
+<title>Clinical Co-Pilot — Build Status</title>
+<style>
+  :root {
+    --ground: #121714;
+    --card: #191f1b;
+    --card-inner: #1f2621;
+    --border: #29332d;
+    --border-soft: #222b26;
+    --text: #e4eae6;
+    --text-2: #96a39b;
+    --text-3: #6f7d75;
+    --accent: #8fd3ae;
+    --accent-strong: #b5e6cb;
+    --done: #7fd0a0;
+    --partial: #e2c078;
+    --open: #77857c;
+    --flag: #e2a678;
+    --pill-bg: rgba(127, 208, 160, 0.12);
+    --pill-border: rgba(127, 208, 160, 0.35);
+    --pill-new-bg: rgba(143, 211, 174, 0.10);
+    --quote-bar: #3b4a41;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --ground: #f3f6f4; --card: #ffffff; --card-inner: #f6f9f7; --border: #d8e1da;
+      --border-soft: #e3eae5; --text: #1c241f; --text-2: #55645b; --text-3: #7d8a82;
+      --accent: #17754a; --accent-strong: #0d5c38; --done: #1d8a55; --partial: #a97d14;
+      --open: #8b968f; --flag: #b2691f; --pill-bg: rgba(29, 138, 85, 0.10);
+      --pill-border: rgba(29, 138, 85, 0.35); --pill-new-bg: rgba(23, 117, 74, 0.08);
+      --quote-bar: #bcd0c4;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #121714; --card: #191f1b; --card-inner: #1f2621; --border: #29332d;
+    --border-soft: #222b26; --text: #e4eae6; --text-2: #96a39b; --text-3: #6f7d75;
+    --accent: #8fd3ae; --accent-strong: #b5e6cb; --done: #7fd0a0; --partial: #e2c078;
+    --open: #77857c; --flag: #e2a678; --pill-bg: rgba(127, 208, 160, 0.12);
+    --pill-border: rgba(127, 208, 160, 0.35); --pill-new-bg: rgba(143, 211, 174, 0.10);
+    --quote-bar: #3b4a41;
+  }
+  :root[data-theme="light"] {
+    --ground: #f3f6f4; --card: #ffffff; --card-inner: #f6f9f7; --border: #d8e1da;
+    --border-soft: #e3eae5; --text: #1c241f; --text-2: #55645b; --text-3: #7d8a82;
+    --accent: #17754a; --accent-strong: #0d5c38; --done: #1d8a55; --partial: #a97d14;
+    --open: #8b968f; --flag: #b2691f; --pill-bg: rgba(29, 138, 85, 0.10);
+    --pill-border: rgba(29, 138, 85, 0.35); --pill-new-bg: rgba(23, 117, 74, 0.08);
+    --quote-bar: #bcd0c4;
+  }
+
+  body { background: var(--ground); color: var(--text); font-family: var(--sans);
+         font-size: 15px; line-height: 1.55; margin: 0; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 56px 32px 72px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { color: var(--accent-strong); text-decoration: underline; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+  code { font-family: var(--mono); font-size: 0.86em; background: var(--card-inner);
+         border: 1px solid var(--border-soft); border-radius: 4px; padding: 0.08em 0.35em; }
+
+  .eyebrow { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+             color: var(--text-3); font-weight: 600; margin-bottom: 10px; }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 14px; text-wrap: balance; }
+  .statusline { font-family: var(--mono); font-size: 12.5px; color: var(--text-2);
+                line-height: 1.9; margin-bottom: 18px; }
+  .statusline b { color: var(--text); font-weight: 600; }
+  .statusline .new { color: var(--accent-strong); font-weight: 700; }
+  .toplinks { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 14px; font-weight: 500;
+              padding-bottom: 26px; border-bottom: 1px solid var(--border); }
+
+  section { margin-top: 44px; }
+  .seclabel { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+              color: var(--text-3); font-weight: 700; margin-bottom: 16px; }
+  .seclabel span { color: var(--text-3); font-weight: 400; text-transform: none; letter-spacing: 0; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+          padding: 22px 22px 10px; }
+  .card h3 { font-size: 16px; font-weight: 650; margin: 0 0 4px; }
+  .card .sub { font-size: 13px; color: var(--text-2); margin: 0 0 8px; }
+  .item { padding: 12px 0; border-top: 1px solid var(--border-soft); font-size: 13.5px; }
+  .item:first-of-type { border-top: none; }
+  .item .t { font-weight: 600; font-size: 14px; }
+  .item .d { color: var(--text-2); margin-top: 2px; }
+  .dotsep { color: var(--text-3); padding: 0 4px; }
+
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+           padding: 26px 28px; }
+  .panel-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .panel-head h2 { font-size: 19px; font-weight: 700; margin: 0; text-wrap: balance; }
+  .pill { font-size: 12px; font-weight: 600; color: var(--done); background: var(--pill-bg);
+          border: 1px solid var(--pill-border); border-radius: 999px; padding: 3px 12px;
+          white-space: nowrap; }
+  .pill::before { content: "●"; font-size: 8px; vertical-align: 2px; margin-right: 6px; }
+  .pill.amber { color: var(--partial); background: rgba(226, 192, 120, 0.10);
+                border-color: rgba(226, 192, 120, 0.35); }
+  .panel p { margin: 0 0 12px; color: var(--text); max-width: 78ch; }
+  .panel .muted { color: var(--text-2); }
+  blockquote { margin: 0 0 16px; padding: 2px 0 2px 16px; border-left: 3px solid var(--quote-bar);
+               color: var(--text-2); font-size: 14px; max-width: 76ch; }
+
+  .checkline { display: flex; gap: 10px; font-size: 13.5px; padding: 7px 0; align-items: baseline; }
+  .checkline .g { font-family: var(--mono); flex: none; }
+  .g.done { color: var(--done); } .g.part { color: var(--partial); }
+  .g.open { color: var(--open); } .g.flag { color: var(--flag); }
+
+  .wgroups { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+             gap: 14px; margin: 18px 0 6px; }
+  .wg { background: var(--card-inner); border: 1px solid var(--border-soft); border-radius: 8px;
+        padding: 14px 16px; }
+  .wg h4 { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+           color: var(--text-3); margin: 0 0 8px; }
+  .wg .tk { display: flex; gap: 8px; font-size: 13px; padding: 4px 0; align-items: baseline; }
+  .wg .tk .id { font-family: var(--mono); font-size: 12px; color: var(--text-2); flex: none; min-width: 24px; }
+  .order { font-family: var(--mono); font-size: 12.5px; color: var(--text-2); margin-top: 14px;
+           padding-top: 14px; border-top: 1px solid var(--border-soft); }
+
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th { text-align: left; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+       color: var(--text-3); font-weight: 700; padding: 8px 14px 8px 0; border-bottom: 1px solid var(--border); }
+  td { padding: 9px 14px 9px 0; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td .note { color: var(--text-2); }
+
+  footer { margin-top: 52px; padding-top: 20px; border-top: 1px solid var(--border);
+           font-size: 12.5px; color: var(--text-3); line-height: 1.8; }
+  @media (prefers-reduced-motion: no-preference) { a { transition: color 120ms ease; } }
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">TCA-Trelity / GW1-openemr-base-clean · AgentForge Week 1</div>
+  <h1>Clinical Co-Pilot — Build Status</h1>
+  <div class="statusline">
+    Hand-refreshed <b>2026-07-11</b> UTC · main = <b>e1d8f32</b> · early submission <b>100%</b> ·
+    Wave&nbsp;Q complete: 8/8 shipped · P4 awaiting EHR deploy ·
+    <span class="new">Wave&nbsp;M cut: 0/9</span> — multi-turn agent emphasis + thought-partner guardrails
+    (branch <b>8f90641</b>, <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/pull/4">PR&nbsp;#4 draft</a>) ·
+    renders <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/execution-plan.md">docs/execution/execution-plan.md</a> (the source of truth)
+  </div>
+  <div class="toplinks">
+    <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean">Repository</a>
+    <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/pull/3">PR #3 — deploy fix (merged)</a>
+    <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/pull/4">PR #4 — Wave M plan (draft)</a>
+    <a href="https://gw1-openemr-base-clean-production.up.railway.app">Live EHR</a>
+    <a href="https://enchanting-mercy-production-5d32.up.railway.app">Live sidecar + panel</a>
+    <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions">CI runs</a>
+  </div>
+
+  <section>
+    <div class="seclabel">Quick access <span>— every live surface, console, and deliverable in one place</span></div>
+    <div class="grid">
+      <div class="card">
+        <h3>Live apps</h3>
+        <p class="sub">The two deployed services on Railway.</p>
+        <div class="item">
+          <div class="t"><a href="https://enchanting-mercy-production-5d32.up.railway.app">Co-Pilot panel + sidecar</a></div>
+          <div class="d">the graded UI — sign in via the role picker (dev-login): physician · nurse · resident</div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://enchanting-mercy-production-5d32.up.railway.app/health">/health</a><span class="dotsep">·</span><a href="https://enchanting-mercy-production-5d32.up.railway.app/ready">/ready</a></div>
+          <div class="d">liveness vs. real dependency readiness (openemr · anthropic · postgres · langfuse)</div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://gw1-openemr-base-clean-production.up.railway.app">OpenEMR EHR</a></div>
+          <div class="d">login: admin + the password you set after the last DB reset</div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://gw1-openemr-base-clean-production.up.railway.app/apis/default/fhir/metadata">FHIR capability statement</a></div>
+          <div class="d">the R4 API the sidecar syncs from</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Consoles &amp; observability</h3>
+        <p class="sub">Your accounts — the session can't reach these; you can.</p>
+        <div class="item">
+          <div class="t"><a href="https://railway.app/dashboard">Railway dashboard</a></div>
+          <div class="d">services, variables, deploy logs, metrics (CPU/mem for the load windows)</div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://cloud.langfuse.com">Langfuse Cloud</a></div>
+          <div class="d">LLM traces for every prep/chat; token + cost per run</div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://console.anthropic.com">Anthropic console</a></div>
+          <div class="d">API usage + spend behind the $5/day guard</div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions">GitHub Actions</a></div>
+          <div class="d">all runs — <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions/workflows/live-smoke.yml">live smoke</a> · <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions/workflows/sidecar-load.yml">load probe</a> · <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions/workflows/sidecar-ci.yml">sidecar CI</a> · <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions/workflows/evals.yml">evals</a> · <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions/workflows/mirror-to-gitlab.yml">GitLab mirror</a></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Repos &amp; release</h3>
+        <p class="sub">GitHub is the working repo; GitLab is the graded mirror (synced on every push).</p>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean">GitHub — GW1-openemr-base-clean</a></div>
+          <div class="d">source of truth; branch <code>main</code> · Wave M plan on <code>claude/multi-turn-agent-emphasis-kngq9p</code></div>
+        </div>
+        <div class="item">
+          <div class="t">GitLab mirror</div>
+          <div class="d">exact URL lives only in the <code>GITLAB_REPO</code> secret (kept out of the public repo) — it's in your GitLab project list</div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/releases/tag/stable-2026-07-09">stable-2026-07-09</a></div>
+          <div class="d">the tagged, e2e-proven submission snapshot</div>
+        </div>
+        <div class="item">
+          <div class="t">second-opinion</div>
+          <div class="d">prior project — pattern source for the imaging workspace</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Key deliverables (in-repo)</h3>
+        <p class="sub">What a grader reads, in reading order.</p>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/defense/early-submission-readiness.md">Submission readiness</a></div>
+          <div class="d">requirement-by-requirement trace</div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/baselines.md">Load baselines</a><span class="dotsep">·</span><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/eval-results.md">Eval results</a><span class="dotsep">·</span><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/COSTS.md">AI cost analysis</a></div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/RUNBOOK.md">Runbook</a><span class="dotsep">·</span><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/OPERATIONS.md">Operations</a><span class="dotsep">·</span><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/AUDIT.md">Audit</a><span class="dotsep">·</span><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/ARCHITECTURE.md">Architecture</a></div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/defense/demo-script.md">Demo script</a><span class="dotsep">·</span><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/tree/main/sidecar/api-collection">Bruno API collection</a><span class="dotsep">·</span><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/execution-plan.md">Execution plan</a></div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/defense/PRD-clinical-copilot.md">PRD — Wave M addendum</a><span class="dotsep">·</span><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/claude/multi-turn-agent-emphasis-kngq9p/docs/execution/execution-plan.md">Wave M tickets (branch)</a></div>
+          <div class="d">new this refresh — the multi-turn emphasis + guardrails plan</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Wave M — multi-turn agent emphasis + thought-partner guardrails</h2>
+        <span class="pill amber">Cut 2026-07-11 · 0/9 · PR #4 draft</span>
+      </div>
+      <blockquote>Early-submission feedback: "the eval suite is one of the strongest in the batch … however, the rubric explicitly excludes a 'report generator' as the core interface, and the ARCHITECTURE emphasis on a pre-assembled one-page brief … reads closer to that pattern than to the multi-turn tool-invoking agent the rubric asks for; … promoting that conversational surface to a primary role in both the doc and the demo would make that clear."</blockquote>
+      <p class="muted">The chat already <em>is</em> that agent — persisted history, 4-round tool loop, six patient-scoped tools, verbatim-verified citations — but every graded artifact points at the brief: 0 of 11 evals exercise a conversation, Bruno never sends a second message, the panel ships chat closed behind a floating button, and USERS.md traces multi-turn to one use case. Wave M moves the weight, and adds the guardrail the prompt layer lacks: <b>thought partner, never prescriber</b> — cited record facts · engine/guideline output with attribution · questions worth considering. The decision stays with the physician.</p>
+      <div class="wgroups">
+        <div class="wg">
+          <h4>Prove</h4>
+          <div class="tk"><span class="g open">☐</span><span class="id">M1</span><span>conversation evals ×5 — carry-over, tool-chain golden, mid-thread cross-patient denial, round-cap boundary, tool-error recovery</span></div>
+          <div class="tk"><span class="g open">☐</span><span class="id">M5</span><span>Bruno 04-chat becomes a true multi-turn workflow (follow-up reuses <code>conversation_id</code>, tool-chain turn, replay)</span></div>
+        </div>
+        <div class="wg">
+          <h4>Guard</h4>
+          <div class="tk"><span class="g open">☐</span><span class="id">M2</span><span>prompt &amp; tone guide (<code>docs/prompt-guide.md</code>) + chat hard rules: non-prescriptiveness contract</span></div>
+          <div class="tk"><span class="g open">☐</span><span class="id">M3</span><span>deterministic prescriptiveness lint — logged like unverified citations</span></div>
+          <div class="tk"><span class="g open">☐</span><span class="id">M4</span><span>prescriptiveness evals (structural goldens + one live case)</span></div>
+        </div>
+        <div class="wg">
+          <h4>Promote</h4>
+          <div class="tk"><span class="g open">☐</span><span class="id">M6</span><span>chat-primary panel: opens with the patient; "Ask about this" / "Ask about this scan" seed the same conversation</span></div>
+        </div>
+        <div class="wg">
+          <h4>Reframe</h4>
+          <div class="tk"><span class="g open">☐</span><span class="id">M7</span><span>ARCHITECTURE/USERS agent-first — brief = the agent's proactive opening move; multi-turn use cases added</span></div>
+          <div class="tk"><span class="g open">☐</span><span class="id">M8</span><span>demo video #3 script — conversation-led, tool chips + citations on screen, Langfuse trace close</span></div>
+          <div class="tk"><span class="g flag">⚑</span><span class="id">M9</span><span>stretch (approve first): brief-as-turn-zero seeding</span></div>
+        </div>
+      </div>
+      <div class="order">suggested order into Sunday-noon: M1 evals → M5 Bruno → M2–M4 guardrails → M7 docs → M6 panel → M9 (if approved) → M8 demo, recorded Sunday morning</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Deploy pipeline — converged: e2e green, tagged, baselines committed</h2>
+        <span class="pill">Submission-ready</span>
+      </div>
+      <p>Every sidecar deploy since the chat tools landed failed with <code>TS2307 ./tools/index.js</code>. Root cause (<b>S3.7</b>): an unanchored <code>tools/ export-ignore</code> in <code>.gitattributes</code> matched <code>sidecar/src/chat/tools/</code> at any depth, and Railway builds from the GitHub <b>source archive</b>, which honors export-ignore — git checkouts (CI, local) don't. The deploy context was missing eight committed files; no cache busting could restore them. Fixed by anchoring <code>/tools/</code>, adding a <code>sidecar/** -export-ignore</code> carve-out, and a CI <b>export-parity</b> job so a tarball-only breakage can never hide again.</p>
+      <div class="checkline"><span class="g done">✓</span><span><b>Fix verified from a clean archive export</b> — parity exact; sidecar 333 tests + tsc, panel 74 tests + vite, all green</span></div>
+      <div class="checkline"><span class="g done">✓</span><span><b>Tagged</b> <code>stable-2026-07-09</code> — the e2e-proven submission snapshot</span></div>
+      <div class="checkline"><span class="g done">✓</span><span><b>Load baselines committed</b> (S3.1) — 290 req/s, p95 46 ms @ 10 users · 430 req/s, p95 193 ms @ 50 users · 0% errors · inside the 1500 ms SLO gate</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="seclabel">Board <span>— per-wave status, rendered from the execution plan</span></div>
+    <div class="panel tablewrap">
+      <table>
+        <thead><tr><th>Wave</th><th>Focus</th><th>Done</th><th>Open / partial</th></tr></thead>
+        <tbody>
+          <tr><td><b>P0</b></td><td>Platform stabilization</td><td class="num">4/4</td><td class="note">—</td></tr>
+          <tr><td><b>Phase 1</b></td><td>Walking skeleton (A + B)</td><td class="num">10/10</td><td class="note">—</td></tr>
+          <tr><td><b>Phase 2</b></td><td>Surface + hard gates (S2.x)</td><td class="num">11/13</td><td class="note">S2.6 obs dashboard ☐ · S2.9 video #2 superseded by G4 ✓</td></tr>
+          <tr><td><b>R / E / V</b></td><td>UI refinement + EHR layer + imaging module</td><td class="num">12/12</td><td class="note">—</td></tr>
+          <tr><td><b>AZ</b></td><td>Authorization (SMART, roles)</td><td class="num">3/4</td><td class="note">AZ3 live browser launch ◐ (dev-login stands in)</td></tr>
+          <tr><td><b>TC</b></td><td>Tool-calling chat</td><td class="num">3/3</td><td class="note">—</td></tr>
+          <tr><td><b>G</b></td><td>Requirements gap closers</td><td class="num">3/4</td><td class="note">G2 Langfuse live + alerts ☐</td></tr>
+          <tr><td><b>P</b></td><td>Production polish</td><td class="num">2/8</td><td class="note">P4 ◐ code shipped, awaiting reseed · P1–P3, P7, P8 ☐</td></tr>
+          <tr><td><b>Q</b></td><td>UI refinement round 2</td><td class="num">8/8</td><td class="note">—</td></tr>
+          <tr><td><b>Phase 3</b></td><td>Final hardening (S3.x)</td><td class="num">3/7</td><td class="note">S3.2 ◐ · S3.5 ◐ · S3.4 ☐ · S3.6 final video ☐</td></tr>
+          <tr><td><b>M</b></td><td>Multi-turn emphasis + guardrails</td><td class="num">0/9</td><td class="note">cut 2026-07-11 — see above; M9 needs approval</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="seclabel">Needs you <span>— actions only the human can take, in priority order</span></div>
+    <div class="panel">
+      <div class="checkline"><span class="g part">◐</span><span><b>P4</b> — re-register the OAuth client + reseed on Railway (commands in the turn report and the <code>seed-ehr.ts</code> runbook) — unblocks "awaiting EHR deploy"</span></div>
+      <div class="checkline"><span class="g open">☐</span><span><b>G2</b> — Langfuse live on Railway + the 3 alerts configured (spec in <code>docs/execution/observability.md</code>)</span></div>
+      <div class="checkline"><span class="g open">☐</span><span><b>M9 decision</b> — approve or drop the brief-as-turn-zero stretch before build</span></div>
+      <div class="checkline"><span class="g open">☐</span><span><b>P3</b> — create the 3 sample users via the admin-UI checklist (after P1/P2 land)</span></div>
+      <div class="checkline"><span class="g open">☐</span><span><b>S3.6 / M8</b> — record the final demo video (conversation-led script) + social post before Sun 12:00 CT</span></div>
+    </div>
+  </section>
+
+  <footer>
+    Refreshed 2026-07-11 by the working session · source of truth: <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/execution-plan.md">docs/execution/execution-plan.md</a> · this refresh: Wave M cut (<a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/pull/4">PR #4</a>, docs-only, awaiting merge to main).<br>
+    Page rebuilt this refresh from the execution plan + prior layout; earlier versions remain in the artifact version picker.
+  </footer>
+</div>
