@@ -30,7 +30,8 @@ a full trace from logs alone" is satisfied by filtering any store on that ID.
 | Latency | p50 / p95 per surface (overview, chat first-token, prep) | spans + request logs | "p50/p95 latency" |
 | LLM calls | generations/min by `purpose` (prep_extraction, chat_turn) | Langfuse generations | "tool call counts" |
 | Retries | transient-retry + validation-retry count | generation metadata | "retry counts" |
-| **Verification pass/fail** | `citations_failed` = 0 rate; `facts_blocked` distribution | outcome scores | "verification pass/fail rate" |
+| **Verification pass/fail** | `citations_failed` = 0 rate; `facts_blocked` distribution; chat `unverified_count` | outcome scores | "verification pass/fail rate" |
+| **Prescriptiveness lint (M3)** | `prescriptive_flags` count per chat turn (warn log `chat reply flagged by prescriptiveness lint`, rules + excerpts attached); rides the SSE `done` event as `prescriptive_flag_count` | request logs | judgment-guardrail metric (docs/prompt-guide.md) |
 | Token spend | `est_cost_usd` sum, 24h rolling, vs $5 budget | `llm_calls` | "tokens consumed and cost" |
 | Run outcomes | `run_success` rate; failed-run stage histogram | scores + `prep_runs` | agent-specific |
 

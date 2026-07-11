@@ -89,6 +89,7 @@ export function registerChatRoutes(app: FastifyInstance, deps: ChatRouteDeps | u
                 citations: result.citations,
                 unverified_count: result.unverified_count,
                 tools_used: result.tools_used,
+                prescriptive_flag_count: result.prescriptive_flag_count,
             });
         } catch (error) {
             request.log.error({ correlationId: request.id, err: String(error) }, 'chat turn failed');

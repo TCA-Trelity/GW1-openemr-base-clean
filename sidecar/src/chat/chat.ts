@@ -8,6 +8,7 @@ import type { AnthropicClient, AnthropicContentBlock, AnthropicMessage, Anthropi
 import type { PrepLogger } from '../prep/extraction.js';
 import type { PrepSpendGuard } from '../prep/pipeline.js';
 import type { FactBundle } from '../store/index.js';
+import { lintPrescriptiveness } from './prescriptivenessLint.js';
 import { ALL_CHAT_TOOLS, type RegisteredTool } from './tools/index.js';
 
 export interface ChatMessageInput {
@@ -58,6 +59,8 @@ export interface ChatTurnResult {
     unverified_count: number;
     /** Names of the tools the model invoked this turn, in call order (may repeat). */
     tools_used: string[];
+    /** Thought-partner contract (M3): sentences the prescriptiveness lint flagged. */
+    prescriptive_flag_count: number;
 }
 
 export interface ChatTurnHooks {
@@ -348,6 +351,28 @@ export class ChatService {
             // The chat verification metric: unverifiable spans are surfaced, never provenance.
             logger.warn({ correlationId, conversationId, unverified }, 'chat citations failed verbatim verification');
         }
-        return { conversation_id: conversationId, reply, citations, unverified_count: unverified, tools_used: toolsUsed };
+        // Judgment metric (M3), same surfaced-never-silent philosophy as the citation gate:
+        // directive advice without attribution is counted and logged, per docs/prompt-guide.md.
+        const lint = lintPrescriptiveness(reply);
+        if (lint.flags.length > 0) {
+            logger.warn(
+                {
+                    correlationId,
+                    conversationId,
+                    prescriptive_flags: lint.flags.length,
+                    rules: lint.flags.map((flag) => flag.rule),
+                    excerpts: lint.flags.map((flag) => flag.excerpt),
+                },
+                'chat reply flagged by prescriptiveness lint',
+            );
+        }
+        return {
+            conversation_id: conversationId,
+            reply,
+            citations,
+            unverified_count: unverified,
+            tools_used: toolsUsed,
+            prescriptive_flag_count: lint.flags.length,
+        };
     }
 }
