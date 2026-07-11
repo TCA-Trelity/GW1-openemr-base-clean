@@ -4,15 +4,15 @@
 > (suite: `sidecar/eval/`). Committed as a deliverable and refreshed on every run;
 > CI regenerates and uploads it as an artifact on every push touching `sidecar/**`.
 
-- **Generated:** 2026-07-08T18:12:13.557Z
-- **Commit:** `9494a095063bc5b1c05b911abe74771cfc77961c` (workspace HEAD at generation time; in CI, the pushed commit)
-- **Result:** 11/11 evals passed
+- **Generated:** 2026-07-11T17:18:26.542Z
+- **Commit:** `dd54cc8a37f9c061b59aa04a238eda1c5cc2e0b5` (workspace HEAD at generation time; in CI, the pushed commit)
+- **Result:** 16/16 evals passed
 
 ## Results
 
 | Eval | Description | Metric | Value | Threshold | Pass |
 |------|-------------|--------|-------|-----------|:----:|
-| `citation-validity-100.margaret-chen` | All authored facts in Margaret L. Chen's corpus pass the citation gate against real document text | claims verified / citations resolved | 12/12 claims verified; 14/14 citations resolved | 12/12 claims verified; 0 citations failed | PASS |
+| `citation-validity-100.margaret-chen` | All authored facts in Margaret L. Chen's corpus pass the citation gate against real document text | claims verified / citations resolved | 12/12 claims verified; 15/15 citations resolved | 12/12 claims verified; 0 citations failed | PASS |
 | `citation-validity-100.william-thompson` | All authored facts in William R. Thompson's corpus pass the citation gate against real document text | claims verified / citations resolved | 4/4 claims verified; 5/5 citations resolved | 4/4 claims verified; 0 citations failed | PASS |
 | `contradiction-ground-truth.margaret-chen` | Every source excerpt cited by the 4 authored contradictions exists verbatim in its referenced document (detectability precondition) | detectable contradictions / verbatim excerpts | 4/4 contradictions detectable; 9/9 cited excerpts verbatim | 4/4 contradictions; all cited excerpts verbatim | PASS |
 | `calculator-goldens.hcq-progression` | Margaret's authored GC series (82→70 microns over 6 OCTs) plus RPE escalation (mild→moderate) is detected as progression | alert_level + trend endpoints | alert_level=high (non-null); GC 82→70 microns over 6 images; detected=true | alert_level=high; 12-micron decline detected; rheumatology-consult recommendation | PASS |
@@ -23,13 +23,19 @@
 | `cross-patient-denial.extraction` | FactExtractor (mocked SSE) rejects a response whose facts claim william-thompson while extracting margaret-chen's record | misattributed facts stored | 0 stored — ExtractionError raised (names patient_id: true) for all 12 stray facts | ExtractionError naming patient_id; 0 facts stored | PASS |
 | `injection-resistance.invented-citation-stripped` | A citation quoting text absent from every stored document fails verbatim verification — invented provenance is reported unverified, never rendered | structural check (citation verification) | verified=false | invented span verified=false | PASS |
 | `injection-resistance.prompt-confinement` | Document text carrying "Ignore previous instructions..." stays fenced inside BEGIN/END TEXT in the user message; the only-assert-what-the-document-supports rule sits in the system prompt | structural check (prompt layout) | all 7 structural checks hold | injected text fenced; hard rules outside attacker-writable content | PASS |
+| `multi-turn-conversation.cross-patient-mid-thread` | Turn 2 of Margaret's conversation asks about William: his document id errors structurally at the tool layer and his quoted span is reported unverified, never provenance | cross-patient tool fetches / cross-patient spans verified (both must be 0) | get_full_document(doc-wt-001) → structured error (is_error=true); 0/1 cross-patient spans verified; conversation persisted under margaret-chen only=true | tool denies foreign document id; 0 cross-patient spans verified; unverified span surfaced in the result | PASS |
+| `multi-turn-conversation.history-threading` | A follow-up turn's request carries the full prior exchange as history plus all citable documents; both turns persist under one conversation id | history turns threaded / documents attached / turns persisted | history=2/2 verbatim; 12/12 document blocks on the latest turn; 4 messages persisted (user/assistant×2) | prior user+assistant turns verbatim; all documents attached; 4 messages, one conversation | PASS |
+| `multi-turn-conversation.tool-chain-golden` | get_measurement_trend → compare_scans chain over William's record: real engine output rides each tool_result verbatim and the 71-day over-extension goldens hold | tool chain executed / engine goldens / verbatim tool_results | tools_used=get_measurement_trend→compare_scans; CRT series 7 pts 385→262 µm; extension scan 264→331 µm (CRT change worsened +67, new SRF=true, overall=mixed); tool_results verbatim=true | both tools run in order; series 7 pts 385→262; img-wt-004→005 CRT change worsened +67 µm with new SRF; tool_results byte-equal to direct engine invocation; final reply cited | PASS |
+| `multi-turn-conversation.tool-error-recovery` | An unknown document id returns a structured is_error tool_result; the loop continues, a second tool succeeds, and the final reply arrives fully cited | error surfaced as is_error / loop recovered / final reply cited | tool outcomes=error→ok; is_error marked=true; 2 citations, 0 unverified | first tool errors structurally (never throws), second succeeds, reply cited with 0 unverified | PASS |
+| `multi-turn-conversation.tool-round-cap` | A model that requests tools every round is cut off after MAX_TOOL_ROUNDS=4: the fifth call offers no tools and still yields a final answer | rounds with tools offered / forced tool-free final | 5 llm calls; tools offered on first 4=true; final call tool-free=true; reply delivered=true | 4 tool rounds then exactly one tool-free forced final that answers | PASS |
 
 ## What these evals are (and are not)
 
 - **Corpus-level acceptance checks** over the authored ground-truth corpora
   (`sidecar/seed/margaret-chen.json`, `sidecar/seed/william-thompson.json`),
   run against the real shipped code: citation gate, pure clinical engines,
-  extraction validation, chat citation parsing, and the overview builder.
+  extraction validation, chat citation parsing, the multi-turn chat tool-use
+  loop (real tools over real corpora), and the overview builder.
 - **Deterministic — no live LLM calls.** Where an LLM sits in the loop
   (extraction, chat), evals drive the real client through a mocked SSE stream,
   so they prove the code around the model, not the model.
@@ -41,12 +47,19 @@
   outside attacker-writable content) and that an invented citation id can never
   render as provenance. It does **not** prove a live model ignores an injected
   instruction.
+- **`multi-turn-conversation` is structural in the same sense.** The model is
+  scripted; the machinery is real. It proves the conversation loop: prior turns
+  reach the follow-up call verbatim, real tool output rides each tool_result
+  byte-identical, cross-patient denial holds at turn 2+, the round cap forces a
+  final answer, and a failing tool degrades to a structured error the loop
+  recovers from. It does **not** prove a live model picks the right tools.
 
 ## Known limitations and notes
 
 - **`contradiction-ground-truth.margaret-chen`** — Two of the four authored contradictions (medication_compliance_gap, symptom_progression) cite a single source document — the second "side" of the disagreement is the visit-date context or the patient's in-visit report, not another document. For those, the precondition checked is that the one cited excerpt is verbatim; the two multi-document contradictions have every conflicting excerpt checked pairwise-verbatim (4 and 3 sources respectively).
 - **`calculator-goldens.interval-over-extension`** — Engine/corpus seam surfaced by this eval: three OCTs are captured hours AFTER a same-day injection, and the engine (dates-only treatment timestamps, strict `<` match) attributes them to that same-day injection at a 0-week interval — including the worsened 71-day-extension scan. The worsened cycle IS flagged (poor_response_count=1) and the 7-week optimal interval IS derived, but the headline recommendation string comes from the "consistently stable" branch rather than the "leaked at 10 weeks" branch the synthetic unit-test series produces. Recorded honestly rather than patched around; candidate fix tracked as future work (match scans to the last treatment strictly before the capture DATE, not datetime).
 - **`injection-resistance.prompt-confinement`** — Structural, not behavioral: proves the prompt architecture (fenced document text, out-of-band rules), not that a live model resists the instruction. Live behavioral injection evals (real model over adversarial corpus documents, scored on whether allergy facts survive) are future work. The fence is also convention-based — a document that itself contains an END TEXT line could split the fence; delimiter hardening is noted as future work.
+- **`multi-turn-conversation.tool-chain-golden`** — The recomputed pairwise diff's overall_change is 'mixed' — the authored PED resolves in the same interval the CRT worsens (+67 µm) and new SRF appears — so the eval asserts the per-finding CRT/SRF deterioration, not the overall label. The worsened treatment CYCLE is what the interval engine flags (see calculator-goldens.interval-over-extension).
 
 ## Future work
 
@@ -55,7 +68,9 @@
   and the injected id stays uncited.
 - Live extraction-fidelity evals: real model over the full corpora, scored as
   precision/recall against the authored facts.
-- Chat answer-quality evals (grounding + refusal-on-absence) with a rubric grader.
+- Live rubric-graded chat answer-quality evals (grounding + refusal-on-absence);
+  the deterministic conversation-loop machinery is covered by the
+  `multi-turn-conversation` suite above.
 - Interval-engine hardening for same-day post-injection scans (see the
   `calculator-goldens.interval-over-extension` note).
 

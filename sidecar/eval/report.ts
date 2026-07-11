@@ -10,7 +10,7 @@ import { RESULTS_PATH, type EvalRecord } from './collector.js';
 const OUTPUT_PATH = fileURLToPath(new URL('../../docs/execution/eval-results.md', import.meta.url));
 const REPO_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 
-// Fixed publication order for the six eval suites (ticket S2.5).
+// Fixed publication order for the eval suites (S2.5; multi-turn conversation added by M1).
 const SUITE_ORDER = [
     'citation-validity-100',
     'contradiction-ground-truth',
@@ -18,6 +18,7 @@ const SUITE_ORDER = [
     'empty-record-boundary',
     'cross-patient-denial',
     'injection-resistance',
+    'multi-turn-conversation',
 ];
 
 export interface ReportSummary {
@@ -104,7 +105,8 @@ export function generateReport(options: { suiteFailed?: boolean } = {}): ReportS
         '- **Corpus-level acceptance checks** over the authored ground-truth corpora',
         '  (`sidecar/seed/margaret-chen.json`, `sidecar/seed/william-thompson.json`),',
         '  run against the real shipped code: citation gate, pure clinical engines,',
-        '  extraction validation, chat citation parsing, and the overview builder.',
+        '  extraction validation, chat citation parsing, the multi-turn chat tool-use',
+        '  loop (real tools over real corpora), and the overview builder.',
         '- **Deterministic — no live LLM calls.** Where an LLM sits in the loop',
         '  (extraction, chat), evals drive the real client through a mocked SSE stream,',
         '  so they prove the code around the model, not the model.',
@@ -116,6 +118,12 @@ export function generateReport(options: { suiteFailed?: boolean } = {}): ReportS
         '  outside attacker-writable content) and that an invented citation id can never',
         '  render as provenance. It does **not** prove a live model ignores an injected',
         '  instruction.',
+        '- **`multi-turn-conversation` is structural in the same sense.** The model is',
+        '  scripted; the machinery is real. It proves the conversation loop: prior turns',
+        '  reach the follow-up call verbatim, real tool output rides each tool_result',
+        '  byte-identical, cross-patient denial holds at turn 2+, the round cap forces a',
+        '  final answer, and a failing tool degrades to a structured error the loop',
+        '  recovers from. It does **not** prove a live model picks the right tools.',
         '',
         '## Known limitations and notes',
         '',
@@ -133,7 +141,9 @@ export function generateReport(options: { suiteFailed?: boolean } = {}): ReportS
         '  and the injected id stays uncited.',
         '- Live extraction-fidelity evals: real model over the full corpora, scored as',
         '  precision/recall against the authored facts.',
-        '- Chat answer-quality evals (grounding + refusal-on-absence) with a rubric grader.',
+        '- Live rubric-graded chat answer-quality evals (grounding + refusal-on-absence);',
+        '  the deterministic conversation-loop machinery is covered by the',
+        '  `multi-turn-conversation` suite above.',
         '- Interval-engine hardening for same-day post-injection scans (see the',
         '  `calculator-goldens.interval-over-extension` note).',
         '',
