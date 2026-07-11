@@ -1,0 +1,73 @@
+meta {
+  name: POST /api/chat/:patientId — turn 3: provoke the tool-use loop
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/chat/margaret-chen
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "message": "Pull the GC-IPL trend across all of her OCTs and compare the most recent scan with the one before it. Is it getting worse?",
+    "conversation_id": "{{conversationId}}"
+  }
+}
+
+tests {
+  test("stream opens with 200 and SSE content type", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(String(res.getHeader('content-type'))).to.contain('text/event-stream');
+  });
+
+  test("the model invoked tools and the done event lists them", function() {
+    const raw = typeof res.getBody() === 'string' ? res.getBody() : JSON.stringify(res.getBody());
+    expect(raw, 'tool_use events should stream live').to.contain('"type":"tool_use"');
+    const doneLine = raw.split('\n').filter(function(line) { return line.indexOf('"type":"done"') !== -1; }).pop();
+    expect(doneLine, 'terminal done event').to.be.a('string');
+    const done = JSON.parse(doneLine.replace(/^data:\s*/, ''));
+    expect(done.tools_used).to.be.an('array');
+    expect(done.tools_used.length, 'tools_used must not be empty for this ask').to.be.greaterThan(0);
+  });
+}
+
+docs {
+  # Turn 3: tool invocation, visible in the stream
+
+  **What it proves:** the agent *invokes tools to retrieve and reason
+  over patient data* (the rubric's words). Measurement trends live in the
+  stored image analyses — NOT in the source documents attached to the
+  prompt — so answering this ask honestly forces the model through its
+  read-only, patient-scoped toolset (`get_measurement_trend`, usually
+  followed by `compare_scans`).
+
+  **What to look for in the stream:**
+
+  ```
+  data: {"type":"tool_use","name":"get_measurement_trend","input":{"metric":"GC-IPL"}}
+
+  data: {"type":"tool_result","name":"get_measurement_trend","ok":true}
+
+  data: {"type":"tool_use","name":"compare_scans","input":{...}}
+
+  data: {"type":"tool_result","name":"compare_scans","ok":true}
+
+  data: {"type":"delta","text":"GC-IPL has thinned from 82 to 70 µm ..."}
+
+  data: {"type":"done","conversation_id":"...","tools_used":["get_measurement_trend","compare_scans"],...}
+  ```
+
+  Every tool is Zod-contracted in and out, executes over THIS patient's
+  bundle only (a foreign patient's ids structurally error), and a failing
+  tool returns a structured `{error}` the model recovers from — the loop
+  is capped at 4 rounds before a final, tool-free answer is forced.
+
+  **Determinism note:** which tools the live model picks is model
+  behavior, not machinery — the deterministic guarantees (threading,
+  verbatim tool_result plumbing, denial, round cap, error recovery) are
+  locked by the `multi-turn-conversation` eval suite; this request shows
+  the same loop working end-to-end against the deployed stack.
+}

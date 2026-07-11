@@ -1,0 +1,66 @@
+meta {
+  name: GET /api/chat/:patientId — replay the whole conversation
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/chat/margaret-chen?conversation_id={{conversationId}}
+  body: none
+  auth: none
+}
+
+params:query {
+  conversation_id: {{conversationId}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.messages: isDefined
+}
+
+tests {
+  test("replays the conversation captured from the chat POST", function() {
+    const body = res.getBody();
+    expect(body.conversation_id).to.be.a('string');
+    expect(body.messages).to.be.an('array');
+  });
+}
+
+docs {
+  # Replay: the persisted multi-turn thread, end to end
+
+  **What it proves:** conversations are persisted server-side — the
+  panel rehydrates its thread from this endpoint across reloads, and the
+  whole multi-turn workflow you just ran is inspectable as one thread.
+
+  **Where the id comes from:** `{{conversationId}}` is set by request
+  01's post-response script, and requests 02/03 continued the same
+  conversation. Run the folder in seq order (a full `bru run` does this
+  automatically). Run standalone, the environment's placeholder id is
+  used and you get a valid `200` with an empty `messages` array —
+  unknown conversation ids are not an error.
+
+  **Response shape** — `200` (up to 100 messages, oldest first):
+
+  ```json
+  {
+    "conversation_id": "...",
+    "messages": [
+      { "role": "user",      "content": "What medication risks does this patient have?", ... },
+      { "role": "assistant", "content": "...", ... },
+      { "role": "user",      "content": "Is that above the AAO high-risk threshold, ...", ... },
+      { "role": "assistant", "content": "...", ... },
+      { "role": "user",      "content": "Pull the GC-IPL trend across all of her OCTs ...", ... },
+      { "role": "assistant", "content": "...", ... }
+    ]
+  }
+  ```
+
+  After the three chat turns above, expect **six messages** — the full
+  alternating user/assistant thread, in order, each row carrying its own
+  correlation id for log tracing.
+
+  **Failure mode:** `400 {"error":"conversation_id_required"}` when the
+  query param is missing or empty.
+}

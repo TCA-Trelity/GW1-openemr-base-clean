@@ -1,5 +1,5 @@
 meta {
-  name: POST /api/chat/:patientId — streaming chat turn (SSE)
+  name: POST /api/chat/:patientId — turn 1: open the conversation (SSE)
   type: http
   seq: 1
 }
@@ -17,8 +17,9 @@ body:json {
 }
 
 script:post-response {
-  // The done event carries the conversation_id; capture it so the replay
-  // request (next in this folder) can reference the same conversation.
+  // The done event carries the conversation_id; capture it so every later
+  // request in this folder (follow-up, tool-chain turn, replay) continues
+  // the SAME conversation.
   const raw = typeof res.getBody() === 'string' ? res.getBody() : JSON.stringify(res.getBody());
   const match = raw.match(/"conversation_id"\s*:\s*"([^"]+)"/);
   if (match) {
@@ -32,21 +33,30 @@ tests {
     expect(String(res.getHeader('content-type'))).to.contain('text/event-stream');
   });
 
-  test("stream ends with a done event carrying cited_fact_ids", function() {
+  test("stream ends with a done event carrying verified citations and tools_used", function() {
     const raw = typeof res.getBody() === 'string' ? res.getBody() : JSON.stringify(res.getBody());
     expect(raw).to.contain('"type":"done"');
-    expect(raw).to.contain('"cited_fact_ids"');
+    expect(raw).to.contain('"citations"');
+    expect(raw).to.contain('"unverified_count"');
+    expect(raw).to.contain('"tools_used"');
   });
 }
 
 docs {
-  # Streaming chat turn (spends guarded LLM budget)
+  # Turn 1 of the multi-turn workflow (spends guarded LLM budget)
 
-  **What it proves:** grounded, citation-gated chat over the patient's
-  stored facts, streamed as **Server-Sent Events**. Bruno is not an SSE
+  **What it proves:** grounded, citation-verified chat over the patient's
+  stored record, streamed as **Server-Sent Events**. Bruno is not an SSE
   client — it shows the **raw stream** as the response body once the
   turn completes, which is exactly what you want for grading: every
   event is visible verbatim.
+
+  This folder is a runnable **multi-turn agent workflow**: this request
+  opens the conversation; `02` sends a follow-up that only makes sense
+  with turn-1 context ("Is *that* above the threshold…"); `03` provokes
+  the tool-use loop (watch `tool_use` events stream); `04` replays the
+  whole persisted thread. Run the folder in seq order (a full `bru run`
+  does this automatically).
 
   **The raw stream looks like:**
 
@@ -55,16 +65,20 @@ docs {
 
   data: {"type":"delta","text":" hydroxychloroquine ..."}
 
-  data: {"type":"done","conversation_id":"...","cited_fact_ids":["fact-mc-med-001", ...],"invalid_citation_ids":[]}
+  data: {"type":"citation","citation":{"document_id":"doc-mc-001","cited_text":"...","verified":true,...}}
+
+  data: {"type":"done","conversation_id":"...","citations":[...],"unverified_count":0,"tools_used":[]}
   ```
 
   - `delta` events carry incremental answer text (what the panel renders
     token-by-token).
-  - The single terminal `done` event carries the `conversation_id` and
-    the **validated** citations: `cited_fact_ids` are ids that resolve
-    against real stored facts (check them via `/api/facts/margaret-chen`);
-    any model-invented ids are quarantined into `invalid_citation_ids`
-    rather than presented as citations.
+  - `citation` events stream as each claim's supporting span arrives —
+    already **re-verified verbatim server-side** against the stored
+    document (native Citations API + our citation gate).
+  - The terminal `done` event carries the `conversation_id`, the full
+    citation list, `unverified_count` (spans that failed verbatim
+    re-verification are *reported*, never rendered as provenance), and
+    `tools_used` (empty when the attached record sufficed).
   - On a mid-stream failure you get `data: {"type":"error","error":"chat_failed"}`
     instead — internals are never leaked into the stream.
 
@@ -78,6 +92,6 @@ docs {
   conversation, or pass a previous `done` event's id to continue one.
 
   **Post-response script:** captures `conversation_id` from the `done`
-  event into the `conversationId` variable, so the replay request that
-  follows targets this very conversation.
+  event into the `conversationId` variable, so every following request in
+  this folder targets this very conversation.
 }

@@ -24,7 +24,7 @@ docs {
   grounded in. Every fact carries provenance (`source_document_id`,
   `sources`), and `documents` contains the **full source documents** —
   this is what the panel's Sources tab and citation deep-links render
-  from, and what chat/brief citations (`cited_fact_ids`) resolve against.
+  from, and what chat citations (verbatim `cited_text` spans) verify against.
 
   **Response shape** — `200`, the raw `FactBundle`:
 
@@ -52,10 +52,12 @@ docs {
   }
   ```
 
-  **Why it matters for grading:** take any `cited_fact_ids` value from a
-  chat `done` event or a brief and find it under `facts[].id` here — the
-  citation chain from LLM output back to a verifiable EHR source document
-  closes on this endpoint.
+  **Why it matters for grading:** take any citation from a chat `done`
+  event (its `document_id` + `cited_text`) and find that exact span inside
+  the matching `documents[]` entry here — the citation chain from LLM
+  output back to a verifiable stored source document closes on this
+  endpoint. Brief items likewise carry fact/citation refs that resolve
+  under `facts[].id`.
 
   **Failure modes:** `404 {"error":"patient_not_found"}`;
   `503 {"error":"store_not_configured"}`.

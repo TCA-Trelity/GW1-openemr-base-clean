@@ -4,8 +4,12 @@ meta {
 }
 
 docs {
-  Streaming chat over the stored fact bundle. The POST spends real
-  (budget-guarded) LLM money and answers as a Server-Sent-Events stream;
-  the GET replays a stored conversation for free. Run the POST first — its
-  post-response script captures the `conversation_id` for the replay.
+  A runnable MULTI-TURN agent workflow over one persisted conversation:
+  01 opens it, 02 follows up with a pronoun that only resolves against
+  turn 1 ("Is *that* above the threshold…"), 03 provokes the tool-use
+  loop (tool_use / tool_result events stream live; done lists
+  tools_used), 04 replays the whole six-message thread for free. The
+  three POSTs spend real (budget-guarded) LLM money and answer as
+  Server-Sent-Events streams. Run in seq order — request 01 captures the
+  conversation_id the rest of the folder reuses.
 }
