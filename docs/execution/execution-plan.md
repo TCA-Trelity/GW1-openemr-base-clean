@@ -249,6 +249,25 @@ Wave M = prove (M1, M5) + guard (M2–M4) + promote (M6) + reframe (M7, M8).*
 | M8 | Demo video #3 script (feeds S3.6): conversation-led — brief framed as what the agent already prepared → 3–4-turn thread with visible tool chips + citations → imaging drill-down → mid-conversation cross-patient refusal → Langfuse trace of the thread under one correlation ID. *(Script done: single William-Thompson narrative — scan-ask seed → prior-cycles follow-up → shorten-the-interval guardrail reframe → Margaret cross-patient denial → citation deep-link → 18/18 evals + Bruno + Langfuse close; timed beats + pre-record checklist. Recording = user, S3.6.)* | main + user | M1–M7 | review | ☑ |
 | M9 | *(stretch — user-approved with defaults 2026-07-11)* Brief-as-turn-zero: new conversations seeded with a compact brief summary as the opening assistant message — the transcript literally opens with the brief (replayable via `GET /api/chat`, Bruno-runnable). *(Done: `src/chat/openingMove.ts` composes a ≤3-point digest from the latest COMPLETED brief; persisted before the first turn so the model reads it as history — behind a synthetic user-first introducer the Messages API requires — and echoed as an SSE `seed` event the panel renders as a labelled "Opening move" bubble; skipped silently with no brief; never re-seeds a continued conversation; not model output so the lint doesn't apply. +7 tests, Chromium-verified screenshot.)* | main | M6 | unit + screenshot | ☑ |
 
+## Wave IC — Imaging↔chat cohesion (user-approved 2026-07-11, evening)
+
+*Live find during demo prep (screenshot): asked "what trends are you seeing in
+Margaret's scan?", the model answered from document prose, claimed the priors
+don't exist (they are one `get_measurement_trend` call away), and asked
+permission to search — a capability-wrong reply. User approved the full
+cohesion stack (options 0–4): fix the tool-use miss, give the common ask a
+one-call tool, close the chat↔viewer loop both directions, and ship bounded
+pixel-level observation. Order: IC0 → IC1 → IC3 → IC2 → IC4; single PR;
+`stable-2026-07-12` checkpoint tag cut after merge.*
+
+| ID | Ticket | Agent | Depends | Verify | Done |
+|---|---|---|---|---|---|
+| IC0 | Tool-use miss fix: chat rule 4 rewritten — longitudinal/imaging data lives ONLY in the stored analyses reachable via tools, imaging tools must be consulted before any claim of absence, and read-only tools are used without asking permission; imaging tool descriptions sharpened to say so; structural prompt pins; opt-in live behavioral eval (trend ask → imaging tool invoked) | main | M2 | unit + live-eval | ☐ |
+| IC1 | `get_imaging_overview` tool: projects the SAME derived imaging block `buildOverview` feeds the analytics rail (HCQ progression, interval analysis, latest deltas) — the common "what trends?" ask becomes one call quoting the rail's own object; unit goldens + a deterministic cohesion eval (tool output ≡ overview imaging block, both corpora); tool-count asserts updated | main | IC0 | unit + eval | ☐ |
+| IC3 | Viewed-scan context: optional `viewing_image_id` on POST /api/chat, validated against THIS patient's bundle (foreign/unknown ids ignored + logged), appended as a model-only context line on the latest turn (never persisted, replay stays clean) so "this scan"/"what changed here?" resolve; panel sends it while the imaging workspace has a selection | main | M6 | unit | ☐ |
+| IC2 | Chat↔viewer loop: imaging tool_result SSE events carry a compact projected summary (trend series w/ image ids; compare ids + CRT delta + overall); bubbles render an inline trend sparkline and compare thumbnails (via the overview's image records); clicking a point/thumbnail/chip deep-links into the Imaging workspace on that exact scan (App focus wiring, Imaging `focusImageId`); Chromium-verified | main | IC1 | unit + screenshot | ☐ |
+| IC4 | `describe_scan` (bounded vision): media-tool plumbing — the tool validates the id synchronously, ChatService attaches the actual B-scan (injected ImageStore loader) as an image block on the tool_result so the SAME chat model views the pixels; hard quarantine — observations introduced as "AI visual observation (not from the record)", never cited, morphology-only (no diagnosis; lint applies), authored-analysis conflicts surfaced; panel banner on any reply whose tools_used includes describe_scan; structural eval (image block attached + label enforced); docs roster/UC-6/PRD-tradeoff updated (T3 slot shipped early as bounded observation) | main | IC2 | unit + eval + screenshot | ☐ |
+
 ## Standing rules
 
 - **Sequencing invariant:** platform (P0) before code; skeleton deployed before surface; the embed timebox decision falls at Phase-2 midpoint.
