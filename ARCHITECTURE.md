@@ -22,18 +22,24 @@ configurability). So we change **what the doctor sees, never how the EHR
 stores data** — an additive layer above the record that cites into it and is
 removable without a trace.
 
-The central idea: **move the thinking to where time is free.** After check-in,
-patients wait 5–20 minutes before the doctor enters. In that gap a deep-reader
-model (Claude Sonnet 5) reads the full record, extracts typed facts — each
-with a source pointer, confidence, verification status, and laterality —
-reconciles contradictions, runs medication-risk arithmetic, pre-selects the
-visit's scans, and assembles a one-page brief. At the door everything is
-retrieval: the brief opens in under a second, scans are one sub-second toggle
-away, and a fast model (Claude Haiku 4.5) answers follow-ups over the prepared
-facts. This dissolves speed-vs-completeness — completeness at preparation
-time, speed at read time — and it is the *only* shape OpenEMR's performance
-model allows, because the platform has no async queue (`AUDIT.md` P-section):
-heavy work must live outside the EHR.
+The product is a **multi-turn, tool-invoking clinical agent**, and its central
+idea is to **move the agent's thinking to where time is free.** After
+check-in, patients wait 5–20 minutes before the doctor enters. In that gap the
+agent works proactively: a deep-reader model (Claude Sonnet 5) reads the full
+record, extracts typed facts — each with a source pointer, confidence,
+verification status, and laterality — reconciles contradictions, runs
+medication-risk arithmetic, and pre-selects the visit's scans. What it
+prepared greets the doctor as the agent's **opening move**: a one-page brief
+in under a second, scans one sub-second toggle away. From there the physician
+*talks to the agent* (Claude Haiku 4.5, streaming): the conversation persists
+and carries context turn to turn, and six read-only, patient-scoped tools let
+it fetch and reason over what no summary carries — full documents, OCT
+measurement trends, pairwise scan comparisons, medication-risk arithmetic,
+record search, open questions — with tool activity streamed visibly into the
+panel. This dissolves speed-vs-completeness — completeness at preparation
+time, speed at read-and-reply time — and it is the *only* shape OpenEMR's
+performance model allows, because the platform has no async queue (`AUDIT.md`
+P-section): heavy work must live outside the EHR.
 
 **Where it lives.** A sidecar service (Node.js + Fastify + Zod) beside an
 untouched OpenEMR, talking to it only through the FHIR R4 API and
@@ -58,7 +64,10 @@ model's context, so the hardest retrieval problem never arises).
 **Trust and authorization are constructed, not assumed.** A deterministic
 citation gate — plain code, not a model — sits between generation and display;
 an unsourced claim is blocked by construction. Domain rules are arithmetic the
-physician can hand-check. Our audit found OpenEMR's per-patient access check
+physician can hand-check. And the agent is a **thought partner, never a
+prescriber**: it never originates treatment, dosing, or diagnosis direction —
+a prompt-level contract backed by a deterministic prescriptiveness lint on
+every reply and published evals (`docs/prompt-guide.md`). Our audit found OpenEMR's per-patient access check
 unimplemented (returns "allow" unconditionally), so the interactive surface
 holds a SMART token bound to one patient and one user, while the preparer
 holds a separate read-only, fully audit-logged credential. The governing
@@ -179,27 +188,49 @@ what Dan requires of a partner he stays responsible for.
 
 ## 5. The agent's surface (traced to users)
 
-A **brief-first conversational agent** — the precomputed brief is the opening
-turn; chat handles what it provokes. Surface area is set by user need, not
-technical interest:
+**One conversational agent with two moments.** *Proactive:* the preparation
+run in the waiting gap — its output, the brief, is the agent's opening move.
+*Interactive:* the multi-turn, tool-invoking conversation that continues from
+it. The core interface is the conversation; the brief is what the agent has
+already done by the time the physician starts talking. Surface area is set by
+user need, not technical interest:
 
-- **The brief** → UC-1 (the anti-template).
-- **Multi-turn chat** → UC-2 (iterative verification is a *thread*; each
-  answer sets the next question — a search box drops that context).
-- **A small, closed toolset:** fetch the patient's fact bundle · drill into a
-  fact's source · run the deterministic calculators · list gaps/contradictions
-  · mark a fact verified. It cannot write to the record, order anything, or
-  reach outside the launch patient. Every tool input/output is Zod-validated —
-  the contract is the source of truth, and a malformed payload is rejected
-  before it propagates.
+- **Multi-turn conversation** → UC-2 (iterative verification), UC-8 (imaging
+  drill-down thread), UC-9 (recommendation-shaped asks). Conversations persist
+  server-side and replay across reloads; history rides turn to turn while the
+  full document set re-attaches to only the newest turn, so context carries
+  without compounding. Verification is a *thread* — each answer sets the next
+  question; a search box drops that context every query.
+- **Six read-only tools, patient-scoped by construction** (each executes over
+  the launch patient's bundle only): `get_full_document` ·
+  `get_measurement_trend` · `compare_scans` (the deterministic comparison
+  engine) · `check_med_risk` (the AAO arithmetic) · `search_record` ·
+  `get_open_questions`. → UC-8 (trend → comparison chaining), UC-9 (attributed
+  engine relays), UC-2 (source drill-down). Every tool input/output is
+  Zod-validated — the contract is the source of truth, and a malformed payload
+  is rejected before it propagates. A failing tool returns a structured error
+  the model recovers from; the loop caps at four rounds before a final,
+  tool-free answer is forced; tool activity streams into the panel as it
+  happens — tool use is visible, not claimed. The toolset cannot write to the
+  record, order anything, or reach outside the launch patient (fact
+  verification is a separate, role-gated REST action beside the chat).
+- **The brief** → UC-1 (the anti-template): precomputed so the agent's opening
+  move opens in under a second.
+- **Thought partner, never prescriber** → UC-9 and the non-goals. The agent
+  never originates treatment/dosing/diagnosis direction; a recommendation-
+  shaped ask gets the reframe — record facts cited, engine/guideline output
+  attributed in the same sentence, questions worth weighing. Enforced at three
+  layers: prompt hard rule, a deterministic prescriptiveness lint on every
+  reply (surfaced and counted like citation failures), and published evals
+  (`docs/prompt-guide.md`).
 - **Contradiction surfacing** → UC-3; **medication-risk computation** → UC-4;
   **interval guidance** → UC-5; **imaging toggle** → UC-6; **patient goals** →
   UC-7.
 - **One agent, no orchestration framework, no multi-agent.** The control flow
-  is a linear preparation pipeline plus a tool-using chat loop — simple enough
-  to own outright. Frameworks add abstractions to debug without adding
-  capability; extra agents add latency to the one surface where latency is the
-  constraint.
+  is one tool-using conversation loop plus its proactive preparation pipeline —
+  simple enough to own outright. Frameworks add abstractions to debug without
+  adding capability; extra agents add latency to the one surface where latency
+  is the constraint.
 
 ## 6. Models & latency
 
@@ -234,7 +265,13 @@ the same corpus seeds the demo and the test suite — **every demo is a test
 run**. Every test exercises a boundary (missing data, empty record, malformed
 input), an invariant (100% citation validity — guaranteed by construction,
 tested anyway), or a regression risk (cross-patient access attempts,
-prompt-injection via document content). The suite runs on every change.
+prompt-injection via document content). The **conversation loop itself is
+eval-covered**: history threading into follow-up turns, tool_result payloads
+byte-equal to direct engine invocation, cross-patient denial holding at turn
+2+, the round cap forcing a final answer, tool-error recovery — plus the
+thought-partner suite, where the prescriptiveness lint must catch every
+originated-direction shape and pass the sanctioned reframe. Committed results:
+`docs/execution/eval-results.md`. The suite runs on every change.
 
 ## 9. Failure modes
 

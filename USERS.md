@@ -172,13 +172,61 @@ prose, not in structured billing fields; extracting it and elevating it
 requires reading unstructured text and judging human relevance — exactly what
 a fixed EHR schema omits.
 
+### UC-8 — The imaging drill-down thread (multi-turn, tool-chaining)
+**Moment.** The brief or the imaging workspace shows something that demands
+interrogation, not a glance — an injection patient's October scan is worse.
+Dan asks: "Did extending his interval hurt him?"
+**Agent behavior.** A conversation that *works* for its answer. The attached
+summary doesn't carry measurement series or pairwise scan diffs, so the agent
+invokes its read-only tools mid-thread — `get_measurement_trend` (CRT across
+all seven OCTs), then `compare_scans` (the two scans bracketing the 71-day
+gap) — each result Zod-validated, each claim cited, tool activity streaming
+visibly in the chat. Follow-ups ("what were the prior cycles holding at?",
+"and the fluid?") continue the same persisted conversation; "his" and "those
+two scans" resolve because the thread carries its own context.
+**What he does with it.** Reads a longitudinal answer in seconds — trend,
+delta, interval correlation — and sets the plan with evidence.
+**Why an agent (and why multi-turn + tool chaining specifically).** The
+questions are not enumerable in advance, and the data lives in stored analyses
+rather than in any document or fixed view — only a tool-invoking agent can
+fetch and reason over it mid-conversation, and only a conversation carries the
+referents from one turn to the next. This is the use case that *requires* tool
+chaining: trend → comparison → interval reasoning inside one thread. (The
+machinery is eval-locked: history threading, verbatim tool-result plumbing,
+round caps, error recovery — `docs/execution/eval-results.md`.)
+
+### UC-9 — Recommendation-shaped asks, answered as a thought partner
+**Moment.** The brief flags hydroxychloroquine toxicity risk as high.
+Time-pressed, Dan asks the shortcut question every clinical chatbot gets:
+"So what should I put her on?" — or mid-thread in UC-8, "should I just
+shorten the interval?"
+**Agent behavior.** Never a prescription. The reframe
+(`docs/prompt-guide.md`): what the record shows, cited ("200 mg daily since
+January 2019"); what the deterministic engines and named guidelines say,
+attributed in the same sentence ("per AAO screening guidelines, five years at
+this dose crosses the high-risk threshold — 365 g cumulative"); and the
+questions worth weighing ("any new visual symptoms since December?"). The
+decision stays with him.
+**What he does with it.** Gets the decision-relevant numbers and their
+provenance instantly — then makes the call himself, which is the only version
+of this exchange a hospital CTO would deploy.
+**Why an agent (and why the guardrail is the feature).** The ask arrives
+conversationally and the correct answer is a synthesis — record + engine +
+open question — that must *resist becoming advice*. A static view can't take
+the question at all; a naive chatbot would answer it wrongly. Enforced at
+three layers: a prompt hard rule, a deterministic prescriptiveness lint on
+every reply (flagged turns surfaced and counted exactly like citation
+failures), and published evals that plant violations and assert the reframe.
+
 ---
 
 ## Non-goals (what the agent will refuse to do)
 
 - **It does not diagnose or prescribe.** It surfaces facts and computations
   and cites them; the physician decides. (Trust posture *and* the regulatory
-  not-CDS line.)
+  not-CDS line.) This is enforced, not aspirational: a prompt hard rule, a
+  deterministic prescriptiveness lint on every chat reply, and published
+  evals — see `docs/prompt-guide.md` and UC-9.
 - **It does not write to the medical record** beyond recording fact
   verifications; no orders, no note authorship in this scope.
 - **It does not answer generic medical questions** untethered from this
