@@ -17,6 +17,8 @@ use OpenEMR\RestControllers\RestControllerHelper;
 use OpenEMR\Services\Address\AddressData;
 use OpenEMR\Services\AddressService;
 use OpenEMR\Services\InsuranceCompanyService;
+use OpenEMR\Validators\BaseValidator;
+use OpenEMR\Validators\InsuranceCompanyValidator;
 
 #[OA\Schema(
     schema: 'api_insurance_company_request',
@@ -57,11 +59,13 @@ class InsuranceCompanyRestController
 {
     private $insuranceCompanyService;
     private $addressService;
+    private InsuranceCompanyValidator $insuranceCompanyValidator;
 
     public function __construct()
     {
         $this->insuranceCompanyService = new InsuranceCompanyService();
         $this->addressService = new AddressService();
+        $this->insuranceCompanyValidator = new InsuranceCompanyValidator();
     }
 
     #[OA\Get(
@@ -146,10 +150,11 @@ class InsuranceCompanyRestController
     )]
     public function post($data)
     {
-        $insuranceCompanyValidationResult = $this->insuranceCompanyService->validate($data);
-        $insuranceCompanyValidationHandlerResult = RestControllerHelper::validationHandler($insuranceCompanyValidationResult);
-        if (is_array($insuranceCompanyValidationHandlerResult)) {
-            return $insuranceCompanyValidationHandlerResult;
+        // The service has no validate() (calling it was an undefined-method 500);
+        // validation lives in InsuranceCompanyValidator, which returns a ProcessingResult.
+        $insuranceCompanyValidationResult = $this->insuranceCompanyValidator->validate($data, BaseValidator::DATABASE_INSERT_CONTEXT);
+        if (!$insuranceCompanyValidationResult->isValid()) {
+            return RestControllerHelper::handleProcessingResult($insuranceCompanyValidationResult, 400);
         }
 
         $addressValidationResult = $this->addressService->validate(AddressData::fromArray($data));
@@ -191,10 +196,10 @@ class InsuranceCompanyRestController
     )]
     public function put($iid, $data)
     {
-        $insuranceCompanyValidationResult = $this->insuranceCompanyService->validate($data);
-        $insuranceCompanyValidationHandlerResult = RestControllerHelper::validationHandler($insuranceCompanyValidationResult);
-        if (is_array($insuranceCompanyValidationHandlerResult)) {
-            return $insuranceCompanyValidationHandlerResult;
+        // Same undefined-method fix as post(); update context relaxes required fields.
+        $insuranceCompanyValidationResult = $this->insuranceCompanyValidator->validate($data, BaseValidator::DATABASE_UPDATE_CONTEXT);
+        if (!$insuranceCompanyValidationResult->isValid()) {
+            return RestControllerHelper::handleProcessingResult($insuranceCompanyValidationResult, 400);
         }
 
         $addressValidationResult = $this->addressService->validate(AddressData::fromArray($data));
