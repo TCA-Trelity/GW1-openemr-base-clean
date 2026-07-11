@@ -53,6 +53,17 @@ Argued in full in the architecture defense; verdicts recorded here. **In scope:*
 > retrieve and reason," each traced to a USERS.md use case), and **Wave G**
 > (observability dashboard live + 3 alerts per `docs/execution/observability.md`,
 > demo video). These extend Tier 1/2; they do not change the committed design.
+>
+> **Early-submission feedback pass (2026-07-11).** Grader feedback on the
+> Thursday submission: the eval suite and safety story scored strongly, but the
+> ARCHITECTURE emphasis on the pre-assembled brief "reads closer to
+> [the rubric-excluded report-generator] pattern than to the multi-turn
+> tool-invoking agent the rubric asks for" — promote the conversational surface
+> to a primary role in the doc and the demo. Tracked as **Wave M** (multi-turn
+> agent emphasis + thought-partner guardrails) — see the Wave M addendum below
+> and `docs/execution/execution-plan.md`. Wave M changes where the weight sits
+> (docs, demo, panel IA, eval/collection coverage) and adds a prescriptiveness
+> guardrail layer; it does not change the committed brief-preparation design.
 
 ### ─── TIER 0 — MVP hard gates (tonight, Tue 11:59 PM CT) ───
 
@@ -251,3 +262,106 @@ deterministic `imaging_summary` on the overview payload. Every UI change ships
 with in-session Chromium screenshots for all five patients. *Acceptance:
 screenshots match the approved layout; panel + sidecar suites green; smoke
 stays green on deploy.*
+
+## Addendum: Wave M — multi-turn agent emphasis + thought-partner guardrails (user-approved 2026-07-11)
+
+Scoped from the early-submission grader feedback plus a user-directed guardrail
+review. Tickets M1–M9 in `docs/execution/execution-plan.md`.
+
+**The diagnosis.** The shipped chat already *is* the multi-turn tool-invoking
+agent the rubric demands — conversation persistence with history replay, a
+tool-use loop (up to 4 rounds + forced tool-free final), six read-only
+patient-scoped Zod-contracted tools, native citations re-verified verbatim
+server-side, streamed tool activity, correlation IDs, budget guards
+(`sidecar/src/chat/`). The problem is that every *graded artifact* points at
+the brief instead: zero of the 11 committed evals exercises a conversation or
+the tool loop; the Bruno `04-chat` folder never sends a second message into the
+same conversation; the panel ships chat closed-by-default behind a floating
+button while Imaging gets full viewport; ARCHITECTURE.md frames chat as
+"handles what [the brief] provokes"; USERS.md traces multi-turn to a single use
+case (UC-2). Wave M moves the weight, not the architecture: the brief remains
+the agent's proactive preparation, and the conversational surface becomes the
+demonstrated core interface. The ophthalmology imaging suite is not in tension
+with this — it is the strongest *justification* for multi-turn tool chaining
+(imaging review is inherently dialogic: compare → trend → interval → decision),
+and three of the six tools are imaging/risk tools.
+
+**A. Prove the agent in the graded artifacts (M1, M5).** Five multi-turn
+conversation evals in the suite's existing deterministic mocked-SSE style
+(context carry-over, tool-chain golden tied to the calculator goldens,
+mid-conversation cross-patient denial, MAX_TOOL_ROUNDS forced-final boundary,
+tool-error recovery), published to `docs/execution/eval-results.md` as a new
+"conversation" category. The Bruno `04-chat` folder becomes a runnable
+multi-turn workflow (follow-up turn reusing `conversation_id` with a pronoun
+reference, then a tool-chain-provoking turn, then replay) so graders can run
+the multi-turn claim cold. *Acceptance: eval suite ≥16 cases, all green,
+committed with commit hash + timestamp as today; Bruno workflow passes against
+the live deployment.*
+
+**B. Surface promotion (M6).** Chat opens with the patient (persistent pane at
+desktop widths; drawer stays for narrow screens); brief/insight cards gain "Ask
+about this" affordances and the imaging workspace gains "Ask about this scan" —
+both seed turns into the *same* persisted conversation, making the imagery
+suite an entry point into the agent. Copy/comment sweep removes
+chat-as-secondary framing ("working surface" language). *Acceptance:
+screenshots show chat present on patient load; a seeded ask from a scan
+continues the existing conversation id.*
+
+**C. Thought partner, not prescriber (M2–M4).** Guardrail inventory
+conclusion (2026-07-11): the *grounding* layers are strong — hard prompt rules
+(answer only from documents, "Not in the record." on absence, no outside
+medical knowledge), fenced document text with rules held in the system prompt,
+the deterministic citation gate + verbatim span re-verification, read-only
+patient-scoped tools, round/length/budget caps, and the R4 brevity contract.
+What no layer governs is *judgment*: a reply can cite record facts perfectly
+and still practice medicine ("shorten the interval to 7 weeks"). The design
+intent elsewhere is already correct — recommendation-shaped content comes only
+from deterministic engines attributed to published guidelines (AAO strings in
+the med-risk engine) or from the record itself (game plan composes over
+gated content only) — but that intent is written down nowhere and enforced
+nowhere in chat. Wave M makes it a contract:
+
+1. **Prompt & tone guide** (`docs/prompt-guide.md`) — one voice spec for the
+   physician-facing LLM surfaces (chat, game plan, insights copy):
+   consultative thought-partner, brief, calm, absence stated as absence; and
+   the non-prescriptiveness rule — the agent never initiates, adjusts, or
+   recommends treatment, dosing, or diagnosis as its own advice.
+   Recommendation-shaped asks get the consultative reframe: what the record
+   shows (cited) · what the engines/guidelines say (attributed to their
+   source) · questions worth considering — the decision stays with the
+   physician. Carve-out made explicit: relaying a *documented* plan or a
+   guideline-derived engine output with attribution is correct behavior;
+   originating clinical direction is not.
+2. **Chat prompt hard rules** (`buildChatSystemPrompt`) updated to the guide;
+   quick prompts aligned.
+3. **Deterministic prescriptiveness lint** — post-generation check for
+   unattributed directive-advice patterns in chat replies, logged and counted
+   exactly like unverified citations (same "surfaced, never silently passed"
+   philosophy), visible in the observability verification metrics.
+4. **Prescriptiveness evals** — golden refusal-to-prescribe behaviors ("what
+   dose should I start her on?", "should I shorten the injection interval?")
+   asserting the reframe shape structurally, plus one budget-tagged live
+   behavioral case.
+
+*Acceptance: prompt guide committed; prompt structural tests pin the rules the
+same way injection-resistance pins fencing; lint metric visible in logs/obs;
+prescriptiveness evals green in the committed results.*
+
+**D. Docs + demo reframe (M7, M8).** ARCHITECTURE.md summary and §5 rewritten
+agent-first — the brief is the agent's proactive opening move over the same
+fact store and engines its tools call; the §5 tool roster corrected to the six
+shipped tools. USERS.md gains use cases that *require* multi-turn conversation
+and tool chaining (imaging drill-down thread, dose-math drill-down,
+contradiction-resolution thread), each with the "why an agent" defense —
+satisfying the rubric's traceability rule in the direction that now matters.
+Demo video #3 is conversation-led: the brief framed as what the agent already
+prepared, then a 3–4-turn thread with visible tool chips and citations, an
+imaging drill-down, a mid-conversation cross-patient refusal, and the Langfuse
+trace of that thread under one correlation ID. *Acceptance: docs reviewed
+against the rubric's "Agentic Chatbot" paragraph; demo script timed ≤5 min.*
+
+**Stretch (M9, approve before build).** Brief-as-turn-zero: seed each new
+conversation with a compact brief summary as the opening assistant message, so
+the transcript literally opens with the brief — replayable via `GET /api/chat`,
+runnable in Bruno, and the "report generator" reading dissolves structurally
+(one conversation; the brief is message #1 in it).
