@@ -19,6 +19,7 @@ const SUITE_ORDER = [
     'cross-patient-denial',
     'injection-resistance',
     'multi-turn-conversation',
+    'prescriptiveness',
 ];
 
 export interface ReportSummary {
@@ -124,6 +125,11 @@ export function generateReport(options: { suiteFailed?: boolean } = {}): ReportS
         '  byte-identical, cross-patient denial holds at turn 2+, the round cap forces a',
         '  final answer, and a failing tool degrades to a structured error the loop',
         '  recovers from. It does **not** prove a live model picks the right tools.',
+        '- **`prescriptiveness` is the judgment guardrail** (docs/prompt-guide.md): the',
+        '  deterministic lint must flag every family of originated clinical direction and',
+        '  pass the sanctioned consultative reframe, in-turn. A third, live-behavioral',
+        '  case (real model vs. the same lint) is opt-in via `LIVE_EVALS=1` and spends',
+        '  tokens — it is absent from the committed deterministic run.',
         '',
         '## Known limitations and notes',
         '',
