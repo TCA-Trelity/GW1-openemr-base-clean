@@ -403,6 +403,7 @@ export async function sendChatMessage(
     onCitation: (citation: ChatCitation) => void,
     onToolUse?: (tool: ChatToolUse) => void,
     onToolResult?: (tool: ChatToolResult) => void,
+    onSeed?: (content: string) => void,
 ): Promise<ChatSendResult> {
     let res: Response;
     try {
@@ -444,6 +445,10 @@ export async function sendChatMessage(
             onToolUse?.({ name: event.name, input });
         } else if (event.type === 'tool_result' && typeof event.name === 'string') {
             onToolResult?.({ name: event.name, ok: event.ok === true });
+        } else if (event.type === 'seed' && typeof event.content === 'string') {
+            // M9 opening move: the agent's prepared digest, persisted server-side as the
+            // conversation's first assistant message and echoed here for live rendering.
+            onSeed?.(event.content);
         } else if (event.type === 'done' && typeof event.conversation_id === 'string') {
             done = {
                 conversationId: event.conversation_id,

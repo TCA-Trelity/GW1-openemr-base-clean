@@ -1,9 +1,13 @@
-// Panel shell (S2.11 realignment, R2 IA): day-schedule sidebar + instant deterministic
-// landing from GET /api/overview — no LLM in any load path. The patient header band sits
-// above the tab bar on every tab and hosts the AI insights control (Generate -> compact
-// progress -> Refresh); the brief renders on its own AI Insights tab, and Diagnosis &
-// Care renders deterministically from the overview's care_plan. ?patient= deep links
-// stay authoritative. The S2.3 chat drawer ("Ask the record") docks over every tab.
+// Panel shell (S2.11 realignment, R2 IA, M6 chat promotion): day-schedule sidebar +
+// instant deterministic landing from GET /api/overview — no LLM in any load path. The
+// patient header band sits above the tab bar on every tab and hosts the AI insights
+// control (Generate -> compact progress -> Refresh); the brief renders on its own AI
+// Insights tab, and Diagnosis & Care renders deterministically from the overview's
+// care_plan. ?patient= deep links stay authoritative. The conversational surface ("Ask
+// the record") is the co-pilot's primary interface: it opens with the patient at desktop
+// widths as a persistent pane the content shifts aside for (drawer on narrow screens),
+// and ask-about-this affordances on Overview, Imaging, and AI Insights seed turns into
+// the same persisted conversation.
 import { useCallback, useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import {
@@ -35,8 +39,9 @@ import SourcesTab, { type SourceFocus } from './SourcesTab';
 
 type TabId = 'ehr' | 'overview' | 'background' | 'imaging' | 'insights' | 'careplan' | 'sources';
 
-// Overview leads (P5 — it's the working surface); EHR Record sits beside it as the
-// system of record the co-pilot layers on top of.
+// Overview leads the tab bar (P5); the persistent chat pane (M6) is the conversational
+// core the tabs feed into. EHR Record sits beside Overview as the system of record the
+// co-pilot layers on top of.
 const TABS: { id: TabId; label: string }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'ehr', label: 'EHR Record' },
@@ -65,7 +70,13 @@ export default function App() {
     const [activeTab, setActiveTab] = useState<TabId>(tabFromUrl);
     const [sourceFocus, setSourceFocus] = useState<SourceFocus | null>(null);
     const [reloadNonce, setReloadNonce] = useState(0);
-    const [chatOpen, setChatOpen] = useState(false);
+    // M6: the conversation is the primary surface — open it with the patient wherever the
+    // viewport can hold a persistent pane; narrow screens keep the on-demand drawer.
+    const [chatOpen, setChatOpen] = useState<boolean>(
+        () => typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 1536px)').matches,
+    );
+    // Ask-about-this seeding: bumping the nonce re-seeds even for the same text.
+    const [chatSeed, setChatSeed] = useState<{ text: string; nonce: number } | null>(null);
     // Auth (Wave AZ): the demo role, whether dev-login is active, and the current capabilities.
     const [role, setRole] = useState<ClinicalRole>('physician');
     const [authActive, setAuthActive] = useState(false);
@@ -151,6 +162,13 @@ export default function App() {
         [patientId],
     );
 
+    // Ask-about-this (M6): open the conversation and prefill it — the send stays with the
+    // physician. Every seeded ask continues the patient's one persisted conversation.
+    const askTheRecord = useCallback((text: string) => {
+        setChatSeed({ text, nonce: Date.now() });
+        setChatOpen(true);
+    }, []);
+
     const viewSource = useCallback((citation: CitationRef) => {
         setSourceFocus({
             documentId: citation.source_document_id,
@@ -192,7 +210,10 @@ export default function App() {
             <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex">
                 <PatientSidebar state={patientsState} activeId={patientId} onSelect={selectPatient} onRetry={() => void loadPatients()} />
 
-                <div className="flex-1 min-w-0 flex flex-col">
+                {/* M6: at pane-capable widths the open chat sits BESIDE the content (the
+                    content shifts left by the drawer's 28rem), reading as a persistent pane
+                    rather than an overlay; below 2xl it overlays as a drawer. */}
+                <div className={`flex-1 min-w-0 flex flex-col transition-[margin] duration-300 ${chatOpen ? '2xl:mr-[28rem]' : ''}`}>
                     {/* Dark chrome — echo of the prototype's slate-800 nav rail */}
                     <header className="bg-slate-800 text-white">
                         <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
@@ -304,7 +325,7 @@ export default function App() {
                                         />
                                     )}
                                     {activeTab === 'overview' && (
-                                        <Overview key={patientId} overview={overview} onOpenImaging={() => setActiveTab('imaging')} />
+                                        <Overview key={patientId} overview={overview} onOpenImaging={() => setActiveTab('imaging')} onAsk={askTheRecord} />
                                     )}
                                     {activeTab === 'background' && (
                                         <MedicalBackground factsByType={overview.facts_by_type} riskFlags={overview.medication_risk_flags} canVerify={canVerify} onVerify={handleVerify} />
@@ -321,10 +342,11 @@ export default function App() {
                                                 imaging={overview.imaging}
                                                 images={overview.images}
                                                 treatments={factsState.kind === 'ready' ? factsState.bundle.treatments : []}
+                                                onAsk={askTheRecord}
                                             />
                                         </>
                                     )}
-                                    {activeTab === 'insights' && <AiInsightsTab state={insights.state} onRetry={insights.retry} />}
+                                    {activeTab === 'insights' && <AiInsightsTab state={insights.state} onRetry={insights.retry} onAsk={askTheRecord} />}
                                     {activeTab === 'careplan' && (
                                         <CarePlan
                                             carePlan={overview.care_plan}
@@ -354,9 +376,10 @@ export default function App() {
                     </main>
                 </div>
 
-                {/* Docked chat — keyed by patient so switching patients switches conversations */}
+                {/* The conversational surface — keyed by patient so switching patients switches
+                    to that patient's own persisted conversation */}
                 {patientId !== null && overview !== null && (
-                    <ChatDrawer key={patientId} patientId={patientId} open={chatOpen} onToggle={setChatOpen} />
+                    <ChatDrawer key={patientId} patientId={patientId} open={chatOpen} onToggle={setChatOpen} seed={chatSeed} />
                 )}
             </div>
         </SourceNavContext.Provider>

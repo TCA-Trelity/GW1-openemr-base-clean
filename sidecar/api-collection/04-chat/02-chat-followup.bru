@@ -1,0 +1,59 @@
+meta {
+  name: POST /api/chat/:patientId — turn 2: follow-up in the same conversation
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/chat/margaret-chen
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "message": "Is that above the AAO high-risk threshold, and since when has she been on it?",
+    "conversation_id": "{{conversationId}}"
+  }
+}
+
+tests {
+  test("stream opens with 200 and SSE content type", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(String(res.getHeader('content-type'))).to.contain('text/event-stream');
+  });
+
+  test("the done event continues the SAME conversation id", function() {
+    const raw = typeof res.getBody() === 'string' ? res.getBody() : JSON.stringify(res.getBody());
+    const expected = bru.getVar('conversationId');
+    expect(expected, 'conversationId var (set by request 01)').to.be.a('string');
+    expect(raw).to.contain('"type":"done"');
+    expect(raw).to.contain('"conversation_id":"' + expected + '"');
+  });
+}
+
+docs {
+  # Turn 2: the follow-up that proves multi-turn context
+
+  **What it proves:** the agent is a *conversation*, not a search box.
+  This message — "Is **that** above the AAO high-risk threshold…" — is
+  unanswerable on its own: "that" resolves only against turn 1's answer
+  (the medication-risk discussion). The server threads the persisted
+  prior exchange into the model call, so the reply resolves the pronoun
+  and answers about hydroxychloroquine specifically, with citations.
+
+  **How it works:** the request body carries the `conversation_id`
+  captured from turn 1's `done` event. The sidecar loads that
+  conversation's history (up to 20 turns), replays it as plain-text
+  context, and attaches the full document set to the newest turn only.
+
+  **What to look for in the stream:** the reply should reference the
+  medication from turn 1 by name and cite the record for the start date
+  and dose — thread context + grounding at once. The `done` event echoes
+  the same `conversation_id` you sent.
+
+  **Run order note:** run request 01 first (`bru run` handles this via
+  seq). Standalone, the environment's placeholder id is used; the server
+  accepts any id and simply starts a thread under it, so the assertions
+  still hold — but you lose the actual context-carry-over demonstration.
+}

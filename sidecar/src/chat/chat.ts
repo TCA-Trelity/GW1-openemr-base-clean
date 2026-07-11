@@ -8,6 +8,7 @@ import type { AnthropicClient, AnthropicContentBlock, AnthropicMessage, Anthropi
 import type { PrepLogger } from '../prep/extraction.js';
 import type { PrepSpendGuard } from '../prep/pipeline.js';
 import type { FactBundle } from '../store/index.js';
+import { lintPrescriptiveness } from './prescriptivenessLint.js';
 import { ALL_CHAT_TOOLS, type RegisteredTool } from './tools/index.js';
 
 export interface ChatMessageInput {
@@ -58,6 +59,8 @@ export interface ChatTurnResult {
     unverified_count: number;
     /** Names of the tools the model invoked this turn, in call order (may repeat). */
     tools_used: string[];
+    /** Thought-partner contract (M3): sentences the prescriptiveness lint flagged. */
+    prescriptive_flag_count: number;
 }
 
 export interface ChatTurnHooks {
@@ -85,7 +88,9 @@ export function citableDocuments(bundle: FactBundle): { id: string; title: strin
     });
 }
 
-// Brevity is the contract (R4): physicians have seconds, not minutes.
+// Brevity is the contract (R4): physicians have seconds, not minutes. Voice + judgment
+// rules implement docs/prompt-guide.md (M2) — the guide wins on drift; load-bearing
+// phrases are pinned by test/chat.test.ts.
 export function buildChatSystemPrompt(bundle: FactBundle): string {
     return `You are the chat surface of a clinical co-pilot, answering a physician's questions about ONE patient \
 (${bundle.patient.name}, id ${bundle.patient.id}) immediately before the visit.
@@ -100,7 +105,13 @@ conflict in one line — do not pick a winner.
 4. You have read-only tools that fetch more from THIS patient's record — full documents, OCT measurement trends, \
 scan comparisons, medication-risk checks, keyword search, and open questions. They ARE the record, so rule 1 \
 still holds. Call a tool when the attached documents are insufficient rather than guessing; never invent data a \
-tool could supply. A tool may return an error (e.g. unknown id) — recover and try another approach.`;
+tool could supply. A tool may return an error (e.g. unknown id) — recover and try another approach.
+5. You are a thought partner, not a prescriber. Never advise starting, stopping, or changing treatment, dosing, \
+or a diagnosis — even when asked directly. For a recommendation-shaped ask, reframe instead: what the record \
+shows (cited), what the deterministic engines or named guidelines say (attribute the source in the same \
+sentence, e.g. "per AAO screening guidelines"), and the questions worth weighing — the decision stays with the \
+physician. Quoting a plan already documented in the record, or relaying an engine/guideline output WITH its \
+attribution, is correct; originating your own clinical direction is not.`;
 }
 
 const NULLISH_WS = /\s+/g;
@@ -213,10 +224,15 @@ export class ChatService {
             })),
             { type: 'text', text: message },
         ];
-        const messages: AnthropicMessage[] = [
-            ...history.map((turn) => ({ role: turn.role, content: turn.content })),
-            { role: 'user' as const, content: latestContent },
-        ];
+        const historyMessages: AnthropicMessage[] = history.map((turn) => ({ role: turn.role, content: turn.content }));
+        // An M9-seeded conversation begins with the agent's opening move (assistant). The
+        // Messages API requires a user-first thread, so a synthetic user line — model-context
+        // only, never persisted or rendered — introduces it and keeps it referenceable
+        // ("expand point 2") in later turns.
+        if (historyMessages[0]?.role === 'assistant') {
+            historyMessages.unshift({ role: 'user', content: 'I have opened the chart — give me your prepared opening.' });
+        }
+        const messages: AnthropicMessage[] = [...historyMessages, { role: 'user' as const, content: latestContent }];
 
         const citations: ChatCitation[] = [];
         const toolsUsed: string[] = [];
@@ -340,6 +356,28 @@ export class ChatService {
             // The chat verification metric: unverifiable spans are surfaced, never provenance.
             logger.warn({ correlationId, conversationId, unverified }, 'chat citations failed verbatim verification');
         }
-        return { conversation_id: conversationId, reply, citations, unverified_count: unverified, tools_used: toolsUsed };
+        // Judgment metric (M3), same surfaced-never-silent philosophy as the citation gate:
+        // directive advice without attribution is counted and logged, per docs/prompt-guide.md.
+        const lint = lintPrescriptiveness(reply);
+        if (lint.flags.length > 0) {
+            logger.warn(
+                {
+                    correlationId,
+                    conversationId,
+                    prescriptive_flags: lint.flags.length,
+                    rules: lint.flags.map((flag) => flag.rule),
+                    excerpts: lint.flags.map((flag) => flag.excerpt),
+                },
+                'chat reply flagged by prescriptiveness lint',
+            );
+        }
+        return {
+            conversation_id: conversationId,
+            reply,
+            citations,
+            unverified_count: unverified,
+            tools_used: toolsUsed,
+            prescriptive_flag_count: lint.flags.length,
+        };
     }
 }

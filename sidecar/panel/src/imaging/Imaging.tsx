@@ -272,10 +272,13 @@ export default function Imaging({
     imaging,
     images,
     treatments,
+    onAsk,
 }: {
     imaging: BriefContent['imaging'];
     images: ImageRecord[];
     treatments: TreatmentWireRecord[];
+    /** Ask-about-this-scan (M6): threaded to the Workspace's seed button. */
+    onAsk?: (text: string) => void;
 }) {
     const hasImages = images.length > 0;
     // Land on the image-first Workspace when there are scans; fall back to Timeline otherwise.
@@ -356,6 +359,7 @@ export default function Imaging({
                         onSelect={setSelectedImageId}
                         hcq={imaging.hcq_progression}
                         onBack={fromTimeline ? () => setActiveSubTab('timeline') : undefined}
+                        {...(onAsk === undefined ? {} : { onAsk })}
                     />
                 )}
                 {activeSubTab === 'timeline' && (

@@ -15,7 +15,7 @@ repository, as of 2026-07-09. Live EHR:
 | Run locally, setup documented | Docker dev environment + setup in `README.md` / `CONTRIBUTING.md`; demo dataset loads via `DEMO_MODE=standard`. |
 | Public deployment, URL in every submission | Railway project: OpenEMR + MariaDB (private networking) and the sidecar (Node/Fastify, serves the panel). URLs above; deploys track `main`. |
 | `./AUDIT.md` with ~500-word summary | Security / performance / architecture / data-quality / compliance passes, summary-first. Findings drove the build (e.g. S1 "no per-patient authz in core" → the sidecar's patient-bound PEP; S2 error-disclosure → fixed in `apis/dispatch.php`). |
-| `./USERS.md` (+ `./USER.md`) | Narrow user (ophthalmologist, 20-patient clinic day) + concrete use cases; each maps to a shipped capability, and each agent capability traces back (the "agent surface = user need" rule). |
+| `./USERS.md` (+ `./USER.md`) | Narrow user (ophthalmologist, ~70-patient clinic day) + concrete use cases; each maps to a shipped capability, and each agent capability traces back (the "agent surface = user need" rule). |
 | `./ARCHITECTURE.md` with ~500-word summary | Sidecar-beside-untouched-EHR design, verification strategy, trust boundaries, tradeoffs; kept honest against built status (G3 alignment pass). |
 
 **Agent requirements**

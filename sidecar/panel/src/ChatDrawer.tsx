@@ -1,5 +1,9 @@
-// Chat drawer (S2.3, R5 native citations): the docked "Ask the record" slide-over,
-// reachable from every tab. Replies stream over POST /api/chat SSE as clean prose — no
+// "Ask the record" (S2.3, R5 native citations, M6 promotion): the co-pilot's primary
+// conversational surface — a persistent pane beside the tabs at desktop widths (App opens
+// it with the patient and shifts content aside), a slide-over drawer on narrow screens.
+// Ask-about-this affordances across Overview, Imaging, and AI Insights seed the input via
+// the `seed` prop; the physician sends (one keystroke), so every seeded ask continues the
+// same persisted conversation. Replies stream over POST /api/chat SSE as clean prose — no
 // inline tokens. Provenance rides the stream's citation events (already server-verified
 // verbatim against the stored documents): verified citations render as source-labelled
 // chips appended to the bubble, deep-linking into the source viewer at the cited character
@@ -29,11 +33,14 @@ import { asSourceType, titleCase } from './ui';
 
 const MAX_MESSAGE_CHARS = 2000; // mirrors routes/chat.ts MAX_MESSAGE_CHARS
 
+// The first asks a grader sees — they model the sanctioned thought-partner shapes
+// (docs/prompt-guide.md): what-changed, risk surfacing, open questions. None requests
+// a treatment decision.
 const QUICK_PROMPTS = [
     'What brings her in today?',
     'Any medication risks?',
     'What changed since the last visit?',
-    'Summarize the contradictions in the record.',
+    'What questions are worth asking today?',
 ];
 
 // ---- Per-patient conversation persistence (sessionStorage keyed by patient id) ----
@@ -62,6 +69,8 @@ interface ChatBubble {
     id: string;
     role: 'user' | 'assistant';
     content: string;
+    /** M9: the agent's opening move — rendered with its prepared-during-check-in label. */
+    opening?: boolean;
     status: 'complete' | 'streaming' | 'error';
     /** Streamed citations in arrival order, deduped — replayed history carries none. */
     citations: ChatCitation[];
@@ -252,6 +261,11 @@ function AssistantBubble({ bubble, onRetry }: { bubble: ChatBubble; onRetry: (bu
     return (
         <div className="flex justify-start">
             <div className="max-w-[85%]">
+                {bubble.opening === true && (
+                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                        Opening move — prepared during check-in
+                    </p>
+                )}
                 <ToolActivityStrip activity={bubble.toolActivity} />
                 {(bubble.content !== '' || bubble.status === 'streaming' || chips.length > 0) && (
                     <div className="rounded-xl rounded-bl-sm bg-slate-100 px-3.5 py-2 text-[13px] text-slate-700 leading-snug whitespace-pre-wrap">
@@ -295,10 +309,13 @@ export default function ChatDrawer({
     patientId,
     open,
     onToggle,
+    seed = null,
 }: {
     patientId: string;
     open: boolean;
     onToggle: (open: boolean) => void;
+    /** Ask-about-this seeding (M6): prefills the input (never auto-sends) and focuses it. */
+    seed?: { text: string; nonce: number } | null;
 }) {
     const [bubbles, setBubbles] = useState<ChatBubble[]>([]);
     const [draft, setDraft] = useState('');
@@ -361,6 +378,15 @@ export default function ChatDrawer({
         }
     }, [open]);
 
+    // A seeded ask prefills the draft and focuses — the physician stays in control of the
+    // send (thought-partner posture: no turn fires, and no tokens spend, without their key).
+    useEffect(() => {
+        if (seed !== null) {
+            setDraft(seed.text);
+            inputRef.current?.focus();
+        }
+    }, [seed]);
+
     const patch = useCallback((id: string, update: (bubble: ChatBubble) => ChatBubble) => {
         setBubbles((prev) => prev.map((bubble) => (bubble.id === id ? update(bubble) : bubble)));
     }, []);
@@ -396,6 +422,25 @@ export default function ChatDrawer({
                         ...bubble,
                         toolActivity: resolveFirstRunning(bubble.toolActivity, tool.name, tool.ok ? 'ok' : 'error'),
                     }));
+                },
+                (seedContent) => {
+                    // M9 opening move: fires only on the first turn of a fresh conversation,
+                    // so prepending puts the agent's prepared digest at the top of the thread.
+                    setBubbles((prev) => [
+                        {
+                            id: bubbleId('opening'),
+                            role: 'assistant',
+                            content: seedContent,
+                            opening: true,
+                            status: 'complete',
+                            citations: [],
+                            unverifiedCount: 0,
+                            toolActivity: [],
+                            requestText: '',
+                            errorText: null,
+                        },
+                        ...prev,
+                    ]);
                 },
             );
             if (result.kind === 'done') {

@@ -1,17 +1,23 @@
-// Chat routes (S2.3). POST streams the reply as SSE (delta events, then one done event
-// carrying validated citation ids); guards (patient exists, budget) answer as plain JSON
-// BEFORE the stream opens so the panel can branch on status codes. GET replays a
-// conversation for persistence across reloads.
+// Chat routes (S2.3, M9 opening move). POST streams the reply as SSE (delta events, then
+// one done event carrying validated citation ids); guards (patient exists, budget) answer
+// as plain JSON BEFORE the stream opens so the panel can branch on status codes. A NEW
+// conversation opens with the agent's prepared digest when a completed brief exists —
+// persisted first (the model sees it as history; replay shows the transcript opening with
+// it) and echoed to the panel as a `seed` event. GET replays a conversation for
+// persistence across reloads.
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { ChatService, ChatStore } from '../chat/chat.js';
+import { composeOpeningMove } from '../chat/openingMove.js';
 import { BudgetExceededError } from '../prep/budget.js';
 import type { PrepSpendGuard } from '../prep/pipeline.js';
-import type { FactBundle } from '../store/index.js';
+import type { FactBundle, StoredBrief } from '../store/index.js';
 
 /** The store surface these routes need (FactStore satisfies it; tests fake it). */
 export interface ChatRouteStore extends ChatStore {
     getFactBundle(patientId: string): Promise<FactBundle | null>;
+    /** Latest COMPLETED brief — the M9 opening move composes from it (null = no seed). */
+    getBrief(patientId: string): Promise<StoredBrief | null>;
 }
 
 export interface ChatRouteDeps {
@@ -40,7 +46,8 @@ export function registerChatRoutes(app: FastifyInstance, deps: ChatRouteDeps | u
             return reply.status(400).send({ error: 'invalid_message', max_chars: MAX_MESSAGE_CHARS });
         }
         const rawConversation = request.body?.conversation_id;
-        const conversationId = typeof rawConversation === 'string' && rawConversation !== '' ? rawConversation : randomUUID();
+        const mintedFresh = !(typeof rawConversation === 'string' && rawConversation !== '');
+        const conversationId = mintedFresh ? randomUUID() : (rawConversation as string);
 
         // Pre-stream guards answer as plain JSON: after the SSE opens, only events remain.
         const bundle = await deps.store.getFactBundle(request.params.patientId);
@@ -60,6 +67,28 @@ export function registerChatRoutes(app: FastifyInstance, deps: ChatRouteDeps | u
             }
         }
 
+        // M9 opening move: a NEW conversation opens with the agent's prepared digest when a
+        // completed brief exists. Persisted BEFORE the turn so the model reads it as history
+        // and GET replay shows the transcript opening with it; skipped silently when no brief
+        // has completed (absence over invention). Store failures here surface as plain 500s —
+        // the stream has not opened yet.
+        let openingMove: string | null = null;
+        if (mintedFresh) {
+            const brief = await deps.store.getBrief(request.params.patientId);
+            if (brief !== null) {
+                openingMove = composeOpeningMove(brief.content, brief.prepared_at);
+                if (openingMove !== null) {
+                    await deps.store.saveChatMessage({
+                        patient_id: request.params.patientId,
+                        conversation_id: conversationId,
+                        role: 'assistant',
+                        content: openingMove,
+                        correlation_id: String(request.id),
+                    });
+                }
+            }
+        }
+
         reply.hijack();
         reply.raw.writeHead(200, {
             'content-type': 'text/event-stream',
@@ -70,6 +99,10 @@ export function registerChatRoutes(app: FastifyInstance, deps: ChatRouteDeps | u
         const writeEvent = (event: Record<string, unknown>): void => {
             reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
         };
+        // The opening move streams first so the panel renders it above the first exchange.
+        if (openingMove !== null) {
+            writeEvent({ type: 'seed', conversation_id: conversationId, content: openingMove });
+        }
         try {
             const result = await deps.service.turn(
                 { bundle, conversationId, message, correlationId: String(request.id) },
@@ -89,6 +122,7 @@ export function registerChatRoutes(app: FastifyInstance, deps: ChatRouteDeps | u
                 citations: result.citations,
                 unverified_count: result.unverified_count,
                 tools_used: result.tools_used,
+                prescriptive_flag_count: result.prescriptive_flag_count,
             });
         } catch (error) {
             request.log.error({ correlationId: request.id, err: String(error) }, 'chat turn failed');

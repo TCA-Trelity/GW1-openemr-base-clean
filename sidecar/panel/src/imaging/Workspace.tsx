@@ -9,7 +9,7 @@
 // B-scan, thickness/en-face heatmaps, ETDRS 9-sector grids, slice-scrolling through a volume —
 // each scan is a single 2D JPEG, so the filmstrip scrubs *scans in the series*, not slices.
 import type { ReactNode } from 'react';
-import { ArrowLeft, ChevronLeft, ChevronRight, ScanEye, Sparkles } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, MessageCircle, ScanEye, Sparkles } from 'lucide-react';
 import { Minus, TrendingDown, TrendingUp } from 'lucide-react';
 import type { HcqProgressionAnalysis, ImageRecord } from '../types';
 import { Card, formatDate } from '../ui';
@@ -244,6 +244,7 @@ export default function Workspace({
     onSelect,
     hcq,
     onBack,
+    onAsk,
 }: {
     images: ImageRecord[];
     selectedId: string | null;
@@ -251,6 +252,8 @@ export default function Workspace({
     hcq: HcqProgressionAnalysis;
     /** When present (arrived from the timeline), a back link; omitted on the default workspace. */
     onBack?: () => void;
+    /** Ask-about-this-scan (M6): seeds the chat pane with the selected scan's context. */
+    onAsk?: (text: string) => void;
 }) {
     // Resolve the selected scan, defaulting to the most recent so the workspace is never empty.
     const byDateDesc = [...images].sort(
@@ -286,9 +289,27 @@ export default function Workspace({
                         Viewing {series.length} {series.length === 1 ? 'scan' : 'scans'} · {selected.image_metadata.laterality.toUpperCase()}
                     </span>
                 )}
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-violet-50 text-violet-700 border-violet-200 text-xs font-medium">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    AI analysis
+                <span className="inline-flex items-center gap-2">
+                    {/* M6: the imagery suite is an entry point INTO the agent — this seeds the
+                        selected scan into the same persisted conversation (send stays manual). */}
+                    {onAsk !== undefined && (
+                        <button
+                            type="button"
+                            onClick={() =>
+                                onAsk(
+                                    `About the ${formatDate(selected.image_metadata.capture_date)} ${selected.image_metadata.laterality.toUpperCase()} scan: what changed compared with the prior scan?`,
+                                )
+                            }
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-slate-800 text-white border-slate-700 text-xs font-medium hover:bg-slate-700 transition-colors"
+                        >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                            Ask about this scan
+                        </button>
+                    )}
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-violet-50 text-violet-700 border-violet-200 text-xs font-medium">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        AI analysis
+                    </span>
                 </span>
             </div>
 
