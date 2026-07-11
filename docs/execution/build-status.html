@@ -140,10 +140,10 @@
   <div class="eyebrow">TCA-Trelity / GW1-openemr-base-clean · AgentForge Week 1</div>
   <h1>Clinical Co-Pilot — Build Status</h1>
   <div class="statusline">
-    Hand-refreshed <b>2026-07-11</b> UTC (late evening) · Wave&nbsp;M merged to main · early submission <b>100%</b> ·
+    Hand-refreshed <b>2026-07-11</b> UTC (late evening) · main = <b>a73c068</b> (Wave IC merged) · tagged <b>stable-2026-07-12</b> · early submission <b>100%</b> ·
     Wave&nbsp;Q 8/8 · P4 complete — EHR depth live, insurance ×5 (reseed 2026-07-11) ·
-    <span class="new">Wave&nbsp;IC complete: 5/5</span> — imaging↔chat cohesion, all five layers stacked
-    (<a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/pull/6">PR&nbsp;#6</a>; evals 21/21 · sidecar 380 · panel 88, all green; Chromium-verified) ·
+    <span class="new">Wave&nbsp;IC merged: 5/5</span> — imaging↔chat cohesion, all five layers stacked
+    (<a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/pull/6">PR&nbsp;#6 merged</a>; evals 21/21 · sidecar 380 · panel 88, all green; Chromium-verified) ·
     renders <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/execution-plan.md">docs/execution/execution-plan.md</a> (the source of truth)
   </div>
   <div class="toplinks">
@@ -284,7 +284,7 @@
     <div class="panel">
       <div class="panel-head">
         <h2>Wave IC — imaging↔chat cohesion (all five options, stacked)</h2>
-        <span class="pill">Built 2026-07-11 evening · 5/5</span>
+        <span class="pill">Merged to main 2026-07-11 · 5/5 · tagged stable-2026-07-12</span>
       </div>
       <p class="muted">Observed failure: chat claimed it had no access to prior OCT trends while the analytics rail displayed them beside it. User directive: build options 0–4, all of them. The result is one loop — the agent consults the imaging tools before any absence claim, quotes the rail's own derived object, knows which scan is on screen, draws what it saw in the bubble with deep links back into the viewer, and can look at the pixels themselves under a hard quarantine.</p>
       <div class="wgroups">
@@ -319,6 +319,7 @@
       <p>Every sidecar deploy since the chat tools landed failed with <code>TS2307 ./tools/index.js</code>. Root cause (<b>S3.7</b>): an unanchored <code>tools/ export-ignore</code> in <code>.gitattributes</code> matched <code>sidecar/src/chat/tools/</code> at any depth, and Railway builds from the GitHub <b>source archive</b>, which honors export-ignore — git checkouts (CI, local) don't. The deploy context was missing eight committed files; no cache busting could restore them. Fixed by anchoring <code>/tools/</code>, adding a <code>sidecar/** -export-ignore</code> carve-out, and a CI <b>export-parity</b> job so a tarball-only breakage can never hide again.</p>
       <div class="checkline"><span class="g done">✓</span><span><b>Fix verified from a clean archive export</b> — parity exact; sidecar 333 tests + tsc, panel 74 tests + vite, all green</span></div>
       <div class="checkline"><span class="g done">✓</span><span><b>Tagged</b> <code>stable-2026-07-09</code> — the e2e-proven submission snapshot</span></div>
+      <div class="checkline"><span class="g done">✓</span><span><b>Tagged</b> <code>stable-2026-07-12</code> — Waves M + IC on main (<code>a73c068</code>): the multi-turn-agent + imaging-cohesion checkpoint for graders</span></div>
       <div class="checkline"><span class="g done">✓</span><span><b>EHR service redeployed from current main</b> (2026-07-11) — orphan 46e149aa retired; insurance routes live-verified by the P4 reseed</span></div>
             <div class="checkline"><span class="g done">✓</span><span><b>Load baselines committed</b> (S3.1) — 290 req/s, p95 46 ms @ 10 users · 430 req/s, p95 193 ms @ 50 users · 0% errors · inside the 1500 ms SLO gate</span></div>
     </div>
@@ -357,7 +358,7 @@
   </section>
 
   <footer>
-    Refreshed 2026-07-11 (late evening) by the working session · source of truth: <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/execution-plan.md">docs/execution/execution-plan.md</a> · this refresh: Wave IC built 5/5 (<a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/pull/6">PR #6</a> — imaging↔chat cohesion: tool-use contract, imaging overview tool, viewing context, chat↔viewer loop, describe_scan with quarantine).<br>
+    Refreshed 2026-07-11 (late evening) by the working session · source of truth: <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/execution-plan.md">docs/execution/execution-plan.md</a> · this refresh: Wave IC merged to main <code>a73c068</code> + tagged <code>stable-2026-07-12</code> (<a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/pull/6">PR #6</a> — imaging↔chat cohesion: tool-use contract, imaging overview tool, viewing context, chat↔viewer loop, describe_scan with quarantine).<br>
     Page rebuilt this refresh from the execution plan + prior layout; earlier versions remain in the artifact version picker.
   </footer>
 </div>
