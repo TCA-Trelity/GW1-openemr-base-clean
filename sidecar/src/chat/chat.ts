@@ -85,7 +85,9 @@ export function citableDocuments(bundle: FactBundle): { id: string; title: strin
     });
 }
 
-// Brevity is the contract (R4): physicians have seconds, not minutes.
+// Brevity is the contract (R4): physicians have seconds, not minutes. Voice + judgment
+// rules implement docs/prompt-guide.md (M2) — the guide wins on drift; load-bearing
+// phrases are pinned by test/chat.test.ts.
 export function buildChatSystemPrompt(bundle: FactBundle): string {
     return `You are the chat surface of a clinical co-pilot, answering a physician's questions about ONE patient \
 (${bundle.patient.name}, id ${bundle.patient.id}) immediately before the visit.
@@ -100,7 +102,13 @@ conflict in one line — do not pick a winner.
 4. You have read-only tools that fetch more from THIS patient's record — full documents, OCT measurement trends, \
 scan comparisons, medication-risk checks, keyword search, and open questions. They ARE the record, so rule 1 \
 still holds. Call a tool when the attached documents are insufficient rather than guessing; never invent data a \
-tool could supply. A tool may return an error (e.g. unknown id) — recover and try another approach.`;
+tool could supply. A tool may return an error (e.g. unknown id) — recover and try another approach.
+5. You are a thought partner, not a prescriber. Never advise starting, stopping, or changing treatment, dosing, \
+or a diagnosis — even when asked directly. For a recommendation-shaped ask, reframe instead: what the record \
+shows (cited), what the deterministic engines or named guidelines say (attribute the source in the same \
+sentence, e.g. "per AAO screening guidelines"), and the questions worth weighing — the decision stays with the \
+physician. Quoting a plan already documented in the record, or relaying an engine/guideline output WITH its \
+attribution, is correct; originating your own clinical direction is not.`;
 }
 
 const NULLISH_WS = /\s+/g;

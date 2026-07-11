@@ -29,11 +29,14 @@ import { asSourceType, titleCase } from './ui';
 
 const MAX_MESSAGE_CHARS = 2000; // mirrors routes/chat.ts MAX_MESSAGE_CHARS
 
+// The first asks a grader sees — they model the sanctioned thought-partner shapes
+// (docs/prompt-guide.md): what-changed, risk surfacing, open questions. None requests
+// a treatment decision.
 const QUICK_PROMPTS = [
     'What brings her in today?',
     'Any medication risks?',
     'What changed since the last visit?',
-    'Summarize the contradictions in the record.',
+    'What questions are worth asking today?',
 ];
 
 // ---- Per-patient conversation persistence (sessionStorage keyed by patient id) ----

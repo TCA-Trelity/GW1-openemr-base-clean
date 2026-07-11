@@ -216,6 +216,20 @@ describe('buildChatSystemPrompt + citableDocuments', () => {
         expect(docs).toHaveLength(1);
         expect(docs[0]!.id).toBe('doc-mc-004');
     });
+
+    // Guards: the thought-partner contract (docs/prompt-guide.md, M2) drifting out of the
+    // prompt — the same pin-the-load-bearing-phrases discipline injection-resistance uses
+    // for the extraction fence. Each phrase carries one leg of the contract: the ban, the
+    // attributed reframe, where the decision sits, and the relay carve-out.
+    it('states the non-prescriptiveness contract: ban, attributed reframe, carve-out', () => {
+        const prompt = buildChatSystemPrompt(tinyBundle());
+        expect(prompt).toContain('thought partner, not a prescriber');
+        expect(prompt).toContain('Never advise starting, stopping, or changing treatment, dosing');
+        expect(prompt).toContain('attribute the source in the same sentence');
+        expect(prompt).toContain('the decision stays with the physician');
+        expect(prompt).toContain('WITH its attribution');
+        expect(prompt).toContain('originating your own clinical direction is not');
+    });
 });
 
 describe('verifyCitation', () => {
