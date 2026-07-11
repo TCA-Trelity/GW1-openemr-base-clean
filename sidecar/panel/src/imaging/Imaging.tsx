@@ -274,6 +274,7 @@ export default function Imaging({
     treatments,
     onAsk,
     onViewScan,
+    focus = null,
 }: {
     imaging: BriefContent['imaging'];
     images: ImageRecord[];
@@ -282,6 +283,8 @@ export default function Imaging({
     onAsk?: (text: string) => void;
     /** IC3: reports the scan open in the Workspace so chat turns can say "this scan". */
     onViewScan?: (id: string | null) => void;
+    /** IC2: chat -> viewer focus; a fresh object per request re-fires even for the same id. */
+    focus?: { id: string; nonce: number } | null;
 }) {
     const hasImages = images.length > 0;
     // Land on the image-first Workspace when there are scans; fall back to Timeline otherwise.
@@ -300,6 +303,17 @@ export default function Imaging({
     useEffect(() => {
         onViewScan?.(selectedImageId);
     }, [selectedImageId, onViewScan]);
+
+    // IC2: chat asked to open a scan (sparkline point / compare thumbnail). Honor it on
+    // mount and on every fresh request; ids not in this patient's set are ignored.
+    useEffect(() => {
+        if (focus !== null && images.some((image) => image.id === focus.id)) {
+            setSelectedImageId(focus.id);
+            setFromTimeline(false);
+            setActiveSubTab('workspace');
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- fire per focus request, not per images identity
+    }, [focus]);
 
     const selectTab = (id: SubTabId) => {
         setFromTimeline(false);

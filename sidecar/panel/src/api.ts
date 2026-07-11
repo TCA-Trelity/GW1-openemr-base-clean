@@ -309,10 +309,69 @@ export interface ChatToolUse {
     input: Record<string, unknown>;
 }
 
+/** IC2: compact render-ready projection of an imaging tool result (drawn in the bubble). */
+export interface ChatTrendSummary {
+    kind: 'trend';
+    metric: string;
+    series: { date: string | null; value: number; image_id: string; laterality: string | null }[];
+}
+
+export interface ChatCompareSummary {
+    kind: 'compare';
+    current_image_id: string;
+    prior_image_id: string;
+    overall_change?: string;
+}
+
+export type ChatToolSummary = ChatTrendSummary | ChatCompareSummary;
+
 /** A `tool_result` stream event (TC3): that tool returned; `ok` is false on a structured error. */
 export interface ChatToolResult {
     name: string;
     ok: boolean;
+    /** IC2: present only for imaging tools whose result the panel can draw inline. */
+    summary?: ChatToolSummary;
+}
+
+/** Structural parse of a wire summary — anything unexpected degrades to null (no visual). */
+function parseToolSummary(value: unknown): ChatToolSummary | null {
+    if (typeof value !== 'object' || value === null) {
+        return null;
+    }
+    const record = value as Record<string, unknown>;
+    if (record['kind'] === 'trend' && typeof record['metric'] === 'string' && Array.isArray(record['series'])) {
+        const series = record['series'].flatMap((point) => {
+            if (typeof point !== 'object' || point === null) {
+                return [];
+            }
+            const { date, value: pointValue, image_id, laterality } = point as Record<string, unknown>;
+            if (typeof pointValue !== 'number' || typeof image_id !== 'string') {
+                return [];
+            }
+            return [
+                {
+                    date: typeof date === 'string' ? date : null,
+                    value: pointValue,
+                    image_id,
+                    laterality: typeof laterality === 'string' ? laterality : null,
+                },
+            ];
+        });
+        return series.length === 0 ? null : { kind: 'trend', metric: record['metric'], series };
+    }
+    if (
+        record['kind'] === 'compare' &&
+        typeof record['current_image_id'] === 'string' &&
+        typeof record['prior_image_id'] === 'string'
+    ) {
+        return {
+            kind: 'compare',
+            current_image_id: record['current_image_id'],
+            prior_image_id: record['prior_image_id'],
+            ...(typeof record['overall_change'] === 'string' ? { overall_change: record['overall_change'] } : {}),
+        };
+    }
+    return null;
 }
 
 export type ChatSendResult =
@@ -455,7 +514,8 @@ export async function sendChatMessage(
                     : {};
             onToolUse?.({ name: event.name, input });
         } else if (event.type === 'tool_result' && typeof event.name === 'string') {
-            onToolResult?.({ name: event.name, ok: event.ok === true });
+            const summary = parseToolSummary(event.summary);
+            onToolResult?.({ name: event.name, ok: event.ok === true, ...(summary === null ? {} : { summary }) });
         } else if (event.type === 'seed' && typeof event.content === 'string') {
             // M9 opening move: the agent's prepared digest, persisted server-side as the
             // conversation's first assistant message and echoed here for live rendering.

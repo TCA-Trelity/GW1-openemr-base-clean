@@ -13,7 +13,7 @@ import { loadConfig } from '../src/config.js';
 import { AnthropicClient, type FetchLike } from '../src/prep/anthropic.js';
 import { BudgetExceededError, type LlmCallRecord } from '../src/prep/budget.js';
 import type { PrepLogger } from '../src/prep/extraction.js';
-import { registerChatRoutes, type ChatRouteDeps } from '../src/routes/chat.js';
+import { imagingToolSummary, registerChatRoutes, type ChatRouteDeps } from '../src/routes/chat.js';
 import { buildServer } from '../src/server.js';
 import type { RegisteredTool } from '../src/chat/tools/index.js';
 import type { FactBundle, StoredBrief } from '../src/store/index.js';
@@ -663,6 +663,57 @@ describe('chat routes', () => {
         const done = events.at(-1)!;
         expect(done['type']).toBe('done');
         expect(done['tools_used']).toEqual(['get_open_questions']);
+    });
+
+    // Guards (IC2): imaging tool results stream with a compact render-ready summary — the
+    // panel draws the sparkline/compare pair from it — while non-imaging tools stay bare.
+    it('POST projects a trend summary onto imaging tool_result events only', async () => {
+        const trendOutput = {
+            metric: 'ganglion_cell_thickness',
+            laterality: 'od',
+            series: [
+                { date: '2024-01-01', laterality: 'od', value: 80, unit: 'microns', image_id: 'img-1' },
+                { date: '2024-06-01', laterality: 'od', value: 65, unit: 'microns', image_id: 'img-2' },
+            ],
+            derived: true,
+        };
+        const store = new FakeChatStore();
+        const spendGuard = new FakeSpendGuard();
+        const { service } = chatServiceWithTools(
+            store,
+            spendGuard,
+            [fakeTool('get_measurement_trend', trendOutput)],
+            toolUseResponse('get_measurement_trend', { metric: 'GC-IPL' }),
+            chatResponse(REPLY),
+        );
+        const deps: ChatRouteDeps = { store, service, spendGuard };
+        const res = await chatApp(deps).inject({
+            method: 'POST',
+            url: '/api/chat/margaret-chen',
+            payload: { message: 'How is her GC-IPL trending?' },
+        });
+        const toolResult = sseEvents(res.body).find((event) => event['type'] === 'tool_result')!;
+        expect(toolResult['summary']).toEqual({
+            kind: 'trend',
+            metric: 'ganglion_cell_thickness',
+            series: [
+                { date: '2024-01-01', value: 80, image_id: 'img-1', laterality: 'od' },
+                { date: '2024-06-01', value: 65, image_id: 'img-2', laterality: 'od' },
+            ],
+        });
+
+        // The projector itself: compare -> compact pair; errors and non-imaging -> undefined.
+        expect(
+            imagingToolSummary('compare_scans', true, {
+                current_image_id: 'img-2',
+                prior_image_id: 'img-1',
+                comparison: { overall_change: 'improved', changes: [] },
+                derived: true,
+            }),
+        ).toEqual({ kind: 'compare', current_image_id: 'img-2', prior_image_id: 'img-1', overall_change: 'improved' });
+        expect(imagingToolSummary('get_measurement_trend', false, { error: 'no data' })).toBeUndefined();
+        expect(imagingToolSummary('get_open_questions', true, { count: 0 })).toBeUndefined();
+        expect(imagingToolSummary('get_measurement_trend', true, { metric: 'cst', series: 'garbage' })).toBeUndefined();
     });
 
     // Guards: guard responses arriving mid-stream — they must be plain JSON status codes.

@@ -526,3 +526,85 @@ describe('ChatDrawer viewing-scan context (IC3)', () => {
         });
     });
 });
+
+describe('ChatDrawer imaging visuals (IC2)', () => {
+    const trendSummary = {
+        kind: 'trend',
+        metric: 'ganglion_cell_thickness',
+        series: [
+            { date: '2024-01-01', value: 80, image_id: 'img-mc-001', laterality: 'od' },
+            { date: '2024-06-01', value: 65, image_id: 'img-mc-002', laterality: 'od' },
+        ],
+    };
+    const compareSummary = {
+        kind: 'compare',
+        current_image_id: 'img-mc-002',
+        prior_image_id: 'img-mc-001',
+        overall_change: 'improved',
+    };
+    const imageRecords = [
+        { id: 'img-mc-001', image_metadata: { capture_date: '2024-01-01', modality: 'oct', laterality: 'od' } },
+        { id: 'img-mc-002', image_metadata: { capture_date: '2024-06-01', modality: 'oct', laterality: 'od' } },
+    ];
+
+    function visualsHarness(summary: Record<string, unknown>, onOpenScan: (id: string) => void) {
+        stubFetch((url) =>
+            url.includes('/api/chat/')
+                ? sseResponse([
+                      { type: 'tool_use', name: summary['kind'] === 'trend' ? 'get_measurement_trend' : 'compare_scans', input: {} },
+                      { type: 'tool_result', name: summary['kind'] === 'trend' ? 'get_measurement_trend' : 'compare_scans', ok: true, summary },
+                      { type: 'delta', text: 'Here is the picture.' },
+                      { type: 'done', conversation_id: 'conv-ic2', citations: [], unverified_count: 0, tools_used: [] },
+                  ])
+                : undefined,
+        );
+        function Harness2() {
+            const [open, setOpen] = useState(false);
+            return (
+                <ChatDrawer
+                    patientId="margaret-chen"
+                    open={open}
+                    onToggle={setOpen}
+                    images={imageRecords as never}
+                    onOpenScan={onOpenScan}
+                />
+            );
+        }
+        render(<Harness2 />);
+        openDrawer();
+        sendMessage('Show me the trend.');
+    }
+
+    // Failure mode: the model narrates a trend the panel cannot show — the sparkline must
+    // render from the tool_result summary and each point must open its scan in the viewer.
+    it('renders a clickable sparkline from a trend summary', async () => {
+        const onOpenScan = vi.fn();
+        visualsHarness(trendSummary, onOpenScan);
+
+        await screen.findByText('Here is the picture.');
+        expect(screen.getByTestId('chat-trend-sparkline')).toBeInTheDocument();
+        const points = screen.getAllByTestId('chat-trend-point');
+        expect(points).toHaveLength(2);
+        fireEvent.click(points[1]!);
+        expect(onOpenScan).toHaveBeenCalledWith('img-mc-002');
+    });
+
+    // Failure mode: "compared scans" with no way to see either scan — the pair must render
+    // prior/current thumbnails that deep-link into the imaging workspace.
+    it('renders prior/current compare thumbnails that open their scans', async () => {
+        const onOpenScan = vi.fn();
+        visualsHarness(compareSummary, onOpenScan);
+
+        await screen.findByText('Here is the picture.');
+        expect(screen.getByTestId('chat-compare-pair')).toBeInTheDocument();
+        expect(screen.getByText(/overall improved/)).toBeInTheDocument();
+        const thumbs = screen.getAllByTestId('chat-compare-thumb');
+        expect(thumbs).toHaveLength(2);
+        expect(thumbs[0]!).toHaveTextContent('Prior');
+        expect(thumbs[0]!).toHaveTextContent('Jan 1, 2024');
+        expect(thumbs[1]!).toHaveTextContent('Current');
+        expect(thumbs[1]!).toHaveTextContent('Jun 1, 2024');
+        fireEvent.click(thumbs[1]!);
+        expect(onOpenScan).toHaveBeenCalledWith('img-mc-002');
+    });
+});

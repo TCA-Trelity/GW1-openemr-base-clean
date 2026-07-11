@@ -458,3 +458,24 @@ describe('Imaging viewing-scan reporting (IC3)', () => {
         expect(onViewScan).toHaveBeenLastCalledWith('img-wt-001');
     });
 });
+
+describe('Imaging chat focus (IC2)', () => {
+    // Failure mode: chat's "open that scan" click lands on the imaging tab but the
+    // workspace still shows the default scan — the focus prop must drive the selection.
+    it('selects the focused scan in the workspace when chat requests it', () => {
+        render(
+            <Imaging
+                imaging={wtImaging}
+                images={wtImages}
+                treatments={wtTreatments}
+                focus={{ id: 'img-wt-001', nonce: 1 }}
+            />,
+        );
+        expect(screen.getByTestId('workspace')).toBeInTheDocument();
+        const selected = screen
+            .getAllByTestId('filmstrip-thumb')
+            .find((thumb) => thumb.getAttribute('data-selected') === 'true');
+        expect(selected).toBeDefined();
+        expect(selected!.getAttribute('aria-label')).toContain('May 5, 2025');
+    });
+});

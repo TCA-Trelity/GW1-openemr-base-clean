@@ -36,6 +36,55 @@ function storeNotConfigured(reply: FastifyReply): FastifyReply {
     return reply.status(503).send({ error: 'store_not_configured' });
 }
 
+/**
+ * IC2: project an imaging tool's result into a compact, render-ready summary the panel
+ * can draw (trend sparkline, compare pair) — never the whole payload. Structural checks
+ * only: anything unexpected degrades to `undefined` (no summary), never an error.
+ */
+export function imagingToolSummary(
+    name: string,
+    ok: boolean,
+    output: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+    if (!ok || output === undefined) {
+        return undefined;
+    }
+    if (name === 'get_measurement_trend' && Array.isArray(output['series']) && typeof output['metric'] === 'string') {
+        const series = (output['series'] as unknown[]).flatMap((point) => {
+            if (typeof point !== 'object' || point === null) {
+                return [];
+            }
+            const { date, value, image_id, laterality } = point as Record<string, unknown>;
+            if (typeof value !== 'number' || typeof image_id !== 'string') {
+                return [];
+            }
+            return [
+                {
+                    date: typeof date === 'string' ? date : null,
+                    value,
+                    image_id,
+                    laterality: typeof laterality === 'string' ? laterality : null,
+                },
+            ];
+        });
+        return series.length === 0 ? undefined : { kind: 'trend', metric: output['metric'], series };
+    }
+    if (name === 'compare_scans' && typeof output['current_image_id'] === 'string' && typeof output['prior_image_id'] === 'string') {
+        const comparison = output['comparison'];
+        const overall =
+            typeof comparison === 'object' && comparison !== null
+                ? (comparison as Record<string, unknown>)['overall_change']
+                : undefined;
+        return {
+            kind: 'compare',
+            current_image_id: output['current_image_id'],
+            prior_image_id: output['prior_image_id'],
+            ...(typeof overall === 'string' ? { overall_change: overall } : {}),
+        };
+    }
+    return undefined;
+}
+
 export function registerChatRoutes(app: FastifyInstance, deps: ChatRouteDeps | undefined): void {
     app.post<ChatPost>('/api/chat/:patientId', async (request, reply) => {
         if (deps === undefined) {
@@ -133,7 +182,16 @@ export function registerChatRoutes(app: FastifyInstance, deps: ChatRouteDeps | u
                     onCitation: (citation) => writeEvent({ type: 'citation', citation }),
                     // Tool activity streams so the panel can show what the model is doing (TC3).
                     onToolUse: (event) => writeEvent({ type: 'tool_use', name: event.name, input: event.input }),
-                    onToolResult: (event) => writeEvent({ type: 'tool_result', name: event.name, ok: event.ok }),
+                    // IC2: imaging results also carry a compact summary the panel renders inline.
+                    onToolResult: (event) => {
+                        const summary = imagingToolSummary(event.name, event.ok, event.output);
+                        writeEvent({
+                            type: 'tool_result',
+                            name: event.name,
+                            ok: event.ok,
+                            ...(summary === undefined ? {} : { summary }),
+                        });
+                    },
                 },
             );
             writeEvent({

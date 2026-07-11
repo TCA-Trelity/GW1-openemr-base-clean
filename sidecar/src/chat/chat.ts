@@ -76,8 +76,12 @@ export interface ChatTurnHooks {
     onCitation?: (citation: ChatCitation) => void;
     /** Fired when the model invokes a tool (before it runs) — the panel shows tool activity. */
     onToolUse?: (event: { name: string; input: Record<string, unknown> }) => void;
-    /** Fired when a tool returns; `ok` is false for a structured-error result. */
-    onToolResult?: (event: { name: string; ok: boolean }) => void;
+    /**
+     * Fired when a tool returns; `ok` is false for a structured-error result. `output` is
+     * the tool's full result (IC2) so callers can project render-ready summaries — absent
+     * for an unknown tool name.
+     */
+    onToolResult?: (event: { name: string; ok: boolean; output?: Record<string, unknown> }) => void;
 }
 
 // Cap on tool-execution rounds before a final, tool-free call is forced (guards against a
@@ -341,7 +345,7 @@ export class ChatService {
                     content: JSON.stringify(invocation.output),
                     ...(invocation.ok ? {} : { is_error: true }),
                 });
-                hooks?.onToolResult?.({ name: call.name, ok: invocation.ok });
+                hooks?.onToolResult?.({ name: call.name, ok: invocation.ok, output: invocation.output });
             }
             messages.push({ role: 'user', content: resultBlocks });
         }

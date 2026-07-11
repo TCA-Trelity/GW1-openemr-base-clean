@@ -28,9 +28,11 @@ import {
     type LucideIcon,
 } from 'lucide-react';
 import { fetchChatHistory, sendChatMessage } from './api';
-import type { ChatCitation, CitationRef } from './types';
+import type { ChatCompareSummary, ChatToolSummary, ChatTrendSummary } from './api';
+import type { ChatCitation, CitationRef, ImageRecord } from './types';
 import { CitationChips } from './CitationChip';
-import { asSourceType, titleCase } from './ui';
+import ScanImage from './imaging/ScanImage';
+import { asSourceType, formatDate, titleCase } from './ui';
 
 const MAX_MESSAGE_CHARS = 2000; // mirrors routes/chat.ts MAX_MESSAGE_CHARS
 
@@ -153,6 +155,8 @@ interface ToolActivity {
     /** A short human hint pulled from the tool input (query/metric/document), else null. */
     descriptor: string | null;
     status: 'running' | 'ok' | 'error';
+    /** IC2: render-ready projection of an imaging result (sparkline / compare pair), else null. */
+    summary: ChatToolSummary | null;
 }
 
 let nextToolSeq = 0;
@@ -198,12 +202,17 @@ function toolDescriptor(input: Record<string, unknown>): string | null {
 }
 
 /** Mark the first still-running activity with this tool name as ok/error (tools can repeat). */
-function resolveFirstRunning(activity: ToolActivity[], name: string, status: 'ok' | 'error'): ToolActivity[] {
+function resolveFirstRunning(
+    activity: ToolActivity[],
+    name: string,
+    status: 'ok' | 'error',
+    summary: ChatToolSummary | null = null,
+): ToolActivity[] {
     let resolved = false;
     return activity.map((item) => {
         if (!resolved && item.name === name && item.status === 'running') {
             resolved = true;
-            return { ...item, status };
+            return { ...item, status, summary };
         }
         return item;
     });
@@ -253,9 +262,159 @@ function ToolActivityStrip({ activity }: { activity: ToolActivity[] }) {
     );
 }
 
+// ---- Imaging result visuals (IC2): draw the data the model saw, linked to the viewer ----
+
+const EYE_STROKES: Record<string, string> = { od: '#2563eb', os: '#7c3aed' };
+
+/** Inline sparkline of a measurement trend; each point opens its scan in the workspace. */
+function TrendSparkline({ summary, onOpenScan }: { summary: ChatTrendSummary; onOpenScan?: (id: string) => void }) {
+    const WIDTH = 200;
+    const HEIGHT = 44;
+    const PAD = 6;
+    const values = summary.series.map((point) => point.value);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const span = max - min || 1;
+    const y = (value: number) => HEIGHT - PAD - ((value - min) / span) * (HEIGHT - 2 * PAD);
+
+    // One polyline per eye present (a mixed series is really two series).
+    const eyes = [...new Set(summary.series.map((point) => point.laterality ?? ''))];
+    const groups = eyes.map((eye) => {
+        const points = summary.series.filter((point) => (point.laterality ?? '') === eye);
+        const x = (index: number) =>
+            points.length === 1 ? WIDTH / 2 : PAD + (index * (WIDTH - 2 * PAD)) / (points.length - 1);
+        return { eye, points, x };
+    });
+    const unit = summary.series.length > 0 ? `${String(min)}–${String(max)}` : '';
+
+    return (
+        <div data-testid="chat-trend-sparkline" className="rounded-lg border border-slate-200 bg-white px-2.5 py-2">
+            <p className="mb-1 text-[11px] leading-none text-slate-500">
+                <span className="font-medium text-slate-600">{titleCase(summary.metric)}</span>
+                {' · '}
+                {summary.series.length} point{summary.series.length === 1 ? '' : 's'} · {unit}
+                {eyes.filter((eye) => eye !== '').length > 1 && ' · OD blue / OS violet'}
+            </p>
+            <svg viewBox={`0 0 ${String(WIDTH)} ${String(HEIGHT)}`} className="block w-full" style={{ maxWidth: WIDTH }} role="img" aria-label={`${summary.metric} trend`}>
+                {groups.map(({ eye, points, x }) => (
+                    <g key={eye === '' ? 'unknown' : eye}>
+                        {points.length > 1 && (
+                            <polyline
+                                fill="none"
+                                stroke={EYE_STROKES[eye] ?? '#64748b'}
+                                strokeWidth="1.5"
+                                points={points.map((point, index) => `${String(x(index))},${String(y(point.value))}`).join(' ')}
+                            />
+                        )}
+                        {points.map((point, index) => (
+                            <circle
+                                key={point.image_id + String(index)}
+                                data-testid="chat-trend-point"
+                                role="button"
+                                aria-label={`Open scan — ${point.date === null ? point.image_id : formatDate(point.date)} (${String(point.value)})`}
+                                cx={x(index)}
+                                cy={y(point.value)}
+                                r="3.5"
+                                fill={EYE_STROKES[eye] ?? '#64748b'}
+                                className={onOpenScan === undefined ? '' : 'cursor-pointer'}
+                                onClick={() => onOpenScan?.(point.image_id)}
+                            >
+                                <title>{`${point.date ?? point.image_id}: ${String(point.value)}`}</title>
+                            </circle>
+                        ))}
+                    </g>
+                ))}
+            </svg>
+            {onOpenScan !== undefined && <p className="mt-0.5 text-[10px] leading-none text-slate-400">Click a point to open that scan</p>}
+        </div>
+    );
+}
+
+/** Prior/current thumbnails for a scan comparison; either opens its scan in the workspace. */
+function ComparePair({
+    summary,
+    images,
+    onOpenScan,
+}: {
+    summary: ChatCompareSummary;
+    images: ImageRecord[];
+    onOpenScan?: (id: string) => void;
+}) {
+    const sides: { label: string; id: string }[] = [
+        { label: 'Prior', id: summary.prior_image_id },
+        { label: 'Current', id: summary.current_image_id },
+    ];
+    return (
+        <div data-testid="chat-compare-pair" className="rounded-lg border border-slate-200 bg-white px-2.5 py-2">
+            <p className="mb-1.5 text-[11px] leading-none text-slate-500">
+                <span className="font-medium text-slate-600">Scan comparison</span>
+                {summary.overall_change !== undefined && ` · overall ${summary.overall_change.replace(/_/g, ' ')}`}
+            </p>
+            <div className="flex gap-2">
+                {sides.map(({ label, id }) => {
+                    const record = images.find((image) => image.id === id);
+                    return (
+                        <button
+                            key={label}
+                            type="button"
+                            data-testid="chat-compare-thumb"
+                            aria-label={`Open ${label.toLowerCase()} scan in the imaging workspace`}
+                            onClick={() => onOpenScan?.(id)}
+                            className="flex-1 rounded-lg border border-slate-200 p-1.5 text-left hover:border-blue-300 hover:shadow-sm transition-all"
+                        >
+                            {record !== undefined && <ScanImage image={record} className="w-full h-14 mb-1" />}
+                            <span className="block text-[11px] font-medium leading-tight text-slate-600">{label}</span>
+                            <span className="block text-[10px] leading-tight text-slate-400">
+                                {record === undefined ? id : formatDate(record.image_metadata.capture_date)}
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+/** All imaging visuals for a bubble, in tool order — rendered between the chips and the prose. */
+function ToolResultVisuals({
+    activity,
+    images,
+    onOpenScan,
+}: {
+    activity: ToolActivity[];
+    images: ImageRecord[];
+    onOpenScan?: (id: string) => void;
+}) {
+    const withSummaries = activity.filter((item) => item.summary !== null);
+    if (withSummaries.length === 0) {
+        return null;
+    }
+    return (
+        <div className="mb-1.5 space-y-2">
+            {withSummaries.map((item) =>
+                item.summary!.kind === 'trend' ? (
+                    <TrendSparkline key={item.id} summary={item.summary as ChatTrendSummary} {...(onOpenScan === undefined ? {} : { onOpenScan })} />
+                ) : (
+                    <ComparePair key={item.id} summary={item.summary as ChatCompareSummary} images={images} {...(onOpenScan === undefined ? {} : { onOpenScan })} />
+                ),
+            )}
+        </div>
+    );
+}
+
 // ---- Bubbles ----
 
-function AssistantBubble({ bubble, onRetry }: { bubble: ChatBubble; onRetry: (bubble: ChatBubble) => void }) {
+function AssistantBubble({
+    bubble,
+    onRetry,
+    images,
+    onOpenScan,
+}: {
+    bubble: ChatBubble;
+    onRetry: (bubble: ChatBubble) => void;
+    images: ImageRecord[];
+    onOpenScan?: (id: string) => void;
+}) {
     // Chips: verified citations only, in arrival order — an unverifiable citation is never provenance.
     const chips = useMemo(
         () => bubble.citations.filter((citation) => citation.verified).map(chatCitationRef),
@@ -270,6 +429,7 @@ function AssistantBubble({ bubble, onRetry }: { bubble: ChatBubble; onRetry: (bu
                     </p>
                 )}
                 <ToolActivityStrip activity={bubble.toolActivity} />
+                <ToolResultVisuals activity={bubble.toolActivity} images={images} {...(onOpenScan === undefined ? {} : { onOpenScan })} />
                 {(bubble.content !== '' || bubble.status === 'streaming' || chips.length > 0) && (
                     <div className="rounded-xl rounded-bl-sm bg-slate-100 px-3.5 py-2 text-[13px] text-slate-700 leading-snug whitespace-pre-wrap">
                         {bubble.content}
@@ -314,6 +474,8 @@ export default function ChatDrawer({
     onToggle,
     seed = null,
     viewingImageId = null,
+    images = [],
+    onOpenScan,
 }: {
     patientId: string;
     open: boolean;
@@ -322,6 +484,10 @@ export default function ChatDrawer({
     seed?: { text: string; nonce: number } | null;
     /** IC3: the scan open in the imaging workspace — sent with each turn so "this scan" resolves. */
     viewingImageId?: string | null;
+    /** IC2: the patient's image records, so compare summaries can render real thumbnails. */
+    images?: ImageRecord[];
+    /** IC2: opens a scan in the imaging workspace (clicked sparkline point / compare thumb). */
+    onOpenScan?: (id: string) => void;
 }) {
     const [bubbles, setBubbles] = useState<ChatBubble[]>([]);
     const [draft, setDraft] = useState('');
@@ -419,14 +585,14 @@ export default function ChatDrawer({
                         ...bubble,
                         toolActivity: [
                             ...bubble.toolActivity,
-                            { id: toolActivityId(), name: tool.name, descriptor: toolDescriptor(tool.input), status: 'running' },
+                            { id: toolActivityId(), name: tool.name, descriptor: toolDescriptor(tool.input), status: 'running', summary: null },
                         ],
                     }));
                 },
                 (tool) => {
                     patch(assistantId, (bubble) => ({
                         ...bubble,
-                        toolActivity: resolveFirstRunning(bubble.toolActivity, tool.name, tool.ok ? 'ok' : 'error'),
+                        toolActivity: resolveFirstRunning(bubble.toolActivity, tool.name, tool.ok ? 'ok' : 'error', tool.summary ?? null),
                     }));
                 },
                 (seedContent) => {
@@ -618,7 +784,7 @@ export default function ChatDrawer({
                                 </div>
                             </div>
                         ) : (
-                            <AssistantBubble key={bubble.id} bubble={bubble} onRetry={retry} />
+                            <AssistantBubble key={bubble.id} bubble={bubble} onRetry={retry} images={images} {...(onOpenScan === undefined ? {} : { onOpenScan })} />
                         ),
                     )}
                 </div>
