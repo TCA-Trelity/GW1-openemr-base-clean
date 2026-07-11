@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent }
 import {
     AlertTriangle,
     Check,
+    Eye,
     FileText,
     GitCompare,
     HelpCircle,
@@ -165,12 +166,13 @@ function toolActivityId(): string {
     return `tool-${nextToolSeq}`;
 }
 
-// Friendly labels + icons for the seven read-only tools; unknown names humanize gracefully.
+// Friendly labels + icons for the eight read-only tools; unknown names humanize gracefully.
 const TOOL_LABELS: Record<string, string> = {
     get_full_document: 'Read full document',
     get_measurement_trend: 'Traced measurement trend',
     compare_scans: 'Compared scans',
     get_imaging_overview: 'Summarized imaging history',
+    describe_scan: 'Looked at the scan',
     check_med_risk: 'Checked medication risk',
     search_record: 'Searched the record',
     get_open_questions: 'Reviewed open questions',
@@ -181,6 +183,7 @@ const TOOL_ICONS: Record<string, LucideIcon> = {
     get_measurement_trend: TrendingUp,
     compare_scans: GitCompare,
     get_imaging_overview: ScanEye,
+    describe_scan: Eye,
     check_med_risk: ShieldAlert,
     search_record: Search,
     get_open_questions: HelpCircle,
@@ -430,6 +433,17 @@ function AssistantBubble({
                 )}
                 <ToolActivityStrip activity={bubble.toolActivity} />
                 <ToolResultVisuals activity={bubble.toolActivity} images={images} {...(onOpenScan === undefined ? {} : { onOpenScan })} />
+                {/* IC4: the model looked at scan pixels — flag that part of this reply is an
+                    AI visual observation, not sourced from (or citable to) the record. */}
+                {bubble.toolActivity.some((item) => item.name === 'describe_scan') && (
+                    <p
+                        data-testid="visual-observation-banner"
+                        className="mb-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-violet-200 bg-violet-50 text-[11px] leading-none text-violet-700"
+                    >
+                        <Eye className="w-3 h-3 flex-shrink-0" />
+                        Includes AI visual observation — not from the record
+                    </p>
+                )}
                 {(bubble.content !== '' || bubble.status === 'streaming' || chips.length > 0) && (
                     <div className="rounded-xl rounded-bl-sm bg-slate-100 px-3.5 py-2 text-[13px] text-slate-700 leading-snug whitespace-pre-wrap">
                         {bubble.content}

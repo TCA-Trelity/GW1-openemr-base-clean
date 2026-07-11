@@ -1,10 +1,12 @@
-// Barrel + registry for the read-only chat tools (TC1; get_imaging_overview added by IC1).
-// ChatService drives these by name in its tool-use loop; import the registry from here.
+// Barrel + registry for the read-only chat tools (TC1; get_imaging_overview added by IC1,
+// describe_scan by IC4). ChatService drives these by name in its tool-use loop; import the
+// registry from here.
 import type { RegisteredTool } from './types.js';
 import { getFullDocument } from './getFullDocument.js';
 import { getMeasurementTrend } from './getMeasurementTrend.js';
 import { compareScans } from './compareScans.js';
 import { getImagingOverview } from './getImagingOverview.js';
+import { describeScan } from './describeScan.js';
 import { checkMedRisk } from './checkMedRisk.js';
 import { searchRecord } from './searchRecord.js';
 import { getOpenQuestions } from './getOpenQuestions.js';
@@ -14,6 +16,7 @@ export { getFullDocument, getFullDocumentOutputSchema } from './getFullDocument.
 export { getMeasurementTrend, getMeasurementTrendOutputSchema } from './getMeasurementTrend.js';
 export { compareScans, compareScansOutputSchema } from './compareScans.js';
 export { getImagingOverview, getImagingOverviewOutputSchema } from './getImagingOverview.js';
+export { describeScan, describeScanOutputSchema } from './describeScan.js';
 export { checkMedRisk, checkMedRiskOutputSchema } from './checkMedRisk.js';
 export { searchRecord, searchRecordOutputSchema } from './searchRecord.js';
 export { getOpenQuestions, getOpenQuestionsOutputSchema } from './getOpenQuestions.js';
@@ -24,6 +27,7 @@ export const ALL_CHAT_TOOLS: readonly RegisteredTool[] = [
     getMeasurementTrend,
     compareScans,
     getImagingOverview,
+    describeScan,
     checkMedRisk,
     searchRecord,
     getOpenQuestions,

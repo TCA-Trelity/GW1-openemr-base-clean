@@ -4,12 +4,13 @@
 // engineering requirement). Store-backed deps wire in only when DATABASE_URL is set.
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { Langfuse } from 'langfuse';
-import { ChatService } from './chat/chat.js';
+import { ChatService, type ChatImageLoader } from './chat/chat.js';
 import { DevTokenService } from './auth/devToken.js';
 import { SmartTokenVerifier } from './auth/smartVerifier.js';
 import { CompositeVerifier } from './auth/verifier.js';
@@ -52,6 +53,42 @@ export interface AppDeps {
     authRoutes?: AuthRouteDeps;
     /** Role-gated fact verification (S3.3). */
     verify?: VerifyRouteDeps;
+}
+
+/** One resolution for the scan-pixels directory: /api/images static route + chat's loader. */
+function scanImagesDir(config: Config): string {
+    return config.SCAN_IMAGES_DIR ?? fileURLToPath(new URL('../seed/images/', import.meta.url));
+}
+
+const SCAN_MEDIA_TYPES: Record<string, string> = {
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp',
+    '.gif': 'image/gif',
+};
+
+/**
+ * Filesystem ChatImageLoader (IC4): reads a scan's pixels from the same directory
+ * /api/images serves. storage_key is a flat filename by contract — anything path-like is
+ * refused, and every failure degrades to null (the loader never throws).
+ */
+export function fsImageLoader(imagesDir: string): ChatImageLoader {
+    return async (storageKey) => {
+        if (storageKey.includes('/') || storageKey.includes('\\') || storageKey.includes('..')) {
+            return null;
+        }
+        const mediaType = SCAN_MEDIA_TYPES[path.extname(storageKey).toLowerCase()];
+        if (mediaType === undefined) {
+            return null;
+        }
+        try {
+            const bytes = await readFile(path.join(imagesDir, storageKey));
+            return { mediaType, base64: bytes.toString('base64') };
+        } catch {
+            return null;
+        }
+    };
 }
 
 // Store-backed dependencies exist only when DATABASE_URL is configured; without it the
@@ -161,6 +198,8 @@ export function buildDeps(config: Config): AppDeps | undefined {
                 }),
                 store,
                 spendGuard,
+                undefined, // default tool registry
+                fsImageLoader(scanImagesDir(config)), // IC4: describe_scan pixel attachment
             ),
             spendGuard,
         },
@@ -200,7 +239,7 @@ export function buildServer(config: Config, deps?: AppDeps): FastifyInstance {
 
     // Scan images (S2.13): image_records carry a storage_key; the panel loads
     // /api/images/<storage_key>. fastify-static owns traversal safety.
-    const imagesDir = config.SCAN_IMAGES_DIR ?? fileURLToPath(new URL('../seed/images/', import.meta.url));
+    const imagesDir = scanImagesDir(config);
     if (existsSync(imagesDir)) {
         void app.register(fastifyStatic, {
             root: imagesDir,

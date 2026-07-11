@@ -1,4 +1,4 @@
-// Eval: imaging-cohesion (IC0/IC1). The chat surface and the analytics rail must tell ONE
+// Eval: imaging-cohesion (IC0/IC1/IC4). The chat surface and the analytics rail must tell ONE
 // imaging story. IC1's get_imaging_overview returns the SAME derived block buildOverview
 // feeds the panel — these evals pin that contract (deep-equal, per corpus) and prove the
 // tool rides the real ChatService loop verbatim. A third, opt-in case (LIVE_EVALS=1 + API
@@ -135,6 +135,71 @@ describe('imaging-cohesion', () => {
             metric: 'tool executed in-loop / tool_result verbatim / final reply lands',
             value: `tools_used=${result.tools_used.join(',') || 'none'}; verbatim=${fedBackVerbatim}; reply delivered=${result.reply.includes(finalReply)}`,
             threshold: 'get_imaging_overview runs once; tool_result deep-equals direct output; reply delivered',
+            pass,
+        });
+    });
+
+    it('describe_scan attaches real pixels through the loop and the observation stays quarantined', async () => {
+        const bundle = seededFactBundle(margaretChen);
+        const withPixels = bundle.images.find((image) => typeof image['storage_key'] === 'string');
+        const imageId = withPixels?.id ?? 'img-mc-006';
+
+        const observation =
+            'AI visual observation (not from the record): central dome-shaped elevation consistent with the authored reading.';
+        const { client, requests } = scriptedClient([
+            llmToolUseResponse([{ id: 'tu-look', name: 'describe_scan', input: { image_id: imageId } }]),
+            llmResponse(observation),
+        ]);
+        const loads: string[] = [];
+        const service = new ChatService(client, new MemoryChatStore(), undefined, undefined, (storageKey) => {
+            loads.push(storageKey);
+            return Promise.resolve({ mediaType: 'image/jpeg', base64: 'UElYRUxT' });
+        });
+
+        const result = await service.turn(
+            { bundle, conversationId: 'conv-ic-4', message: 'What does the latest scan actually look like?', correlationId: 'eval-ic-4' },
+            silentLogger,
+        );
+
+        // The wire: request 2's tool_result carries [verbatim JSON text, base64 image block].
+        const followUp = requests[1] ?? {};
+        const messages = (followUp['messages'] ?? []) as { role: string; content: unknown }[];
+        const toolResult = ((messages.at(-1)?.content ?? []) as Record<string, unknown>[]).find(
+            (block) => block['type'] === 'tool_result',
+        );
+        const content = (toolResult?.['content'] ?? []) as Record<string, unknown>[];
+        const textBlock = content[0] as { text?: string } | undefined;
+        const imageBlock = content[1] as { type?: string; source?: { data?: string } } | undefined;
+        const pixelsAttached =
+            Array.isArray(content) &&
+            content.length === 2 &&
+            typeof textBlock?.text === 'string' &&
+            textBlock.text.includes('"attach_image":true') &&
+            imageBlock?.type === 'image' &&
+            imageBlock.source?.data === 'UElYRUxT';
+
+        // The quarantine: prompt pins present; the reply keeps the mandatory prefix; the
+        // visual read produced zero citations (never provenance).
+        const system = String((requests[0] ?? {})['system'] ?? '');
+        const quarantinePinned =
+            system.includes('"AI visual observation (not from the record):"') &&
+            system.includes('never cite it') &&
+            system.includes('defer to the record');
+        const pass =
+            loads.length === 1 &&
+            pixelsAttached &&
+            quarantinePinned &&
+            isDeepStrictEqual(result.tools_used, ['describe_scan']) &&
+            result.reply.includes('AI visual observation (not from the record):') &&
+            result.citations.length === 0;
+
+        recordEval({
+            id: 'imaging-cohesion.describe-scan-media-loop',
+            description:
+                "describe_scan over Margaret's record: the loop loads the scan's stored pixels and attaches them to the tool_result as an image block, the prompt quarantines the visual read, and the observation arrives prefixed and uncited",
+            metric: 'pixels attached / quarantine pinned / observation prefixed + uncited',
+            value: `loader calls=${String(loads.length)}; pixels attached=${String(pixelsAttached)}; quarantine pinned=${String(quarantinePinned)}; tools_used=${result.tools_used.join(',')}; citations=${String(result.citations.length)}`,
+            threshold: 'one pixel load; tool_result = [json text, image block]; all quarantine pins present; prefixed reply with 0 citations',
             pass,
         });
     });

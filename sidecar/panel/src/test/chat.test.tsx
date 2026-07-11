@@ -608,3 +608,29 @@ describe('ChatDrawer imaging visuals (IC2)', () => {
         expect(onOpenScan).toHaveBeenCalledWith('img-mc-002');
     });
 });
+
+describe('ChatDrawer visual-observation banner (IC4)', () => {
+    // Failure mode: an AI visual read blends invisibly into cited record facts — any bubble
+    // whose turn used describe_scan must carry the not-from-the-record banner.
+    it('flags a reply that used describe_scan', async () => {
+        stubFetch((url) =>
+            url.includes('/api/chat/')
+                ? sseResponse([
+                      { type: 'tool_use', name: 'describe_scan', input: { image_id: 'img-mc-006' } },
+                      { type: 'tool_result', name: 'describe_scan', ok: true },
+                      { type: 'delta', text: 'AI visual observation (not from the record): central dome-shaped elevation.' },
+                      { type: 'done', conversation_id: 'conv-ic4', citations: [], unverified_count: 0, tools_used: ['describe_scan'] },
+                  ])
+                : undefined,
+        );
+        render(<Harness />);
+        openDrawer();
+        sendMessage('What does the latest scan look like?');
+
+        await screen.findByText(/central dome-shaped elevation/);
+        expect(screen.getByTestId('visual-observation-banner')).toBeInTheDocument();
+        expect(screen.getByText('Includes AI visual observation — not from the record')).toBeInTheDocument();
+        // The tool chip renders too, with its friendly label.
+        expect(screen.getByText('Looked at the scan')).toBeInTheDocument();
+    });
+});

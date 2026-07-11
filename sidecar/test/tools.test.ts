@@ -1,5 +1,5 @@
-// Chat tool tests (TC1; IC1 added get_imaging_overview): each of the seven read-only tools,
-// happy path + unresolved-input
+// Chat tool tests (TC1; IC1 added get_imaging_overview, IC4 describe_scan): each of the
+// eight read-only tools, happy path + unresolved-input
 // error path, against a small FactBundle fixture. Every happy output is validated against its
 // own Zod output schema (contracts are the source of truth). Tools never throw — bad input
 // degrades to a structured { error } with ok:false.
@@ -9,6 +9,8 @@ import {
     checkMedRiskOutputSchema,
     compareScans,
     compareScansOutputSchema,
+    describeScan,
+    describeScanOutputSchema,
     getFullDocument,
     getFullDocumentOutputSchema,
     getImagingOverview,
@@ -91,12 +93,13 @@ function toolBundle(): FactBundle {
 }
 
 describe('tool registry', () => {
-    it('registers all seven tools with unique names and valid JSON schemas', () => {
+    it('registers all eight tools with unique names and valid JSON schemas', () => {
         expect(ALL_CHAT_TOOLS.map((t) => t.name)).toEqual([
             'get_full_document',
             'get_measurement_trend',
             'compare_scans',
             'get_imaging_overview',
+            'describe_scan',
             'check_med_risk',
             'search_record',
             'get_open_questions',
@@ -203,6 +206,48 @@ describe('get_imaging_overview', () => {
         expect(inv.ok).toBe(true);
         const timeline = inv.output['timeline'] as { treatment_context: { last_treatment: unknown } }[];
         expect(timeline.every((entry) => entry.treatment_context.last_treatment === null)).toBe(true);
+    });
+});
+
+describe('describe_scan', () => {
+    it('returns scan metadata, the authored reading, and the attach_image marker', () => {
+        const bundle = toolBundle();
+        bundle.images = bundle.images.map((image) =>
+            image.id !== 'img-1'
+                ? image
+                : {
+                      ...image,
+                      storage_key: 'oct-test-1.jpg',
+                      ai_analysis: {
+                          ...(image['ai_analysis'] as Record<string, unknown>),
+                          summary: { headline: 'Subretinal fluid, moderate' },
+                      },
+                  },
+        );
+        const inv = describeScan.invoke(bundle, { image_id: 'img-1' });
+        expect(inv.ok).toBe(true);
+        expect(describeScanOutputSchema.safeParse(inv.output).success).toBe(true);
+        expect(inv.output).toMatchObject({
+            image_id: 'img-1',
+            capture_date: '2024-01-01',
+            modality: 'oct',
+            laterality: 'od',
+            authored_headline: 'Subretinal fluid, moderate',
+            storage_key: 'oct-test-1.jpg',
+            attach_image: true,
+        });
+        expect(inv.provenance).toEqual([]); // a visual read is never document provenance
+    });
+
+    it('returns a structured error for an unknown id and for a scan without stored pixels', () => {
+        const unknown = describeScan.invoke(toolBundle(), { image_id: 'img-nope' });
+        expect(unknown.ok).toBe(false);
+        expect(String(unknown.output['error'])).toContain('img-nope');
+
+        // Fixture images carry no storage_key -> nothing to look at, structured error.
+        const noPixels = describeScan.invoke(toolBundle(), { image_id: 'img-1' });
+        expect(noPixels.ok).toBe(false);
+        expect(String(noPixels.output['error'])).toContain('no stored pixels');
     });
 });
 

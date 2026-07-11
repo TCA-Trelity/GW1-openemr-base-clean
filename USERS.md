@@ -154,8 +154,11 @@ last injection of Avastin") — the disconnect he calls "crazy" is closed.
 without leaving the record or breaking his flow.
 **Why an agent.** Choosing *which* images are relevant for this disease at
 this visit, and binding each to its clinical event, is a relevance-and-
-synthesis judgment. (Model interpretation of the raw pixels is the reserved
-next phase; the schema already has the slot.)
+synthesis judgment. (Pixel-level model interpretation, originally reserved for
+the next phase, now ships as bounded observation: the chat's `describe_scan`
+tool shows the model the actual B-scan, and its read is quarantined — labelled
+"AI visual observation (not from the record)", never citable, morphology-only,
+with a visible banner on any reply that used it.)
 
 ### UC-7 — Patient-goal-aware care
 **Moment.** Planning the visit for a patient whose life context shapes what

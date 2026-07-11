@@ -4,9 +4,9 @@
 > (suite: `sidecar/eval/`). Committed as a deliverable and refreshed on every run;
 > CI regenerates and uploads it as an artifact on every push touching `sidecar/**`.
 
-- **Generated:** 2026-07-11T20:37:32.796Z
-- **Commit:** `c8cf47ff067a6520e3f4ff4c1b7b01b33e37f5b4` (workspace HEAD at generation time; in CI, the pushed commit)
-- **Result:** 20/20 evals passed
+- **Generated:** 2026-07-11T21:04:15.586Z
+- **Commit:** `216985af30e52e4f4ca9dc1a413c56cf114cccbf` (workspace HEAD at generation time; in CI, the pushed commit)
+- **Result:** 21/21 evals passed
 
 ## Results
 
@@ -30,6 +30,7 @@
 | `multi-turn-conversation.tool-round-cap` | A model that requests tools every round is cut off after MAX_TOOL_ROUNDS=4: the fifth call offers no tools and still yields a final answer | rounds with tools offered / forced tool-free final | 5 llm calls; tools offered on first 4=true; final call tool-free=true; reply delivered=true | 4 tool rounds then exactly one tool-free forced final that answers | PASS |
 | `prescriptiveness.reframe-passes` | The sanctioned reframe to a dose ask — cited record facts, in-sentence guideline/engine attribution, a question worth weighing — passes the lint with 0 flags and verified citations | lint flags on the reframe (must be 0) / grounding intact | 0 flags; attribution present=true; closes on a question=true; 1 citations, 0 unverified | 0 flags; attribution + question shape present; citation verified | PASS |
 | `prescriptiveness.violation-caught` | A reply originating clinical direction in all four banned shapes (first-person advice, second-person directive, passive directive, clinical imperative) is fully flagged by the lint inside the real chat turn | planted violations flagged (must be 4/4, one per rule family) | 4/4 flagged in-turn; rules=first_person_advice, second_person_directive, passive_directive, imperative_directive | 4/4 flagged; each rule family fires exactly once | PASS |
+| `imaging-cohesion.describe-scan-media-loop` | describe_scan over Margaret's record: the loop loads the scan's stored pixels and attaches them to the tool_result as an image block, the prompt quarantines the visual read, and the observation arrives prefixed and uncited | pixels attached / quarantine pinned / observation prefixed + uncited | loader calls=1; pixels attached=true; quarantine pinned=true; tools_used=describe_scan; citations=0 | one pixel load; tool_result = [json text, image block]; all quarantine pins present; prefixed reply with 0 citations | PASS |
 | `imaging-cohesion.one-source-of-truth` | get_imaging_overview returns byte-identical timeline / interval analysis / HCQ progression to buildOverview's imaging block (what the panel's analytics rail renders), for both corpora | tool output ≡ overview imaging block (deep-equal, both corpora) + scan-count goldens | margaret-chen: cohesive=true, 6 scans golden=true; william-thompson: cohesive=true, 7 scans golden=true | deep-equal on all three derived structures; margaret 6 scans, william 7 | PASS |
 | `imaging-cohesion.tool-loop-round-trip` | A trend question answered through the real loop: get_imaging_overview executes over Margaret's record and its output rides the tool_result byte-identical to a direct invocation | tool executed in-loop / tool_result verbatim / final reply lands | tools_used=get_imaging_overview; verbatim=true; reply delivered=true | get_imaging_overview runs once; tool_result deep-equals direct output; reply delivered | PASS |
 

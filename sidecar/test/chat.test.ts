@@ -6,6 +6,7 @@ import {
     citableDocuments,
     verifyCitation,
     ChatService,
+    type ChatImageLoader,
     type ChatMessageInput,
     type StoredChatMessage,
 } from '../src/chat/chat.js';
@@ -157,18 +158,20 @@ function chatService(store: FakeChatStore, spendGuard?: FakeSpendGuard, ...respo
 }
 
 // A ChatService wired with an injected (deterministic) tool set for tool-loop tests.
+// imageLoader (IC4) is optional — pass one to exercise the describe_scan media path.
 function chatServiceWithTools(
     store: FakeChatStore,
     spendGuard: FakeSpendGuard | undefined,
     tools: RegisteredTool[],
-    ...responses: Response[]
+    responses: Response[],
+    imageLoader?: ChatImageLoader,
 ) {
     const fetchMock = vi.fn<FetchLike>();
     for (const response of responses) {
         fetchMock.mockResolvedValueOnce(response);
     }
     const client = new AnthropicClient({ apiKey: 'test-key', model: 'claude-haiku-4-5', fetchImpl: fetchMock });
-    return { service: new ChatService(client, store, spendGuard, tools), fetchMock };
+    return { service: new ChatService(client, store, spendGuard, tools, imageLoader), fetchMock };
 }
 
 // A stand-in tool with a fixed result — decouples loop tests from real tool logic.
@@ -236,6 +239,17 @@ describe('buildChatSystemPrompt + citableDocuments', () => {
         expect(prompt).toContain('Consult the imaging tools BEFORE stating any imaging data');
         expect(prompt).toContain('an absence claim without a tool check is a wrong answer');
         expect(prompt).toContain('without asking');
+    });
+
+    // Guards (IC4): the visual-observation quarantine — a describe_scan read must arrive
+    // prefixed as NOT-the-record, uncited, morphology-only, and defer to the authored
+    // analysis on conflict. Pin each leg.
+    it('states the visual-observation quarantine for describe_scan', () => {
+        const prompt = buildChatSystemPrompt(tinyBundle());
+        expect(prompt).toContain('"AI visual observation (not from the record):"');
+        expect(prompt).toContain('never cite it');
+        expect(prompt).toContain('no diagnosis, no severity grading, no treatment implication');
+        expect(prompt).toContain('defer to the record');
     });
 
     it('states the non-prescriptiveness contract: ban, attributed reframe, carve-out', () => {
@@ -373,8 +387,7 @@ describe('ChatService tool-use loop', () => {
             store,
             spendGuard,
             [tool],
-            toolUseResponse('get_open_questions', {}),
-            chatResponse('Ask about Plaquenil duration.'),
+            [toolUseResponse('get_open_questions', {}), chatResponse('Ask about Plaquenil duration.')],
         );
         const toolEvents: { name: string; ok?: boolean }[] = [];
         const result = await service.turn(
@@ -405,6 +418,73 @@ describe('ChatService tool-use loop', () => {
         expect(toolResultBlocks[0]).toMatchObject({ type: 'tool_result', tool_use_id: 'toolu-get_open_questions' });
     });
 
+    // Guards (IC4): the media path — a tool output marked attach_image gets the loaded
+    // pixels appended to its tool_result as an image content block, alongside the verbatim
+    // JSON text block.
+    it('attaches the scan pixels to a describe_scan tool_result via the injected loader', async () => {
+        const store = new FakeChatStore();
+        const output = {
+            image_id: 'img-1',
+            capture_date: '2024-01-01',
+            modality: 'oct',
+            laterality: 'od',
+            authored_headline: 'Subretinal fluid, moderate',
+            storage_key: 'oct-test-1.jpg',
+            attach_image: true,
+            derived: true,
+        };
+        const loads: string[] = [];
+        const loader: ChatImageLoader = (storageKey) => {
+            loads.push(storageKey);
+            return Promise.resolve({ mediaType: 'image/jpeg', base64: 'QUJD' });
+        };
+        const { service, fetchMock } = chatServiceWithTools(
+            store,
+            undefined,
+            [fakeTool('describe_scan', output)],
+            [toolUseResponse('describe_scan', { image_id: 'img-1' }), chatResponse(REPLY)],
+            loader,
+        );
+        await service.turn(
+            { bundle: tinyBundle(), conversationId: 'c', message: 'What does the scan look like?', correlationId: 'x' },
+            silentLogger,
+        );
+
+        expect(loads).toEqual(['oct-test-1.jpg']);
+        const secondBody = JSON.parse(String(fetchMock.mock.calls[1]![1]?.body)) as {
+            messages: { content: unknown }[];
+        };
+        const blocks = (secondBody.messages.at(-1)!.content as Record<string, unknown>[])[0]!;
+        const content = blocks['content'] as Record<string, unknown>[];
+        expect(Array.isArray(content)).toBe(true);
+        expect(content).toHaveLength(2);
+        expect(content[0]).toEqual({ type: 'text', text: JSON.stringify(output) });
+        expect(content[1]).toEqual({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: 'QUJD' } });
+    });
+
+    it('degrades to an explicit image-unavailable note when the pixels cannot load', async () => {
+        const store = new FakeChatStore();
+        const output = { image_id: 'img-1', storage_key: 'gone.jpg', attach_image: true, derived: true };
+        const { service, fetchMock } = chatServiceWithTools(
+            store,
+            undefined,
+            [fakeTool('describe_scan', output)],
+            [toolUseResponse('describe_scan', { image_id: 'img-1' }), chatResponse(REPLY)],
+            () => Promise.resolve(null), // loader present but the pixels are gone
+        );
+        await service.turn(
+            { bundle: tinyBundle(), conversationId: 'c', message: 'Look at the scan.', correlationId: 'x' },
+            silentLogger,
+        );
+        const secondBody = JSON.parse(String(fetchMock.mock.calls[1]![1]?.body)) as {
+            messages: { content: unknown }[];
+        };
+        const blocks = (secondBody.messages.at(-1)!.content as Record<string, unknown>[])[0]!;
+        const content = blocks['content'] as Record<string, unknown>[];
+        expect(content).toHaveLength(2);
+        expect(String((content[1] as { text: string }).text)).toContain('image_unavailable');
+    });
+
     // Guards: a document-quoting tool's provenance is verified server-side and surfaced as a
     // citation (the gate philosophy carried through the tool path).
     it('attaches a verified citation from a document-quoting tool result', async () => {
@@ -417,8 +497,7 @@ describe('ChatService tool-use loop', () => {
             store,
             undefined,
             [tool],
-            toolUseResponse('search_record', { query: 'Plaquenil' }),
-            chatResponse('On Plaquenil since 2019.'),
+            [toolUseResponse('search_record', { query: 'Plaquenil' }), chatResponse('On Plaquenil since 2019.')],
         );
         const streamed: unknown[] = [];
         const result = await service.turn(
@@ -442,11 +521,13 @@ describe('ChatService tool-use loop', () => {
             store,
             undefined,
             [tool],
-            toolUseResponse('search_record', { query: 'x' }),
-            toolUseResponse('search_record', { query: 'x' }),
-            toolUseResponse('search_record', { query: 'x' }),
-            toolUseResponse('search_record', { query: 'x' }),
-            chatResponse('Final answer after the cap.'),
+            [
+                toolUseResponse('search_record', { query: 'x' }),
+                toolUseResponse('search_record', { query: 'x' }),
+                toolUseResponse('search_record', { query: 'x' }),
+                toolUseResponse('search_record', { query: 'x' }),
+                chatResponse('Final answer after the cap.'),
+            ],
         );
         const result = await service.turn(
             { bundle: tinyBundle(), conversationId: 'c', message: 'loop forever', correlationId: 'x' },
@@ -644,8 +725,7 @@ describe('chat routes', () => {
             store,
             spendGuard,
             [tool],
-            toolUseResponse('get_open_questions', {}),
-            chatResponse(REPLY),
+            [toolUseResponse('get_open_questions', {}), chatResponse(REPLY)],
         );
         const deps: ChatRouteDeps = { store, service, spendGuard };
         const res = await chatApp(deps).inject({
@@ -683,8 +763,7 @@ describe('chat routes', () => {
             store,
             spendGuard,
             [fakeTool('get_measurement_trend', trendOutput)],
-            toolUseResponse('get_measurement_trend', { metric: 'GC-IPL' }),
-            chatResponse(REPLY),
+            [toolUseResponse('get_measurement_trend', { metric: 'GC-IPL' }), chatResponse(REPLY)],
         );
         const deps: ChatRouteDeps = { store, service, spendGuard };
         const res = await chatApp(deps).inject({
