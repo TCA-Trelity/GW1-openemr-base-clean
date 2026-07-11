@@ -12,6 +12,7 @@ import {
     CalendarRange,
     GitMerge,
     HelpCircle,
+    MessageCircle,
     Pill,
     RefreshCw,
     Scan,
@@ -295,11 +296,25 @@ function DiscussionPointRow({
     point,
     index,
     factById,
+    onAsk,
 }: {
     point: string | DiscussionPoint;
     index: number;
     factById: Map<string, PatientFact>;
+    /** Ask-about-this (M6): seeds the chat pane with this point, prefilled. */
+    onAsk?: (text: string) => void;
 }) {
+    const askButton = (text: string) =>
+        onAsk === undefined ? null : (
+            <button
+                type="button"
+                onClick={() => onAsk(`About: "${text}" — what does the record show?`)}
+                className="flex-shrink-0 inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-slate-600"
+            >
+                <MessageCircle className="w-3 h-3" />
+                ask
+            </button>
+        );
     // Older stored briefs carry plain strings — render them plainly, numbered.
     if (typeof point === 'string') {
         return (
@@ -310,6 +325,7 @@ function DiscussionPointRow({
                 <span className="text-sm text-slate-700 truncate" title={point}>
                     {point}
                 </span>
+                {askButton(point)}
             </li>
         );
     }
@@ -342,6 +358,7 @@ function DiscussionPointRow({
                     view conflict
                 </button>
             )}
+            {askButton(point.text)}
         </li>
     );
 }
@@ -354,7 +371,7 @@ function DiscussionPointRow({
 
 const MAX_VISIBLE_POINTS = 6;
 
-function InsightsBody({ brief }: { brief: StoredBrief }) {
+function InsightsBody({ brief, onAsk }: { brief: StoredBrief; onAsk?: (text: string) => void }) {
     const content = brief.content;
     const [showAllQuestions, setShowAllQuestions] = useState(false);
     const [showAllPoints, setShowAllPoints] = useState(false);
@@ -391,7 +408,7 @@ function InsightsBody({ brief }: { brief: StoredBrief }) {
                     </h3>
                     <ol className="space-y-1.5">
                         {visiblePoints.map((point, i) => (
-                            <DiscussionPointRow key={i} point={point} index={i} factById={factById} />
+                            <DiscussionPointRow key={i} point={point} index={i} factById={factById} {...(onAsk === undefined ? {} : { onAsk })} />
                         ))}
                     </ol>
                     {!showAllPoints && points.length > MAX_VISIBLE_POINTS && (
@@ -455,7 +472,16 @@ function InsightsBody({ brief }: { brief: StoredBrief }) {
 
 // ---- The tab ----
 
-export default function AiInsightsTab({ state, onRetry }: { state: InsightsState; onRetry: () => void }) {
+export default function AiInsightsTab({
+    state,
+    onRetry,
+    onAsk,
+}: {
+    state: InsightsState;
+    onRetry: () => void;
+    /** Ask-about-this (M6): threaded to each worth-discussing row's seed button. */
+    onAsk?: (text: string) => void;
+}) {
     return (
         <div data-testid="ai-insights">
             {state.kind === 'loading' && <p className="text-sm text-slate-400">Loading AI insights…</p>}
@@ -493,7 +519,7 @@ export default function AiInsightsTab({ state, onRetry }: { state: InsightsState
                 </div>
             )}
 
-            {state.kind === 'ready' && <InsightsBody brief={state.brief} />}
+            {state.kind === 'ready' && <InsightsBody brief={state.brief} {...(onAsk === undefined ? {} : { onAsk })} />}
         </div>
     );
 }

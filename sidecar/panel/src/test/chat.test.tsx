@@ -428,3 +428,40 @@ describe('ChatDrawer quick prompts', () => {
         expect(JSON.parse(String((post![1] as RequestInit).body))).toEqual({ message: 'Any medication risks?' });
     });
 });
+
+describe('ChatDrawer ask-about-this seeding (M6)', () => {
+    // Failure modes: a seeded ask silently not reaching the input, or worse, auto-sending
+    // a turn (spending tokens) without the physician's keystroke.
+    function SeedHarness({ seedText }: { seedText: string }) {
+        const [open, setOpen] = useState(false);
+        const [seed, setSeed] = useState<{ text: string; nonce: number } | null>(null);
+        return (
+            <>
+                <button
+                    type="button"
+                    onClick={() => {
+                        setSeed({ text: seedText, nonce: 1 });
+                        setOpen(true);
+                    }}
+                >
+                    seed-ask
+                </button>
+                <ChatDrawer patientId="margaret-chen" open={open} onToggle={setOpen} seed={seed} />
+            </>
+        );
+    }
+
+    it('opens the pane with the ask prefilled — and never auto-sends it', async () => {
+        const mock = stubFetch(() => jsonResponse(200, { conversation_id: 'x', messages: [] }));
+        const seedText = 'About the Oct 22, 2025 OD scan: what changed compared with the prior scan?';
+        render(<SeedHarness seedText={seedText} />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'seed-ask' }));
+
+        const input = await screen.findByPlaceholderText("Ask about this patient's record…");
+        expect((input as HTMLTextAreaElement).value).toBe(seedText);
+        // Prefill only: no chat POST fired without the physician's send.
+        const post = mock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'POST');
+        expect(post).toBeUndefined();
+    });
+});

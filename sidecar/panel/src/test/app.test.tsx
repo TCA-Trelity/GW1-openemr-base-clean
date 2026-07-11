@@ -415,9 +415,11 @@ describe('AI insights', () => {
         ).toHaveTextContent('Prior visit');
         // contradiction point: link to the matching alert card
         expect(within(points[1]!).getByRole('button', { name: /view conflict/i })).toBeInTheDocument();
-        // legacy plain string renders plainly, numbered
+        // legacy plain string renders plainly, numbered — no chips or conflict link; the
+        // M6 ask affordance is the one action every row carries
         expect(points[2]).toHaveTextContent('Family history of retinal detachment (mother) with new floaters');
-        expect(within(points[2]!).queryByRole('button')).not.toBeInTheDocument();
+        expect(within(points[2]!).queryByRole('button', { name: /view conflict/i })).not.toBeInTheDocument();
+        expect(within(points[2]!).getByRole('button', { name: /ask/i })).toBeInTheDocument();
     });
 
     // Failure mode (R4): the conflict link is decorative — it must scroll to the

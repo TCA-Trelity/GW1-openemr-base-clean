@@ -1,5 +1,9 @@
-// Chat drawer (S2.3, R5 native citations): the docked "Ask the record" slide-over,
-// reachable from every tab. Replies stream over POST /api/chat SSE as clean prose — no
+// "Ask the record" (S2.3, R5 native citations, M6 promotion): the co-pilot's primary
+// conversational surface — a persistent pane beside the tabs at desktop widths (App opens
+// it with the patient and shifts content aside), a slide-over drawer on narrow screens.
+// Ask-about-this affordances across Overview, Imaging, and AI Insights seed the input via
+// the `seed` prop; the physician sends (one keystroke), so every seeded ask continues the
+// same persisted conversation. Replies stream over POST /api/chat SSE as clean prose — no
 // inline tokens. Provenance rides the stream's citation events (already server-verified
 // verbatim against the stored documents): verified citations render as source-labelled
 // chips appended to the bubble, deep-linking into the source viewer at the cited character
@@ -298,10 +302,13 @@ export default function ChatDrawer({
     patientId,
     open,
     onToggle,
+    seed = null,
 }: {
     patientId: string;
     open: boolean;
     onToggle: (open: boolean) => void;
+    /** Ask-about-this seeding (M6): prefills the input (never auto-sends) and focuses it. */
+    seed?: { text: string; nonce: number } | null;
 }) {
     const [bubbles, setBubbles] = useState<ChatBubble[]>([]);
     const [draft, setDraft] = useState('');
@@ -363,6 +370,15 @@ export default function ChatDrawer({
             inputRef.current?.focus();
         }
     }, [open]);
+
+    // A seeded ask prefills the draft and focuses — the physician stays in control of the
+    // send (thought-partner posture: no turn fires, and no tokens spend, without their key).
+    useEffect(() => {
+        if (seed !== null) {
+            setDraft(seed.text);
+            inputRef.current?.focus();
+        }
+    }, [seed]);
 
     const patch = useCallback((id: string, update: (bubble: ChatBubble) => ChatBubble) => {
         setBubbles((prev) => prev.map((bubble) => (bubble.id === id ? update(bubble) : bubble)));

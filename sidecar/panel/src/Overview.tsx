@@ -6,7 +6,7 @@
 // patient header band is exported for App to mount above the tab bar (it hosts the AI
 // insights control); AI insights itself lives on its own tab.
 import { useState, type ReactNode } from 'react';
-import { ChevronDown, Clock, ExternalLink, GitMerge, MessageSquare, Scan } from 'lucide-react';
+import { ChevronDown, Clock, ExternalLink, GitMerge, MessageCircle, MessageSquare, Scan } from 'lucide-react';
 import type {
     CitationRef,
     ContradictionSeverity,
@@ -158,12 +158,15 @@ export function ContradictionAlerts({
     alerts,
     anchorPrefix,
     collapsible = false,
+    onAsk,
 }: {
     alerts: RuntimeContradiction[];
     /** When set, each alert row gets id `${anchorPrefix}-${alert.id}` so links can scroll to it. */
     anchorPrefix?: string;
     /** Overview renders the card collapsed to a summary row; deep-link surfaces keep it open. */
     collapsible?: boolean;
+    /** Ask-about-this (M6): seeds the conflict into the chat pane, prefilled — never auto-sent. */
+    onAsk?: (text: string) => void;
 }) {
     const [open, setOpen] = useState(!collapsible);
     if (alerts.length === 0) {
@@ -223,6 +226,20 @@ export function ContradictionAlerts({
                             </div>
                             {alert.suggested_question !== null && alert.suggested_question !== '' && (
                                 <p className="text-sm text-slate-500 italic mt-0.5">→ {alert.suggested_question}</p>
+                            )}
+                            {onAsk !== undefined && (
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        onAsk(
+                                            `About the ${titleCase(alert.type).toLowerCase()} conflict — ${alert.description} What does each source say?`,
+                                        )
+                                    }
+                                    className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-slate-700"
+                                >
+                                    <MessageCircle className="w-3 h-3" />
+                                    Ask the record
+                                </button>
                             )}
                         </li>
                     ))}
@@ -487,9 +504,12 @@ function RecentScans({
 export default function Overview({
     overview,
     onOpenImaging,
+    onAsk,
 }: {
     overview: OverviewPayload;
     onOpenImaging: () => void;
+    /** Ask-about-this (M6): seeds the chat pane with the clicked context. */
+    onAsk?: (text: string) => void;
 }) {
     const facts = overview.facts_by_type;
     const alerts = overview.contradictions.filter((row) => row.status !== 'resolved').map(projectContradictionRow);
@@ -502,7 +522,7 @@ export default function Overview({
 
             <RecentScans images={overview.images} imaging={overview.imaging} onOpenImaging={onOpenImaging} />
 
-            <ContradictionAlerts alerts={alerts} collapsible />
+            <ContradictionAlerts alerts={alerts} collapsible {...(onAsk === undefined ? {} : { onAsk })} />
         </div>
     );
 }
