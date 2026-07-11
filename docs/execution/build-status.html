@@ -142,8 +142,8 @@
   <div class="statusline">
     Hand-refreshed <b>2026-07-11</b> UTC · main = <b>e1d8f32</b> · early submission <b>100%</b> ·
     Wave&nbsp;Q 8/8 · P4 awaiting EHR deploy ·
-    <span class="new">Wave&nbsp;M built: 8/9 in one pass</span> — multi-turn agent emphasis + thought-partner guardrails
-    (branch <b>b5bf45e</b>, <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/pull/4">PR&nbsp;#4 draft</a>; evals 18/18 · sidecar 362 · panel 81, all green) ·
+    <span class="new">Wave&nbsp;M complete: 9/9</span> — multi-turn agent emphasis + thought-partner guardrails
+    (branch <b>b5bf45e</b>, <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/pull/4">PR&nbsp;#4 draft</a>; evals 18/18 · sidecar 368 · panel 82, all green) ·
     renders <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/execution-plan.md">docs/execution/execution-plan.md</a> (the source of truth)
   </div>
   <div class="toplinks">
@@ -249,7 +249,7 @@
     <div class="panel">
       <div class="panel-head">
         <h2>Wave M — multi-turn agent emphasis + thought-partner guardrails</h2>
-        <span class="pill">Built 2026-07-11 · 8/9 · PR #4 draft — M9 stretch awaits your call</span>
+        <span class="pill">Complete 2026-07-11 · 9/9 · PR #4 draft</span>
       </div>
       <blockquote>Early-submission feedback: "the eval suite is one of the strongest in the batch … however, the rubric explicitly excludes a 'report generator' as the core interface, and the ARCHITECTURE emphasis on a pre-assembled one-page brief … reads closer to that pattern than to the multi-turn tool-invoking agent the rubric asks for; … promoting that conversational surface to a primary role in both the doc and the demo would make that clear."</blockquote>
       <p class="muted">The chat already <em>is</em> that agent — persisted history, 4-round tool loop, six patient-scoped tools, verbatim-verified citations — but every graded artifact points at the brief: 0 of 11 evals exercise a conversation, Bruno never sends a second message, the panel ships chat closed behind a floating button, and USERS.md traces multi-turn to one use case. Wave M moves the weight, and adds the guardrail the prompt layer lacks: <b>thought partner, never prescriber</b> — cited record facts · engine/guideline output with attribution · questions worth considering. The decision stays with the physician.</p>
@@ -273,10 +273,10 @@
           <h4>Reframe</h4>
           <div class="tk"><span class="g done">☑</span><span class="id">M7</span><span>ARCHITECTURE/USERS agent-first — brief = the agent's proactive opening move; multi-turn use cases added</span></div>
           <div class="tk"><span class="g done">☑</span><span class="id">M8</span><span>demo video #3 script — conversation-led, tool chips + citations on screen, Langfuse trace close</span></div>
-          <div class="tk"><span class="g flag">⚑</span><span class="id">M9</span><span>stretch (approve first): brief-as-turn-zero seeding</span></div>
+          <div class="tk"><span class="g done">☑</span><span class="id">M9</span><span>brief-as-turn-zero: the opening move leads every new conversation (approved + shipped)</span></div>
         </div>
       </div>
-      <div class="order">shipped 2026-07-11: M1 → M5 → M2 → M3 → M4 → M7 → M6 (Chromium-verified) → M8 · eval suite 11→18 cases · remaining: M9 decision + record the demo (S3.6, Sunday AM)</div>
+      <div class="order">shipped 2026-07-11: M1 → M5 → M2 → M3 → M4 → M7 → M6 → M8 → M9 (Chromium-verified) · eval suite 11→18 cases · remaining: record the demo (S3.6, Sunday AM)</div>
     </div>
   </section>
 
@@ -309,7 +309,7 @@
           <tr><td><b>P</b></td><td>Production polish</td><td class="num">2/8</td><td class="note">P4 ◐ code shipped, awaiting reseed · P1–P3, P7, P8 ☐</td></tr>
           <tr><td><b>Q</b></td><td>UI refinement round 2</td><td class="num">8/8</td><td class="note">—</td></tr>
           <tr><td><b>Phase 3</b></td><td>Final hardening (S3.x)</td><td class="num">3/7</td><td class="note">S3.2 ◐ · S3.5 ◐ · S3.4 ☐ · S3.6 final video ☐</td></tr>
-          <tr><td><b>M</b></td><td>Multi-turn emphasis + guardrails</td><td class="num">8/9</td><td class="note">built 2026-07-11 — see above; M9 stretch needs approval</td></tr>
+          <tr><td><b>M</b></td><td>Multi-turn emphasis + guardrails</td><td class="num">9/9</td><td class="note">complete 2026-07-11 — see above</td></tr>
         </tbody>
       </table>
     </div>
@@ -320,14 +320,13 @@
     <div class="panel">
       <div class="checkline"><span class="g part">◐</span><span><b>P4</b> — re-register the OAuth client + reseed on Railway (commands in the turn report and the <code>seed-ehr.ts</code> runbook) — unblocks "awaiting EHR deploy"</span></div>
       <div class="checkline"><span class="g open">☐</span><span><b>G2</b> — Langfuse live on Railway + the 3 alerts configured (spec in <code>docs/execution/observability.md</code>)</span></div>
-      <div class="checkline"><span class="g open">☐</span><span><b>M9 decision</b> — approve or drop the brief-as-turn-zero stretch before build</span></div>
-      <div class="checkline"><span class="g open">☐</span><span><b>P3</b> — create the 3 sample users via the admin-UI checklist (after P1/P2 land)</span></div>
+            <div class="checkline"><span class="g open">☐</span><span><b>P3</b> — create the 3 sample users via the admin-UI checklist (after P1/P2 land)</span></div>
       <div class="checkline"><span class="g open">☐</span><span><b>S3.6</b> — record the final demo video (conversation-led script is ready: <code>docs/defense/demo-script.md</code>) + social post before Sun 12:00 CT</span></div>
     </div>
   </section>
 
   <footer>
-    Refreshed 2026-07-11 by the working session · source of truth: <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/execution-plan.md">docs/execution/execution-plan.md</a> · this refresh: Wave M built 8/9 (<a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/pull/4">PR #4</a> — evals, guardrails, panel promotion, docs reframe, demo script; awaiting review + the M9 call).<br>
+    Refreshed 2026-07-11 by the working session · source of truth: <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/execution-plan.md">docs/execution/execution-plan.md</a> · this refresh: Wave M complete 9/9 (<a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/pull/4">PR #4</a> — evals, guardrails, panel promotion, docs reframe, demo script, opening move; awaiting review).<br>
     Page rebuilt this refresh from the execution plan + prior layout; earlier versions remain in the artifact version picker.
   </footer>
 </div>

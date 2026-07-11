@@ -360,8 +360,12 @@ imaging drill-down, a mid-conversation cross-patient refusal, and the Langfuse
 trace of that thread under one correlation ID. *Acceptance: docs reviewed
 against the rubric's "Agentic Chatbot" paragraph; demo script timed ≤5 min.*
 
-**Stretch (M9, approve before build).** Brief-as-turn-zero: seed each new
-conversation with a compact brief summary as the opening assistant message, so
-the transcript literally opens with the brief — replayable via `GET /api/chat`,
-runnable in Bruno, and the "report generator" reading dissolves structurally
-(one conversation; the brief is message #1 in it).
+**Stretch (M9) — user-approved with defaults and shipped 2026-07-11.**
+Brief-as-turn-zero: each new conversation is seeded with a compact digest of
+the latest completed brief as the opening assistant message (persisted, echoed
+live as an SSE `seed` event, labelled "Opening move — prepared during
+check-in" in the panel), so the transcript literally opens with the brief —
+replayable via `GET /api/chat`, visible in Bruno, and the "report generator"
+reading dissolves structurally (one conversation; the brief is message #1 in
+it). Skipped silently when no brief has completed; continued conversations
+are never re-seeded.
