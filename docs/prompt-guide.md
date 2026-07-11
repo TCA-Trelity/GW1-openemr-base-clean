@@ -97,6 +97,7 @@ relays them; it never adds its own.
 | Prompt (M2) | Hard rule 5 in the chat system prompt; run-sheet tone rules in the game plan prompt | `chat.ts`, `gamePlan.ts`; pinned by `test/chat.test.ts` structural tests |
 | Lint (M3) | Deterministic post-generation check for unattributed directive advice; flagged turns logged + counted like unverified citations | `sidecar/src/chat/prescriptivenessLint.ts`, wired into `ChatService.turn` |
 | Evals (M4) | Refusal-to-prescribe goldens (reframe shape asserted structurally) | `sidecar/eval/prescriptiveness.eval.ts`, published to `docs/execution/eval-results.md` |
+| Prompt + panel (IC4) | Hard rule 6: visual-observation quarantine (prefix, never cited, morphology-only, defer to record) + panel banner | `chat.ts` rule 6, `ChatDrawer.tsx` banner; pinned by `test/chat.test.ts` + `eval/imaging-cohesion.eval.ts` (see the quarantine section below) |
 
 ## Per-surface notes
 
@@ -111,3 +112,36 @@ relays them; it never adds its own.
 - **Extraction** is exempt from tone (it emits JSON) but carries the same
   grounding absolutes: only what THIS document supports, verbatim citations,
   absence over estimate.
+
+## The visual-observation quarantine (IC4)
+
+`describe_scan` is the one tool whose result is NOT the record: it attaches a
+stored scan's pixels and the model looks at them. Everything it "sees" is an
+AI visual observation — a third epistemic class beside cited record facts and
+attributed engine output — and it is quarantined on every layer:
+
+- **Prefix, always.** The observation must be introduced with exactly
+  **"AI visual observation (not from the record):"** — the reader should never
+  have to guess which sentences came from pixels (prompt hard rule 6, pinned
+  by structural tests).
+- **Never citable.** A visual read carries no document provenance, so it can
+  never render as a citation chip. The tool emits no provenance records by
+  construction; nothing to verify, nothing to cite.
+- **Morphology only.** Visible structure — elevation, fluid pockets, layer
+  contour. No diagnosis, no severity grading, no treatment implication; the
+  prescriptiveness lint applies to the observation like any other sentence.
+- **Defer to the record.** The tool result carries the authored analysis
+  headline alongside the pixels; when the model's read disagrees, it must say
+  so explicitly and defer to the record.
+- **Visible in the panel.** Any reply whose turn used `describe_scan` renders
+  a banner — "Includes AI visual observation — not from the record" — so the
+  quarantine is legible to the physician, not just to the model
+  (`ChatDrawer.tsx`, pinned by panel tests).
+
+| Ask | Banned | Sanctioned |
+|---|---|---|
+| "What does this scan actually look like?" | "The scan shows CNV; she needs an injection." | "AI visual observation (not from the record): a central dome-shaped elevation with an adjacent hyporeflective pocket. The authored analysis reads this as PED with subretinal fluid — consistent with what I see." |
+
+Structural enforcement: `imaging-cohesion.describe-scan-media-loop` proves the
+pixels ride the tool_result, the prompt pins hold, and the observation arrives
+prefixed and uncited (`sidecar/eval/imaging-cohesion.eval.ts`).

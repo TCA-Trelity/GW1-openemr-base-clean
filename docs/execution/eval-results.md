@@ -4,9 +4,9 @@
 > (suite: `sidecar/eval/`). Committed as a deliverable and refreshed on every run;
 > CI regenerates and uploads it as an artifact on every push touching `sidecar/**`.
 
-- **Generated:** 2026-07-11T17:51:07.710Z
-- **Commit:** `b5bf45e25f928a80088e54333e8108c0c41da09f` (workspace HEAD at generation time; in CI, the pushed commit)
-- **Result:** 18/18 evals passed
+- **Generated:** 2026-07-11T21:04:15.586Z
+- **Commit:** `216985af30e52e4f4ca9dc1a413c56cf114cccbf` (workspace HEAD at generation time; in CI, the pushed commit)
+- **Result:** 21/21 evals passed
 
 ## Results
 
@@ -30,6 +30,9 @@
 | `multi-turn-conversation.tool-round-cap` | A model that requests tools every round is cut off after MAX_TOOL_ROUNDS=4: the fifth call offers no tools and still yields a final answer | rounds with tools offered / forced tool-free final | 5 llm calls; tools offered on first 4=true; final call tool-free=true; reply delivered=true | 4 tool rounds then exactly one tool-free forced final that answers | PASS |
 | `prescriptiveness.reframe-passes` | The sanctioned reframe to a dose ask — cited record facts, in-sentence guideline/engine attribution, a question worth weighing — passes the lint with 0 flags and verified citations | lint flags on the reframe (must be 0) / grounding intact | 0 flags; attribution present=true; closes on a question=true; 1 citations, 0 unverified | 0 flags; attribution + question shape present; citation verified | PASS |
 | `prescriptiveness.violation-caught` | A reply originating clinical direction in all four banned shapes (first-person advice, second-person directive, passive directive, clinical imperative) is fully flagged by the lint inside the real chat turn | planted violations flagged (must be 4/4, one per rule family) | 4/4 flagged in-turn; rules=first_person_advice, second_person_directive, passive_directive, imperative_directive | 4/4 flagged; each rule family fires exactly once | PASS |
+| `imaging-cohesion.describe-scan-media-loop` | describe_scan over Margaret's record: the loop loads the scan's stored pixels and attaches them to the tool_result as an image block, the prompt quarantines the visual read, and the observation arrives prefixed and uncited | pixels attached / quarantine pinned / observation prefixed + uncited | loader calls=1; pixels attached=true; quarantine pinned=true; tools_used=describe_scan; citations=0 | one pixel load; tool_result = [json text, image block]; all quarantine pins present; prefixed reply with 0 citations | PASS |
+| `imaging-cohesion.one-source-of-truth` | get_imaging_overview returns byte-identical timeline / interval analysis / HCQ progression to buildOverview's imaging block (what the panel's analytics rail renders), for both corpora | tool output ≡ overview imaging block (deep-equal, both corpora) + scan-count goldens | margaret-chen: cohesive=true, 6 scans golden=true; william-thompson: cohesive=true, 7 scans golden=true | deep-equal on all three derived structures; margaret 6 scans, william 7 | PASS |
+| `imaging-cohesion.tool-loop-round-trip` | A trend question answered through the real loop: get_imaging_overview executes over Margaret's record and its output rides the tool_result byte-identical to a direct invocation | tool executed in-loop / tool_result verbatim / final reply lands | tools_used=get_imaging_overview; verbatim=true; reply delivered=true | get_imaging_overview runs once; tool_result deep-equals direct output; reply delivered | PASS |
 
 ## What these evals are (and are not)
 
@@ -60,6 +63,12 @@
   pass the sanctioned consultative reframe, in-turn. A third, live-behavioral
   case (real model vs. the same lint) is opt-in via `LIVE_EVALS=1` and spends
   tokens — it is absent from the committed deterministic run.
+- **`imaging-cohesion` pins chat↔rail unity.** The chat tool and the panel's
+  analytics rail must derive the imaging story from one source: the tool output
+  is deep-equal to the overview builder's imaging block, per corpus, and rides
+  the real loop verbatim. Its live case (opt-in, `LIVE_EVALS=1`) replays the
+  observed failure — a trend ask answered with a false absence claim — and
+  requires an imaging tool consultation instead.
 
 ## Known limitations and notes
 

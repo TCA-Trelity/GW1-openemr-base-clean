@@ -1,13 +1,21 @@
-# Mints the RELEASE.md promotion tag from CI: the dev session's git proxy only
-# accepts branch pushes, so the tag is created here with the runner's token.
-# Idempotent — an existing tag is left untouched.
+# Mints grader-checkpoint tags from CI: the dev session's git proxy only accepts
+# branch pushes, so tags are created here with the runner's token. Idempotent —
+# an existing tag is left untouched. Dispatch with the tag name per RELEASE.md's
+# checkpoint flow (the historical hard-coded push trigger minted stable-2026-07-09).
 name: Tag stable
 
 on:
-  push:
-    paths:
-      - '.github/workflows/tag-stable.yml'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Checkpoint tag name (must match stable-*, e.g. stable-2026-07-12)'
+        required: true
+        type: string
+      ref:
+        description: 'Ref to tag (default: main tip)'
+        required: false
+        default: 'main'
+        type: string
 
 permissions:
   contents: write
@@ -15,17 +23,24 @@ permissions:
 jobs:
   tag:
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag }}
+      REF: ${{ inputs.ref }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Tag the main tip as stable-2026-07-09
+      - name: Tag the requested ref
         run: |
-          git fetch origin main -q
-          if git ls-remote --exit-code origin refs/tags/stable-2026-07-09 >/dev/null 2>&1; then
+          case "$TAG" in
+            stable-*) ;;
+            *) echo "tag must match stable-* (got: $TAG)"; exit 1;;
+          esac
+          git fetch origin "$REF" -q
+          if git ls-remote --exit-code origin "refs/tags/$TAG" >/dev/null 2>&1; then
             echo "tag already exists — nothing to do"
             exit 0
           fi
-          git tag stable-2026-07-09 origin/main
-          git push origin stable-2026-07-09
-          echo "tagged $(git rev-parse --short origin/main) as stable-2026-07-09"
+          git tag "$TAG" FETCH_HEAD
+          git push origin "$TAG"
+          echo "tagged $(git rev-parse --short FETCH_HEAD) as $TAG"

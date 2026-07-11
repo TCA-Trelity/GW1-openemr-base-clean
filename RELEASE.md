@@ -1,71 +1,82 @@
 # Release & branch model
 
-Two branches, one gate. Production and the instructor-facing mirror only ever
-see commits that have been proven stable and deliberately promoted.
+One protected line, one gate. Production and the instructor-facing mirror only
+ever see commits that have been proven stable and deliberately promoted.
 
-## Branches
+## The model (current — PR-gated)
 
 - **`main` — stable / instructor-facing.** The production Railway environment
-  and the evaluated mirror track this branch. It advances *only* by a deliberate
-  promotion of a proven commit — never a work-in-progress push. This is the
-  "last stable version" at all times.
-- **`claude/sidecar-debug-redeploy-hwd66g` — working / release branch.** All
-  active development lands here (supersedes `claude/ehr-architecture-defense-gg486o`,
-  whose history it contains). In-flight and occasionally-broken states are
-  expected and fine; nothing here reaches instructors until it is promoted.
+  and the evaluated mirror track this branch. It advances *only* by merging a
+  reviewed, CI-green pull request — the merge **is** the promotion decision.
+  This is the "last stable version" at all times.
+- **Feature branches (`claude/*`)** — all active development. In-flight and
+  occasionally-broken states are expected and fine; nothing reaches
+  instructors until its PR merges.
 
-Rule of thumb: **commits are made on the working branch; `main` only moves on a
-promotion.**
+This supersedes the earlier two-branch model (a designated working branch,
+`claude/sidecar-debug-redeploy-hwd66g`, manually promoted to `main`), which
+served the 2026-07-09/10 deploy-blocker firefight. Wave M (PR #4, merged
+2026-07-11 as `b1b9346`) was the first promotion through the PR gate.
 
-## Where things stand (2026-07-09, evening)
+## Promotion gate
 
-- `main` @ `736b51a` — AZ/TC3, config-hardening, CI gate, ops docs, load probe.
-  **Note:** its sidecar cannot deploy — the tree predates the export-ignore fix,
-  so the archive Railway builds from drops `sidecar/src/chat/tools/` (TS2307).
-- working @ current HEAD — everything on `main` plus S3.3 (verify workflow),
-  the deploy hardening (DB-reinstall guard, REST 500 message fix), and the
-  **deploy-blocker root-cause fix**: `.gitattributes` unanchored
-  `tools/ export-ignore` was silently excluding `sidecar/src/chat/tools/` from
-  every GitHub source archive — the build context Railway deploys. Anchored to
-  `/tools/`, added a `sidecar/** -export-ignore` carve-out, reverted the
-  CACHEBUST workaround, and added an export-parity CI job so this class of
-  failure is caught on push. **Promote this once its deploy is confirmed clean.**
-
-## Promotion (working → stable)
-
-Promote only when ALL of these are green on the working branch HEAD:
+A PR may merge to `main` only when ALL of these are green on its head:
 
 1. `cd sidecar && npm test` **and** `cd sidecar/panel && npm test`
-2. `npm run typecheck` in both
+2. `npm run typecheck` in both (plus `typecheck:eval`)
 3. `npm run build` in `sidecar/panel` and `sidecar` (the Docker build path)
-4. A clean deploy — `/health` and `/ready` green on a staging or test deploy
+4. The CI suite on the PR — including `export parity` (deploy archive ==
+   committed tree) and the live smoke where applicable. Known-benign
+   infra failures (e.g. Codecov tokenless-upload rejections; no
+   `CODECOV_TOKEN` secret is configured) are the only acceptable reds, and
+   must be verified as such per-run, not assumed.
 
-Then fast-forward `main` (working already contains all of `main`'s history, so
-this never rewrites stable):
+## Checkpoints for graders
 
-```
-git checkout main
-git merge --ff-only claude/sidecar-debug-redeploy-hwd66g
-git tag stable-$(date +%Y-%m-%d)
-git push origin main --tags
-```
+Immutable checkpoints are tags, minted from CI because the dev session's git
+proxy only accepts branch pushes (`.github/workflows/tag-stable.yml`; currently
+hard-coded per tag). Existing: `stable-2026-07-09` → `2124b47` (in `main`'s
+history). Cut a fresh `stable-YYYY-MM-DD` tag at each submission milestone so
+graders always have a frozen ref while Railway tracks `main`.
 
-If `--ff-only` refuses, `main` has commits the working branch lacks — rebase the
-working branch onto `main`, re-run the gate, then promote.
+## Historical note: orphaned deployment SHAs
+
+During the 2026-07-09/10 firefight, at least one promotion replaced `main`'s
+history instead of fast-forwarding. Two then-tips of `main` are therefore no
+longer reachable from any branch or tag:
+
+- `736b51a` — recorded as `main`'s tip in this file's 2026-07-09 revision.
+- `46e149aa` — the commit the Railway **OpenEMR service's** Active deployment
+  (built 2026-07-10 ~4 PM EDT) still reports as of 2026-07-11.
+
+These SHAs are not corruption and not mystery meat: they were `main` when they
+were built/recorded, and were superseded by later promotions. The content they
+carry predates the 2026-07-10 insurance-route fix (`7562e84`) and everything
+after it — which is why the deployed EHR can 500 on routes that are fixed in
+today's `main`. The remedy is always "deploy current `main`," never "redeploy
+the orphaned SHA."
 
 ## Rollback
 
-`main` is always the last proven commit, and each promotion is tagged
-`stable-YYYY-MM-DD`. To roll production back: redeploy the `main` deployment
-(Railway → the service → Deployments → Redeploy) or check out the latest
-`stable-*` tag. Nothing on the working branch can affect production until the
-next promotion.
+`main` is always the last proven commit, and submission milestones are tagged
+`stable-YYYY-MM-DD`. To roll production back: redeploy the previous `main`
+deployment (Railway → the service → Deployments → Redeploy on that older
+deployment) or deploy the latest `stable-*` tag. Nothing on a feature branch
+can affect production until its PR merges.
 
 ## Hardening that protects this model
 
-- **Boot-crash-proof config** — a malformed env var should disable *that feature*
-  and log a warning, not throw and kill the process. (Tracked; lands on the
-  working branch before the next promotion.)
+- **Boot-crash-proof config** — a malformed env var disables *that feature*
+  and logs a warning (`[config] X is invalid and was ignored`), it does not
+  kill the process.
 - **Health-gated deploys** — `railway.json` sets `healthcheckPath: /health`;
   Railway keeps the previous healthy deployment serving if a new one fails its
   health check, so a bad promotion cannot take production down.
+- **Export parity in CI** — the deploy archive is byte-compared against the
+  committed tree on every push, so an export-ignore regression (the original
+  deploy blocker) fails on push instead of silently shipping a partial tree.
+- **Deploy triggers** — the OpenEMR service must rebuild on any `main` change
+  outside `sidecar/**` and `docs/**` (Railway watch paths are *include*
+  patterns: `/**` plus `!sidecar/**`, `!docs/**`). A service that misses two
+  consecutive `main` movements has a trigger problem, not a code problem —
+  check Settings → Source before debugging anything else.

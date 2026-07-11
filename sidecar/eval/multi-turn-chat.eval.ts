@@ -293,8 +293,12 @@ describe('multi-turn-conversation', () => {
         );
 
         // Structural denial point 1: the tool layer is bundle-bound — William's document id
-        // does not resolve inside Margaret's record.
-        const toolDenied = isDeepStrictEqual(toolOutcomes, [{ name: 'get_full_document', ok: false }]);
+        // does not resolve inside Margaret's record. (Project name/ok: the hook also
+        // carries the full output since IC2.)
+        const toolDenied = isDeepStrictEqual(
+            toolOutcomes.map(({ name, ok }) => ({ name, ok })),
+            [{ name: 'get_full_document', ok: false }],
+        );
         const errorBlock = contentBlocks(lastMessage(requests[2] ?? {})).find(
             (block) => block['type'] === 'tool_result',
         );
@@ -344,7 +348,7 @@ describe('multi-turn-conversation', () => {
             silentLogger,
         );
 
-        const offeredTools = requests.slice(0, 4).every((request) => Array.isArray(request['tools']) && (request['tools'] as unknown[]).length === 6);
+        const offeredTools = requests.slice(0, 4).every((request) => Array.isArray(request['tools']) && (request['tools'] as unknown[]).length === 8);
         const finalWithoutTools = requests[4] !== undefined && requests[4]['tools'] === undefined;
         const pass =
             requests.length === 5 &&

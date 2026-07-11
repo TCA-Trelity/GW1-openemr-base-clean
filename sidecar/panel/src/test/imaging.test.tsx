@@ -442,3 +442,40 @@ describe('App imaging tab', () => {
         expect(screen.getByTestId('interval-banner')).toBeInTheDocument();
     });
 });
+
+describe('Imaging viewing-scan reporting (IC3)', () => {
+    // Failure mode: chat turns claim "this scan" context for a scan the physician is not
+    // actually viewing (stale or never-reported id) — the workspace must report the
+    // default on mount and every selection change upward.
+    it('reports the default scan on mount and the selected scan on timeline click', () => {
+        const onViewScan = vi.fn();
+        render(<Imaging imaging={wtImaging} images={wtImages} treatments={wtTreatments} onViewScan={onViewScan} />);
+        // Mount: the workspace defaults to the most recent scan.
+        expect(onViewScan).toHaveBeenLastCalledWith('img-wt-007');
+
+        openTimeline();
+        fireEvent.click(screen.getByRole('button', { name: /May 5, 2025/ }));
+        expect(onViewScan).toHaveBeenLastCalledWith('img-wt-001');
+    });
+});
+
+describe('Imaging chat focus (IC2)', () => {
+    // Failure mode: chat's "open that scan" click lands on the imaging tab but the
+    // workspace still shows the default scan — the focus prop must drive the selection.
+    it('selects the focused scan in the workspace when chat requests it', () => {
+        render(
+            <Imaging
+                imaging={wtImaging}
+                images={wtImages}
+                treatments={wtTreatments}
+                focus={{ id: 'img-wt-001', nonce: 1 }}
+            />,
+        );
+        expect(screen.getByTestId('workspace')).toBeInTheDocument();
+        const selected = screen
+            .getAllByTestId('filmstrip-thumb')
+            .find((thumb) => thumb.getAttribute('data-selected') === 'true');
+        expect(selected).toBeDefined();
+        expect(selected!.getAttribute('aria-label')).toContain('May 5, 2025');
+    });
+});

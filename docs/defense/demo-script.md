@@ -33,10 +33,12 @@ grounded in the seeded corpus, and every demo is a test run.*
   mine — the transcript literally opens with what it prepared. There is no
   separate report; the brief is turn zero of this conversation."
 - Say: "Measurement trends don't live in any document I attached — the agent
-  has six read-only, patient-scoped tools, and you can watch it use them. It
+  has eight read-only, patient-scoped tools, and you can watch it use them. It
   pulled the CRT series across all seven scans, compared the two scans around
   the 71-day gap, and the numbers it quotes are the same deterministic engine
-  output as the analytics rail — the model never does the math."
+  output as the analytics rail — the model never does the math. The trend it
+  traced renders right in the bubble as a sparkline, and clicking a point
+  opens that scan in the imaging workspace — chat and viewer are one loop."
 - Type the follow-up: **"What were the prior cycles holding at?"** — say:
   "Second turn, same conversation — 'prior cycles' only means something
   because the thread carries its context. This conversation is persisted

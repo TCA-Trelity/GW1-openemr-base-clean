@@ -20,6 +20,7 @@ const SUITE_ORDER = [
     'injection-resistance',
     'multi-turn-conversation',
     'prescriptiveness',
+    'imaging-cohesion',
 ];
 
 export interface ReportSummary {
@@ -130,6 +131,12 @@ export function generateReport(options: { suiteFailed?: boolean } = {}): ReportS
         '  pass the sanctioned consultative reframe, in-turn. A third, live-behavioral',
         '  case (real model vs. the same lint) is opt-in via `LIVE_EVALS=1` and spends',
         '  tokens — it is absent from the committed deterministic run.',
+        '- **`imaging-cohesion` pins chat↔rail unity.** The chat tool and the panel\'s',
+        '  analytics rail must derive the imaging story from one source: the tool output',
+        '  is deep-equal to the overview builder\'s imaging block, per corpus, and rides',
+        '  the real loop verbatim. Its live case (opt-in, `LIVE_EVALS=1`) replays the',
+        '  observed failure — a trend ask answered with a false absence claim — and',
+        '  requires an imaging tool consultation instead.',
         '',
         '## Known limitations and notes',
         '',

@@ -32,11 +32,12 @@ medication-risk arithmetic, and pre-selects the visit's scans. What it
 prepared greets the doctor as the agent's **opening move**: a one-page brief
 in under a second, scans one sub-second toggle away. From there the physician
 *talks to the agent* (Claude Haiku 4.5, streaming): the conversation persists
-and carries context turn to turn, and six read-only, patient-scoped tools let
+and carries context turn to turn, and eight read-only, patient-scoped tools let
 it fetch and reason over what no summary carries — full documents, OCT
-measurement trends, pairwise scan comparisons, medication-risk arithmetic,
-record search, open questions — with tool activity streamed visibly into the
-panel. This dissolves speed-vs-completeness — completeness at preparation
+measurement trends, pairwise scan comparisons, the whole-imaging-story
+overview, a direct (quarantined) look at a stored scan, medication-risk
+arithmetic, record search, open questions — with tool activity streamed
+visibly into the panel. This dissolves speed-vs-completeness — completeness at preparation
 time, speed at read-and-reply time — and it is the *only* shape OpenEMR's
 performance model allows, because the platform has no async queue (`AUDIT.md`
 P-section): heavy work must live outside the EHR.
@@ -201,12 +202,18 @@ user need, not technical interest:
   full document set re-attaches to only the newest turn, so context carries
   without compounding. Verification is a *thread* — each answer sets the next
   question; a search box drops that context every query.
-- **Six read-only tools, patient-scoped by construction** (each executes over
+- **Eight read-only tools, patient-scoped by construction** (each executes over
   the launch patient's bundle only): `get_full_document` ·
   `get_measurement_trend` · `compare_scans` (the deterministic comparison
-  engine) · `check_med_risk` (the AAO arithmetic) · `search_record` ·
+  engine) · `get_imaging_overview` (the analytics rail's own derived imaging
+  block, so chat and rail quote one source of truth) · `describe_scan`
+  (attaches the stored scan's pixels for a bounded visual read, quarantined as
+  "AI visual observation (not from the record)": never citable,
+  morphology-only, banner on any reply that used it) · `check_med_risk` (the
+  AAO arithmetic) · `search_record` ·
   `get_open_questions`. → UC-8 (trend → comparison chaining), UC-9 (attributed
-  engine relays), UC-2 (source drill-down). Every tool input/output is
+  engine relays), UC-2 (source drill-down), UC-6 (the pixel-level read). Every
+  tool input/output is
   Zod-validated — the contract is the source of truth, and a malformed payload
   is rejected before it propagates. A failing tool returns a structured error
   the model recovers from; the loop caps at four rounds before a final,

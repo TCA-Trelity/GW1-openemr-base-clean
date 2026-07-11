@@ -77,6 +77,16 @@ export default function App() {
     );
     // Ask-about-this seeding: bumping the nonce re-seeds even for the same text.
     const [chatSeed, setChatSeed] = useState<{ text: string; nonce: number } | null>(null);
+    // IC3: the scan open in the imaging Workspace — rides each chat turn so "this scan"
+    // resolves server-side. Reset on patient switch (the id is patient-scoped).
+    const [viewedScanId, setViewedScanId] = useState<string | null>(null);
+    // IC2: chat -> viewer focus. A fresh object per click so re-focusing the same scan
+    // still fires Imaging's effect. Reset on patient switch alongside viewedScanId.
+    const [imagingFocus, setImagingFocus] = useState<{ id: string; nonce: number } | null>(null);
+    const openScanFromChat = useCallback((id: string) => {
+        setImagingFocus((prev) => ({ id, nonce: (prev?.nonce ?? 0) + 1 }));
+        setActiveTab('imaging');
+    }, []);
     // Auth (Wave AZ): the demo role, whether dev-login is active, and the current capabilities.
     const [role, setRole] = useState<ClinicalRole>('physician');
     const [authActive, setAuthActive] = useState(false);
@@ -121,6 +131,8 @@ export default function App() {
         let cancelled = false;
         setOverviewState({ kind: 'loading' });
         setFactsState({ kind: 'loading' });
+        setViewedScanId(null);
+        setImagingFocus(null);
         void (async () => {
             const auth = await devLogin(role, patientId);
             if (cancelled) {
@@ -343,6 +355,8 @@ export default function App() {
                                                 images={overview.images}
                                                 treatments={factsState.kind === 'ready' ? factsState.bundle.treatments : []}
                                                 onAsk={askTheRecord}
+                                                onViewScan={setViewedScanId}
+                                                focus={imagingFocus}
                                             />
                                         </>
                                     )}
@@ -379,7 +393,16 @@ export default function App() {
                 {/* The conversational surface — keyed by patient so switching patients switches
                     to that patient's own persisted conversation */}
                 {patientId !== null && overview !== null && (
-                    <ChatDrawer key={patientId} patientId={patientId} open={chatOpen} onToggle={setChatOpen} seed={chatSeed} />
+                    <ChatDrawer
+                        key={patientId}
+                        patientId={patientId}
+                        open={chatOpen}
+                        onToggle={setChatOpen}
+                        seed={chatSeed}
+                        viewingImageId={viewedScanId}
+                        images={overview.images}
+                        onOpenScan={openScanFromChat}
+                    />
                 )}
             </div>
         </SourceNavContext.Provider>

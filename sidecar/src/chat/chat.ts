@@ -50,6 +50,13 @@ export interface ChatTurnInput {
     conversationId: string;
     message: string;
     correlationId: string;
+    /**
+     * Ephemeral UI state (IC3), e.g. which scan the physician has open, so "this scan"
+     * resolves. Appended to the latest user text block ONLY — model context for this one
+     * call, never persisted and never rendered; the transcript keeps the physician's
+     * words verbatim.
+     */
+    uiContext?: string;
 }
 
 export interface ChatTurnResult {
@@ -69,9 +76,25 @@ export interface ChatTurnHooks {
     onCitation?: (citation: ChatCitation) => void;
     /** Fired when the model invokes a tool (before it runs) — the panel shows tool activity. */
     onToolUse?: (event: { name: string; input: Record<string, unknown> }) => void;
-    /** Fired when a tool returns; `ok` is false for a structured-error result. */
-    onToolResult?: (event: { name: string; ok: boolean }) => void;
+    /**
+     * Fired when a tool returns; `ok` is false for a structured-error result. `output` is
+     * the tool's full result (IC2) so callers can project render-ready summaries — absent
+     * for an unknown tool name.
+     */
+    onToolResult?: (event: { name: string; ok: boolean; output?: Record<string, unknown> }) => void;
 }
+
+/** A scan's pixels, loaded for the model to look at (IC4). */
+export interface ChatLoadedImage {
+    mediaType: string;
+    base64: string;
+}
+
+/**
+ * Loads stored scan pixels by storage_key (IC4). Injected so ChatService stays free of
+ * filesystem knowledge; returns null (never throws) when the pixels cannot be loaded.
+ */
+export type ChatImageLoader = (storageKey: string) => Promise<ChatLoadedImage | null>;
 
 // Cap on tool-execution rounds before a final, tool-free call is forced (guards against a
 // model that loops asking for tools forever).
@@ -103,15 +126,24 @@ physician explicitly asks for more detail. No preamble, no restating the questio
 3. Ground every clinical claim in the documents so it carries a citation. When documents disagree, surface the \
 conflict in one line — do not pick a winner.
 4. You have read-only tools that fetch more from THIS patient's record — full documents, OCT measurement trends, \
-scan comparisons, medication-risk checks, keyword search, and open questions. They ARE the record, so rule 1 \
-still holds. Call a tool when the attached documents are insufficient rather than guessing; never invent data a \
-tool could supply. A tool may return an error (e.g. unknown id) — recover and try another approach.
+scan comparisons, the whole-story imaging overview, a direct look at a stored scan, medication-risk checks, \
+keyword search, and open questions. They ARE the record (describe_scan's visual read excepted — rule 6), so rule 1 \
+still holds. Longitudinal imaging data — trends, comparisons, progression — lives ONLY in the stored image \
+analyses these tools read; documents rarely carry it. Consult the imaging tools BEFORE stating any imaging data \
+is missing: an absence claim without a tool check is a wrong answer. Use tools directly, without asking \
+permission — they are read-only. A tool may return an error (e.g. unknown id) — recover and try another \
+approach.
 5. You are a thought partner, not a prescriber. Never advise starting, stopping, or changing treatment, dosing, \
 or a diagnosis — even when asked directly. For a recommendation-shaped ask, reframe instead: what the record \
 shows (cited), what the deterministic engines or named guidelines say (attribute the source in the same \
 sentence, e.g. "per AAO screening guidelines"), and the questions worth weighing — the decision stays with the \
 physician. Quoting a plan already documented in the record, or relaying an engine/guideline output WITH its \
-attribution, is correct; originating your own clinical direction is not.`;
+attribution, is correct; originating your own clinical direction is not.
+6. describe_scan attaches a stored scan's pixels for you to LOOK at. What you see is an AI visual observation, \
+NOT the record: introduce it with exactly "AI visual observation (not from the record):", never cite it, and \
+keep it to visible morphology — no diagnosis, no severity grading, no treatment implication. The result includes \
+the record's own authored reading; when your observation differs from it, say so explicitly and defer to the \
+record.`;
 }
 
 const NULLISH_WS = /\s+/g;
@@ -198,6 +230,7 @@ export class ChatService {
         private readonly store: ChatStore,
         private readonly spendGuard?: PrepSpendGuard,
         private readonly tools: readonly RegisteredTool[] = ALL_CHAT_TOOLS,
+        private readonly imageLoader?: ChatImageLoader,
     ) {
         this.toolByName = new Map(this.tools.map((tool) => [tool.name, tool]));
         this.toolDefs = this.tools.map((tool) => ({
@@ -208,7 +241,7 @@ export class ChatService {
     }
 
     async turn(input: ChatTurnInput, logger: PrepLogger, hooks?: ChatTurnHooks): Promise<ChatTurnResult> {
-        const { bundle, conversationId, message, correlationId } = input;
+        const { bundle, conversationId, message, correlationId, uiContext } = input;
         const patientId = bundle.patient.id;
         const documents = citableDocuments(bundle);
         const history = await this.store.getChatMessages(patientId, conversationId, 20);
@@ -222,7 +255,7 @@ export class ChatService {
                 title: doc.title,
                 citations: { enabled: true },
             })),
-            { type: 'text', text: message },
+            { type: 'text', text: uiContext === undefined ? message : `${message}\n\n${uiContext}` },
         ];
         const historyMessages: AnthropicMessage[] = history.map((turn) => ({ role: turn.role, content: turn.content }));
         // An M9-seeded conversation begins with the agent's opening move (assistant). The
@@ -324,13 +357,34 @@ export class ChatService {
                         hooks?.onCitation?.(mapped);
                     }
                 }
+                // IC4 media attachment: a tool output carrying attach_image + storage_key
+                // (describe_scan) gets the actual pixels appended as an image block so the
+                // model can look at the scan. Load failures degrade to an explicit
+                // image-unavailable note — the model must not describe what it cannot see.
+                let resultContent: string | AnthropicContentBlock[] = JSON.stringify(invocation.output);
+                const storageKey = invocation.output['storage_key'];
+                if (invocation.ok && invocation.output['attach_image'] === true && typeof storageKey === 'string') {
+                    const loaded = this.imageLoader === undefined ? null : await this.imageLoader(storageKey);
+                    resultContent = [
+                        { type: 'text', text: JSON.stringify(invocation.output) },
+                        loaded === null
+                            ? {
+                                  type: 'text',
+                                  text: JSON.stringify({
+                                      image_unavailable: true,
+                                      note: 'stored pixels could not be loaded — do not describe what you cannot see',
+                                  }),
+                              }
+                            : { type: 'image', source: { type: 'base64', media_type: loaded.mediaType, data: loaded.base64 } },
+                    ];
+                }
                 resultBlocks.push({
                     type: 'tool_result',
                     tool_use_id: call.id,
-                    content: JSON.stringify(invocation.output),
+                    content: resultContent,
                     ...(invocation.ok ? {} : { is_error: true }),
                 });
-                hooks?.onToolResult?.({ name: call.name, ok: invocation.ok });
+                hooks?.onToolResult?.({ name: call.name, ok: invocation.ok, output: invocation.output });
             }
             messages.push({ role: 'user', content: resultBlocks });
         }

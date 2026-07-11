@@ -369,3 +369,24 @@ replayable via `GET /api/chat`, visible in Bruno, and the "report generator"
 reading dissolves structurally (one conversation; the brief is message #1 in
 it). Skipped silently when no brief has completed; continued conversations
 are never re-seeded.
+
+## Addendum: Wave IC — imaging↔chat cohesion (user-approved 2026-07-11, evening)
+
+Live demo prep surfaced a capability-wrong reply: asked for trends, the chat
+answered from document prose and claimed the longitudinal data didn't exist —
+while the analytics rail beside it was rendering that exact series from the
+stored image analyses. Wave IC (tickets IC0–IC4 in the execution plan) closes
+the gap in five stacked layers: **IC0** makes the prompt/tool contract state
+that imaging data lives only in the tools and must be consulted before any
+absence claim (never asking permission for read-only tools); **IC1** exposes
+the analytics rail's own derived object as `get_imaging_overview`, so chat and
+rail quote one source of truth; **IC3** lets the viewed scan ride the turn as
+model-only context so deictic asks ("what changed here?") resolve; **IC2**
+closes the loop visually — tool results render as inline sparklines and scan
+thumbnails that deep-link back into the imaging workspace; **IC4** ships the
+T3-reserved pixel-level capability early as **bounded observation**:
+`describe_scan` shows the model the actual B-scan, and its output is
+quarantined — labelled "AI visual observation (not from the record)", never
+citable, morphology-only under the prescriptiveness lint, with a visible
+banner on any reply that used it. The trust posture is unchanged: record facts
+cite, engine outputs attribute, observations declare themselves.
