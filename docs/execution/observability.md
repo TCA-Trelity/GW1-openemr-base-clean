@@ -33,7 +33,8 @@ a full trace from logs alone" is satisfied by filtering any store on that ID.
 | **Verification pass/fail** | `citations_failed` = 0 rate; `facts_blocked` distribution; chat `unverified_count` | outcome scores | "verification pass/fail rate" |
 | **Prescriptiveness lint (M3)** | `prescriptive_flags` count per chat turn (warn log `chat reply flagged by prescriptiveness lint`, rules + excerpts attached); rides the SSE `done` event as `prescriptive_flag_count` | request logs | judgment-guardrail metric (docs/prompt-guide.md) |
 | Token spend | `est_cost_usd` sum, 24h rolling, vs $5 budget | `llm_calls` | "tokens consumed and cost" |
-| Run outcomes | `run_success` rate; failed-run stage histogram | scores + `prep_runs` | agent-specific |
+| Run outcomes | `run_success` rate; failed-run stage histogram; verification gate outcomes (facts blocked vs stored, citations verified vs dropped) | scores + `prep_runs` | "decision outcomes" |
+| In-flight work | `prep_runs` with `status='running'` (count + age) | `prep_runs` | "queue depth" — **n/a by design**: the architecture has no async queue (OpenEMR offers no broker — `AUDIT.md` P-section — and prep runs synchronously in-process with per-process dedupe), so in-flight prep runs are the nearest real signal; a stuck row past the p95 prep duration is the "depth" anomaly to alert on |
 
 ## Alerts (≥3 required — thresholds + on-call response)
 
