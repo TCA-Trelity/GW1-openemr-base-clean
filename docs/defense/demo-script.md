@@ -39,10 +39,16 @@ grounded in the seeded corpus, and every demo is a test run.*
   output as the analytics rail — the model never does the math. The trend it
   traced renders right in the bubble as a sparkline, and clicking a point
   opens that scan in the imaging workspace — chat and viewer are one loop."
+- Click a **sparkline point** → the Imaging workspace lands on that exact
+  scan. Then type: **"What changed on this scan versus the prior one?"** —
+  say: "'This scan' resolves because the panel tells the agent which scan I
+  have open — UI state rides the turn as context, and the transcript keeps my
+  words verbatim. Chat and viewer are one loop, both directions."
 - Type the follow-up: **"What were the prior cycles holding at?"** — say:
-  "Second turn, same conversation — 'prior cycles' only means something
+  "Another turn, same conversation — 'prior cycles' only means something
   because the thread carries its context. This conversation is persisted
-  server-side; reload the page and it's still here."
+  server-side; reload the page and it's still here." (Optional 5-second
+  proof: reload on camera — the thread replays.)
 
 ### 1:25–1:55 — The guardrail moment (thought partner, UC-9)
 - Type: **"So should I just shorten his interval?"**
@@ -61,7 +67,15 @@ grounded in the seeded corpus, and every demo is a test run.*
   can never verify as a citation. The refusal at turn four is eval-locked,
   not hoped for."
 
-### 2:20–2:50 — The trust chain, end to end
+### 2:20–2:40 — The vision beat (bounded observation, UC-6 — cut first if over time)
+- Type: **"What does the latest scan actually look like?"**
+- Say, over the `describe_scan` chip + violet banner: "It can look at the
+  actual pixels — and what it sees is quarantined: prefixed as an AI visual
+  observation, never citable, morphology only, deferring to the authored
+  analysis on conflict. The banner makes that legible to the physician, not
+  just to the model."
+
+### 2:40–2:55 — The trust chain, end to end
 - On screen: click a **citation chip** on any reply → the source viewer opens
   with the exact span highlighted.
 - Say: "Every claim traces to a verbatim span in a stored document, re-checked
@@ -70,24 +84,27 @@ grounded in the seeded corpus, and every demo is a test run.*
   runs through the same deterministic citation gate. The rule for the whole
   system: it may be unavailable; it may never be silently wrong."
 
-### 2:50–3:35 — The proof, not the promise
+### 2:55–3:35 — The proof, not the promise
 - On screen: `docs/execution/eval-results.md` — scroll the table.
-- Say: "Eighteen evals, committed with the commit hash: citation validity,
+- Say: "Twenty-one evals, committed with the commit hash: citation validity,
   the clinical-calculator goldens against published AAO guidelines, planted
-  contradictions, cross-patient denial, injection resistance — and as of this
-  wave, the **conversation loop itself**: history threading, verbatim
-  tool-result plumbing, the round cap, tool-error recovery, and the
-  prescriptiveness contract."
+  contradictions, cross-patient denial, injection resistance — and the
+  **conversation loop itself**: history threading, verbatim tool-result
+  plumbing, the round cap, tool-error recovery, the prescriptiveness
+  contract, and imaging cohesion — the chat tool and the analytics rail are
+  pinned to one source of truth."
 - On screen: the Bruno `04-chat` folder (one glance): "Graders can run this
   exact multi-turn workflow — follow-up, tool chain, replay — without reading
   a line of source."
-- On screen: the observability trail — the prep run's Langfuse trace (stages,
-  generations, gate scores), then `GET /api/usage` beside the Railway logs
-  filtered to one chat turn's correlation ID.
-- Say: "And everything you watched is reconstructable from logs alone: the
-  prep run is a Langfuse trace with a span per stage and gate verdicts as
-  scores, and every chat turn carries one correlation ID through the token
-  ledger, the tool calls, and the verification results."
+- On screen: the observability trail — `GET /api/usage` (the per-call token +
+  cost ledger) beside the Railway logs filtered to one chat turn's
+  correlation ID. (If Langfuse is wired by recording time, add the prep
+  trace's per-stage spans for one beat; otherwise skip — the ledger + logs
+  carry the claim.)
+- Say: "And everything you watched is reconstructable from logs alone: every
+  chat turn carries one correlation ID through the token ledger, the tool
+  calls, and the verification results, and every prep run leaves a per-stage
+  record with gate verdicts."
 
 ### 3:35–4:00 — Close
 - On screen: the deployed URL; the role picker (physician / nurse / resident)
@@ -106,11 +123,13 @@ grounded in the seeded corpus, and every demo is a test run.*
 - [ ] A fresh conversation (clear sessionStorage) so the thread builds
       on-camera.
 - [ ] Imaging tab shows the 7-scan OD series; "Ask about this scan" visible.
-- [ ] The four asks rehearsed: scan-ask (seeded) → "What were the prior
+- [ ] The asks rehearsed: scan-ask (seeded) → sparkline-point click → "What
+      changed on this scan versus the prior one?" → "What were the prior
       cycles holding at?" → "So should I just shorten his interval?" →
-      "What about Margaret Chen — what were her injection intervals?"
+      "What about Margaret Chen — what were her injection intervals?" →
+      (optional) "What does the latest scan actually look like?"
 - [ ] Citation chip → source viewer deep link works on the live stack.
-- [ ] `eval-results.md` at 18/18 on the submitted commit; Bruno folder and
-      Langfuse trace tabs pre-opened.
+- [ ] `eval-results.md` at 21/21 on the submitted commit; Bruno folder tab
+      pre-opened (Langfuse trace tab only if G2 is wired).
 - [ ] Spend guard headroom checked (four Haiku turns ≪ $5/day budget).
 - [ ] Total runtime 3–5 min.
