@@ -311,9 +311,12 @@ prep (emit-side) but **not deployed**.
 - **Alerts A4–A6** (with response actions, extending A1–A3): extraction
   failure rate; RAG retrieval latency; eval regression >5%.
 - **Cost tracking:** extraction and Cohere calls priced into the ledger so the
-  D7 report is ledger-backed. Projections: extraction ~$0.03–0.10/doc, corpus
-  embedding ~one-time, rerank ~$0.002/query → ~$20–25 per 70-patient day vs
-  Week 1's ~$20.
+  D7 report is ledger-backed (docs/COSTS.md §6). Reconciled projections:
+  extraction ~$0.005–0.03/doc (1-page text PDF → multi-page scan), corpus
+  embedding one-time, evidence composition ~$0.002–0.01/turn, Cohere
+  per-unit prices verified at key-drop → the W2 additions cost well under
+  $1/day at Dan's volumes on top of Week 1's ~$10.50–17.50 per
+  70-patient day.
 
 **Trace privacy rule (spec, verbatim intent):** traces, logs, eval datasets,
 and cost reports contain no patient identifiers, no raw document text, and no

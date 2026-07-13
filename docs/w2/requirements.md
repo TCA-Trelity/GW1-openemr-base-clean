@@ -353,6 +353,10 @@ exists, wired into prep only, **not deployed** ("pending G2" in
   `llm_calls` (or a parallel ledger line) so D7's dev-spend number is
   ledger-backed; **$5/day SpendGuard unchanged** (locked — alert the user if
   this becomes infeasible).
+  *(Partial: evidence_composition calls ledger-priced (E.9); extraction
+  usage captured in ExtractOutcome and priced in the D7 model (COSTS.md §6);
+  Cohere per-unit pricing rows land at key-drop — the pricing pages 403'd
+  from the build sandbox and are deliberately not memory-quoted.)*
 
 ### S5 — Integrate, deploy, and defend
 
