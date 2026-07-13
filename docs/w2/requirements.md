@@ -496,10 +496,14 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
   correlation ID) and the recovery action.
 
 ### G10 — Runnable API collection
-- [ ] Bruno collection (`sidecar/api-collection/`) adds: document upload,
+- [x] Bruno collection (`sidecar/api-collection/`) adds: document upload,
   extraction status, evidence retrieval, and the full W2 agent flow;
   runnable headless (`bru run`) against local + railway envs; auth'd write
   requests documented with dev-login flow.
+  *(Shipped: `06-documents/` — dev-login → multipart upload of the committed
+  renal fixture → staged status → stored file → evidence search, with a
+  narrated full-flow doc; headless-runnable; Railway leg awaits
+  DEV_LOGIN_SECRET there — USER-ACTIONS.md.)*
 
 ### G11 — Baseline profiles
 - [ ] Baselines recorded for W2 flows (ingestion, extraction, retrieval, full

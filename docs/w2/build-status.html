@@ -187,7 +187,7 @@
 // Update in the SAME PR as the code it describes (anti-drift rule #3).
 // ============================================================================
 const DATA = {
-  stamp: "updated 2026-07-13 · session 3 (E.9 evidence turns + E.7 OpenAPI contract + full spec pack committed)",
+  stamp: "updated 2026-07-13 · session 3 (E.7/E.8/E.9 done — Band 2 nearly closed; specs cover all remaining work)",
   budget: { capPerDay: "$5.00", spentToday: "—", note: "SpendGuard unchanged (locked #16); Cohere rides a ledger line at B.4" },
   w1Floor: "24/24 W1 evals passing · read-path p95 46 ms @10 / 193 ms @50 (regression floor)",
 
@@ -249,7 +249,7 @@ const DATA = {
         { id: "E.5", t: "LangSmith demo-env wiring (fenced)", reqs: ["R7","P5"], deps: "C.3", s: "pending" },
         { id: "E.6", t: "/ready probes: doc storage (token mint), retriever index, reranker — degraded semantics", reqs: ["G14"], deps: "A.3, B.3", s: "done" },
         { id: "E.7", t: "OpenAPI 3.0 spec (21 endpoints) + two-direction drift contract test", reqs: ["G16"], deps: "A.3 stable routes", s: "done" },
-        { id: "E.8", t: "Bruno collection: W2 folder (upload/status/retrieval/full flow)", reqs: ["G10"], deps: "E.3, E.6", s: "pending" },
+        { id: "E.8", t: "Bruno 06-documents: dev-login → upload → status → file → evidence search + full-flow docs", reqs: ["G10"], deps: "E.3, E.6", s: "done" },
         { id: "E.9", t: "Evidence turn LIVE: LLM composer + graph in chat SSE (status event, honest fallback)", reqs: ["G2"], deps: "C.3", s: "done" },
       ]},
     { id: "F", title: "Wave F — Hardening + deliverables", band: "Band 3 · Final", tickets: [
@@ -318,7 +318,7 @@ const DATA = {
       { id: "G7", t: "CI: audit + security scan on main PRs · contract tests · Dependabot sidecar", plan: "0.2, C.1, D.4, D.6", done: 3, total: 4, s: "active" },
       { id: "G8", t: "Testing strategy documented (per-test failure modes)", plan: "P.2 → W2_ARCHITECTURE §11", done: 1, total: 1, s: "done" },
       { id: "G9", t: "Failure-mode runbook (identify in logs + recovery)", plan: "P.2 → W2_ARCHITECTURE §12", done: 1, total: 1, s: "done" },
-      { id: "G10", t: "Bruno collection covers all W2 workflows", plan: "E.8", done: 0, total: 1, s: "pending" },
+      { id: "G10", t: "Bruno collection covers all W2 workflows", plan: "E.8", done: 1, total: 1, s: "done" },
       { id: "G11", t: "W2 baselines vs W1 (shared-path regression check)", plan: "F.1", done: 0, total: 1, s: "pending" },
       { id: "G12", t: "One logging convention (no parallel format)", plan: "C.5, E.4", done: 0, total: 1, s: "pending" },
       { id: "G13", t: "Span hierarchy: worker ⊂ supervisor; sub-calls ⊂ worker", plan: "C.5", done: 0, total: 1, s: "pending" },

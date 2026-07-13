@@ -1,0 +1,46 @@
+meta {
+  name: POST documents — upload the renal panel (multipart)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/patients/margaret-chen/documents
+  body: multipartForm
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:multipart-form {
+  doc_type: lab_pdf
+  file: @file(../../eval/fixtures/documents/renal-panel-clean.pdf)
+}
+
+assert {
+  res.status: eq 202
+}
+
+script:post-response {
+  bru.setVar('ingestionId', res.getBody().ingestion_id);
+}
+
+tests {
+  test("202 carries ingestion id + status url", function () {
+    const body = res.getBody();
+    expect(body.ingestion_id).to.be.a('string');
+    expect(body.status_url).to.contain('/api/ingestions/');
+  });
+}
+
+docs {
+  # attach_and_extract (S1/R1)
+  The 202 is immediate — the ingestion id is deterministic from the file bytes,
+  so byte-identical re-uploads share one id (dedupe, G1). Extraction runs
+  prep-time; poll 02 for the staged record. If bru reports the fixture file
+  missing, switch to the collection-root form
+  @file(../eval/fixtures/documents/renal-panel-clean.pdf) — Bruno versions
+  differ on @file() base-path resolution.
+}
