@@ -54,6 +54,19 @@ embedded in a brownfield EHR.
 | Tiered PRD | [`docs/defense/PRD-clinical-copilot.md`](docs/defense/PRD-clinical-copilot.md) |
 | Railway deploy runbook | [`deploy/railway-runbook.md`](deploy/railway-runbook.md) |
 
+### Week 2 — Multimodal Evidence Agent (in progress)
+
+Week 2 adds document ingestion (lab PDF + intake form), hybrid RAG over a
+practice-guideline corpus, a supervisor/worker graph, and a PR-blocking eval
+gate. Week 1 baseline behavior above is unchanged until Week 2 waves land.
+
+| Week 2 deliverable | Location |
+|---|---|
+| **Week 2 architecture (start here for W2)** | [`W2_ARCHITECTURE.md`](W2_ARCHITECTURE.md) |
+| Requirements register (canonical, anti-drift) | [`docs/w2/requirements.md`](docs/w2/requirements.md) |
+| Execution plan (waves, tickets) | [`docs/w2/execution-plan.md`](docs/w2/execution-plan.md) |
+| Architecture-defense outline (6 slides) | [`docs/w2/defense-outline.md`](docs/w2/defense-outline.md) |
+
 The original OpenEMR README follows.
 
 # OpenEMR
