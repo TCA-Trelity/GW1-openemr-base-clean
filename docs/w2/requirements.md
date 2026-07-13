@@ -339,9 +339,12 @@ exists, wired into prep only, **not deployed** ("pending G2" in
 - [ ] Langfuse activated (locked: Cloud for the synthetic-data demo,
   self-hosted documented as pilot posture); spans extended beyond prep to
   supervisor → workers → retrieval/extraction sub-calls (G13 hierarchy).
-- [ ] LangSmith enabled **only** in the demo environment (locked), documented
+- [x] LangSmith enabled **only** in the demo environment (locked), documented
   as a demo-env overlay with synthetic data — never the committed production
   posture (P5 guard).
+  *(Fenced by configuration: env vars read natively by LangGraph.js; boot
+  log states the posture; RUNBOOK §C2 + USER-ACTIONS document the demo-only
+  key drop. Visual trace check completes after keys land.)*
 - [ ] Logs/traces contain identifiers and hashes, never raw document text,
   patient identifiers, or extracted clinical values (spec privacy audit
   language — G18); extraction confidence and retrieval scores are logged as

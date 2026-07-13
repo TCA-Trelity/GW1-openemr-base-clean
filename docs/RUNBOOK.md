@@ -123,6 +123,16 @@ demographics screen, opening/embedding the panel for that patient.
 
 ## C. Langfuse observability (G2) — the live dashboard + 3 alerts
 
+### C2. LangSmith — demo environment ONLY (Week 2, locked decision #2)
+
+LangGraph.js reads `LANGSMITH_TRACING` / `LANGSMITH_API_KEY` /
+`LANGSMITH_PROJECT` natively — no sidecar code path depends on them. The
+fence is configuration: set the three vars **only on the demo Railway
+service** (synthetic data), never on the production posture, whose committed
+backend is Langfuse. The boot log states the posture on every start
+(`LangSmith tracing ON — demo environment posture` vs `off — production
+posture`). Key drop steps: `docs/w2/tickets/USER-ACTIONS.md`.
+
 **Goal:** turn the emitted traces into the dashboard + alerts specified in
 `docs/execution/observability.md`.
 

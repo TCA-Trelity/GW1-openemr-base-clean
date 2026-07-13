@@ -452,6 +452,15 @@ if (process.argv[1]?.endsWith('server.js') || process.argv[1]?.endsWith('server.
     if (deps?.chat !== undefined && deps.chat.evidenceGraph === undefined) {
         app.log.info({ composerConfigured: false }, 'evidence turns degrade to fast path — ANTHROPIC_API_KEY absent or ingestion off');
     }
+    // E.5 (locked decision #2): LangSmith is a DEMO-ENV overlay only — LangGraph.js reads
+    // the LANGSMITH_* env vars natively, so the fence is configuration, not code. The
+    // committed posture stays Langfuse; production must never carry a LangSmith key.
+    app.log.info(
+        { langsmithTracing: config.LANGSMITH_TRACING === 'true', project: config.LANGSMITH_PROJECT },
+        config.LANGSMITH_TRACING === 'true'
+            ? 'LangSmith tracing ON — demo environment posture (synthetic data only)'
+            : 'LangSmith tracing off — production posture (Langfuse is the committed backend)',
+    );
     app.log.info(
         { corpusRetriever: evidence !== undefined, dense: config.COHERE_API_KEY !== undefined ? 'cohere' : 'hash-offline' },
         evidence !== undefined ? 'guideline retriever ready' : 'guideline corpus absent — evidence routes off',
