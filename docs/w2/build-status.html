@@ -217,7 +217,7 @@ const DATA = {
         { id: "A.7", t: "Fixtures: renal panel (eGFR↓) + updated intake + degradation ladder + HbA1c (6 PDFs, regenerable)", reqs: ["S1","D4"], deps: "—", s: "done" },
       ]},
     { id: "B", title: "Wave B — Corpus + retrieval", band: "Band 1 · MVP · ∥ with A", tickets: [
-        { id: "B.1", t: "Author 6–10 practice protocols (AAO-grounded, metadata, zero PHI)", reqs: ["S2/R3","G18"], deps: "—", s: "pending" },
+        { id: "B.1", t: "8 authored practice protocols committed (AAO-grounded, metadata, zero PHI) + README", reqs: ["S2/R3","G18"], deps: "—", s: "done" },
         { id: "B.2", t: "Structure-aware chunker (thresholds stay with conditions)", reqs: ["S2/R3"], deps: "B.1", s: "done" },
         { id: "B.3", t: "Index: in-memory dense+BM25 shipped behind the interface; pgvector/tsvector at deploy", reqs: ["S2/R3","G18"], deps: "0.1, 0.4, B.2", s: "active" },
         { id: "B.4", t: "Hybrid retrieve: keyword+dense → RRF → Cohere Rerank → top-k; degraded path", reqs: ["S2/R3","G2"], deps: "B.3", s: "done" },
