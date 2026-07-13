@@ -187,7 +187,7 @@
 // Update in the SAME PR as the code it describes (anti-drift rule #3).
 // ============================================================================
 const DATA = {
-  stamp: "updated 2026-07-13 · session 2 cont. (ingestion spine + retrieval stack + eval categories live)",
+  stamp: "updated 2026-07-13 · session 2 cont. (wave C live: graph + router + contracts + budget + pins + trace example)",
   budget: { capPerDay: "$5.00", spentToday: "—", note: "SpendGuard unchanged (locked #16); Cohere rides a ledger line at B.4" },
   w1Floor: "24/24 W1 evals passing · read-path p95 46 ms @10 / 193 ms @50 (regression floor)",
 
@@ -225,12 +225,12 @@ const DATA = {
         { id: "B.6", t: "Retrieval goldens: 10 canonical + 2 refusal + PHI canary (retrieval_grounded live)", reqs: ["S4/R6","D4"], deps: "B.4, D.1", s: "done" },
       ]},
     { id: "C", title: "Wave C — The graph", band: "Band 1 · MVP · starts vs stubs", tickets: [
-        { id: "C.1", t: "LangGraph StateGraph skeleton + typed state + contract tests", reqs: ["S3/R4","G1","G7"], deps: "A.4/B.4 ifaces", s: "pending" },
-        { id: "C.2", t: "Supervisor-as-entry router (short-circuits + Haiku, ~200–400 ms)", reqs: ["S3/R4"], deps: "C.1", s: "pending" },
-        { id: "C.3", t: "Worker nodes wrap A/B; evidence turn ≤5 s streamed", reqs: ["S3/R4","G2"], deps: "C.1, A.4, B.4", s: "pending" },
-        { id: "C.4", t: "Critic node: citation gate + lint promotion", reqs: ["E1"], deps: "C.1", s: "pending" },
-        { id: "C.5", t: "Handoff logging + span hierarchy (worker ⊂ supervisor)", reqs: ["G4","G13","P3"], deps: "C.3, 0.3", s: "pending" },
-        { id: "C.6", t: "Ingestion-time evidence pinning (HCQ → screening protocol)", reqs: ["S3/R4"], deps: "C.3", s: "pending" },
+        { id: "C.1", t: "LangGraph StateGraph skeleton + typed state + contract tests", reqs: ["S3/R4","G1","G7"], deps: "A.4/B.4 ifaces", s: "done" },
+        { id: "C.2", t: "Supervisor-as-entry router (short-circuits + Haiku tie-break; latency baseline pending)", reqs: ["S3/R4"], deps: "C.1", s: "done" },
+        { id: "C.3", t: "Worker nodes wrap A/B; ≤5 s evidence budget w/ degraded handoff (streaming UX = E.9)", reqs: ["S3/R4","G2"], deps: "C.1, A.4, B.4", s: "done" },
+        { id: "C.4", t: "Critic node: citation gate + lint promotion", reqs: ["E1"], deps: "C.1", s: "done" },
+        { id: "C.5", t: "Handoff logging + trace worked-example (span binding rides E.4)", reqs: ["G4","G13","P3"], deps: "C.3, 0.3", s: "done" },
+        { id: "C.6", t: "Ingestion-time evidence pinning + per-patient pin store (chat Tier-0 read = chat wiring)", reqs: ["S3/R4"], deps: "C.3", s: "done" },
       ]},
     { id: "D", title: "Wave D — Eval gate + CI", band: "Band 1 · MVP · D.1/D.3 start now", tickets: [
         { id: "D.1", t: "Category framework + committed baseline + tiered comparator", reqs: ["S4/R6"], deps: "—", s: "done" },
@@ -285,7 +285,7 @@ const DATA = {
       { id: "S1/R1", t: "Document ingestion & extraction (attach_and_extract, OpenEMR round-trip, no dupes)", plan: "A.3–A.7, E.1", done: 5, total: 7, s: "active" },
       { id: "R2", t: "Strict Zod schemas (lab_pdf 7 fields · intake 6+goals)", plan: "A.1", done: 4, total: 5, s: "active" },
       { id: "S2/R3", t: "Hybrid RAG + rerank (corpus, pgvector+tsvector, RRF, Cohere, PHI-free queries)", plan: "0.1, 0.4, B.1–B.6", done: 7, total: 9, s: "active" },
-      { id: "S3/R4", t: "Supervisor + intake-extractor + evidence-retriever (LangGraph, logged handoffs)", plan: "C.1–C.6", done: 0, total: 7, s: "pending" },
+      { id: "S3/R4", t: "Supervisor + intake-extractor + evidence-retriever (LangGraph, logged handoffs)", plan: "C.1–C.6", done: 4, total: 7, s: "active" },
       { id: "R5", t: "Citation contract v2 + required PDF bbox overlay", plan: "A.2, A.5, E.2", done: 2, total: 5, s: "active" },
       { id: "S4/R6", t: "Eval gate: 50 cases, 5 categories, PR-blocking, tiered >5% math, hard-gate ready", plan: "0.5, D.1–D.7", done: 2, total: 7, s: "active" },
       { id: "R7", t: "Observability + cost per encounter (PHI-free)", plan: "0.3, E.4, E.5", done: 0, total: 5, s: "pending" },
@@ -312,10 +312,10 @@ const DATA = {
       { id: "G1", t: "Typed contracts everywhere · migration notes · explicit data authority", plan: "A.2, F.7 (+table shipped in W2_ARCHITECTURE §10)", done: 2, total: 3, s: "active" },
       { id: "G2", t: "SLOs · timeouts + retries on all egress · circuit behavior", plan: "A.4, B.4, E.9", done: 1, total: 3, s: "active" },
       { id: "G3", t: "Raw VLM output never bypasses validation", plan: "A.4", done: 0, total: 1, s: "pending" },
-      { id: "G4", t: "Correlation ID through every W2 boundary; trace from ID alone", plan: "C.5", done: 0, total: 2, s: "pending" },
+      { id: "G4", t: "Correlation ID through every W2 boundary; trace from ID alone", plan: "C.5", done: 1, total: 2, s: "active" },
       { id: "G5", t: "Structured logs: new W2 event types, searchable, PHI-free", plan: "C.5, E.4", done: 0, total: 2, s: "pending" },
       { id: "G6", t: "Dashboard tiles for W2 metrics", plan: "E.4", done: 0, total: 1, s: "pending" },
-      { id: "G7", t: "CI: audit + security scan on main PRs · contract tests · Dependabot sidecar", plan: "0.2, C.1, D.4, D.6", done: 2, total: 4, s: "active" },
+      { id: "G7", t: "CI: audit + security scan on main PRs · contract tests · Dependabot sidecar", plan: "0.2, C.1, D.4, D.6", done: 3, total: 4, s: "active" },
       { id: "G8", t: "Testing strategy documented (per-test failure modes)", plan: "P.2 → W2_ARCHITECTURE §11", done: 1, total: 1, s: "done" },
       { id: "G9", t: "Failure-mode runbook (identify in logs + recovery)", plan: "P.2 → W2_ARCHITECTURE §12", done: 1, total: 1, s: "done" },
       { id: "G10", t: "Bruno collection covers all W2 workflows", plan: "E.8", done: 0, total: 1, s: "pending" },

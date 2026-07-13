@@ -178,34 +178,47 @@ code). Postgres fact store exists; pgvector availability on Railway Postgres
 > are intake-extractor and evidence-retriever. A critic agent is extension
 > work, not core."*
 
-**Status:** ❌ missing by Week 1 design (one `ChatService` tool loop +
-in-process prep pipeline; zero LangChain surface; clean `defineTool` registry
-to build on).
+**Status:** ⚠️ graph SHIPPED (`sidecar/src/graph/` — StateGraph, router +
+LlmRouterModel tie-break, boundary contracts, ≤5 s evidence budget, pin
+store; 15 tests). Remaining: chat-loop wiring (fast_path delegation +
+production composer), Langfuse span binding (E.4), routing-latency baseline.
 
 **Acceptance criteria:**
-- [ ] LangGraph.js `StateGraph` (locked decision) in the sidecar with exactly:
+- [x] LangGraph.js `StateGraph` (locked decision) in the sidecar with exactly:
   supervisor node, `intake-extractor` worker (wraps the extraction pipeline),
   `evidence-retriever` worker (wraps hybrid RAG), gate/critic node (E1,
-  promoted Week 1 gate), answer node.
+  promoted Week 1 gate), answer node. *(Answer assembly is the critic node's
+  release step; the handoff chain logs `critic→answer` explicitly.)*
 - [ ] Supervisor-as-entry routing (locked decision): every chat turn passes a
   routing decision — deterministic short-circuits first, then a small
   fast-model call — emitting `fast_path | needs_evidence | needs_extraction`
   in ~200–400 ms; `fast_path` delegates to the unchanged Week 1 chat loop;
   document upload events enter the graph directly (Tier 2, prep-time).
-- [ ] Supervisor decides all three spec conditions: extraction needed /
-  evidence needed / final answer ready — each decision logged.
-- [ ] Handoffs explicit: every supervisor→worker and worker→supervisor
+  *(Shipped: rules + `LlmRouterModel` tie-break, never-throw, fast_path-safe
+  defaults, tested. Remaining: ChatService delegation wiring + measured
+  ~200–400 ms baseline.)*
+- [x] Supervisor decides all three spec conditions: extraction needed /
+  evidence needed / final answer ready — each decision logged. *(Final-answer
+  readiness = the critic's release decision, logged with verified/blocked
+  counts on the `critic→answer` handoff.)*
+- [x] Handoffs explicit: every supervisor→worker and worker→supervisor
   transition emits a structured log event `{correlation_id, from, to,
   routing_reason, timestamp}` (P3 anti-pattern guard: the supervisor is never a
-  black box).
+  black box). *(Worked example: `docs/w2/trace-example.md`.)*
 - [ ] Tracing: worker invocations are child spans of the supervisor span;
   extraction/retrieval sub-calls are children of their worker spans (G13).
-- [ ] Contract tests on the supervisor↔worker interface (typed state schema —
+  *(Span skeleton = the handoff events, documented in trace-example.md;
+  Langfuse binding lands in E.4.)*
+- [x] Contract tests on the supervisor↔worker interface (typed state schema —
   G1/G7): a malformed worker payload fails the graph loudly, never propagates.
+  *(`graph/contracts.ts`: entry ask + evidence payload, `.strict()` Zod;
+  GraphContractError names the violated boundary.)*
 - [ ] Ingestion-time evidence pinning: extraction findings trigger
   evidence-retriever during prep (e.g. HCQ in meds → screening protocol
   retrieved and pinned to the fact bundle), so most in-visit guideline asks
-  resolve without live retrieval (latency Tier 0).
+  resolve without live retrieval (latency Tier 0). *(Shipped: prep-time
+  retrieval + per-patient pin store keyed to the ingestion id, replace-on-
+  re-ingest. Remaining: chat bundle consumes pins as the Tier-0 read path.)*
 
 ### R5 — Citation contract
 
@@ -417,9 +430,10 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
 - [ ] The Week 1 correlation ID propagates into: upload request → OpenEMR
   document write → extraction job + VLM calls → graph supervisor + both
   workers → retrieval (embed/rerank) calls → vitals write → answer + citations.
-- [ ] *"A full multi-agent trace must be reconstructable from the correlation
+- [x] *"A full multi-agent trace must be reconstructable from the correlation
   ID alone"* — demonstrated in docs with one worked example (log query +
-  Langfuse trace link).
+  Langfuse trace link). *(`docs/w2/trace-example.md`: verbatim handoff lines
+  from a real run, both tiers; Langfuse trace link joins at E.4.)*
 
 ### G5 — Structured logs, searchable
 - [ ] New W2 event types extend the Week 1 pino schema (no parallel
@@ -440,7 +454,9 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
   `semgrep.yml`/`api-docs.yml`/`pre-commit.yml` are branch-filtered to
   `master`/`rel-*` and never fire on `main` PRs; W2 adds sidecar-scoped
   equivalents that do.
-- [ ] Contract tests for the supervisor–worker interface (G1) run in CI.
+- [x] Contract tests for the supervisor–worker interface (G1) run in CI.
+  *(`test/graph.test.ts` boundary-contract cases run in `sidecar-ci.yml` on
+  every push + PR.)*
 - [ ] Extraction regression tests are part of the PR-blocking suite (S4/R6).
 - [ ] Dependabot (or equivalent) covers `sidecar/` + `sidecar/panel/` (today it
   covers only `/` and `/ccdaservice`).

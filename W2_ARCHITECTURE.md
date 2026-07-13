@@ -72,7 +72,7 @@ both scopes still hold:
   can be called a graph, its nodes wrap services that already exist, and the
   fast path pays only a bounded ~200–400 ms routing decision (REQ: S3/R4).
 
-## 3. Document ingestion flow (REQ: S1/R1, R2, G3) — [SHIPPED: upload route + attach_and_extract service, VLM extractor w/ feedback retry, geometric grounding on real fixtures, fact persistence w/ page_bbox citations, patient-mismatch block, dedupe idempotency, renal→HCQ re-tier · TARGET: chat tool wrapper (C), live EHR write + vitals row (deploy), evidence pinning (C.6), brief refresh]
+## 3. Document ingestion flow (REQ: S1/R1, R2, G3) — [SHIPPED: upload route + attach_and_extract service, VLM extractor w/ feedback retry, geometric grounding on real fixtures, fact persistence w/ page_bbox citations, patient-mismatch block, dedupe idempotency, renal→HCQ re-tier, evidence pinning at prep time (C.6) · TARGET: chat tool wrapper, live EHR write + vitals row (deploy), brief refresh]
 
 ```
 panel upload (front-desk role)                    chat/graph tool
@@ -133,7 +133,7 @@ observation-shaped write is the fixed-field vitals endpoint. Hence the
 persistence split above, with data authority declared per type (§10) rather
 than shoehorning lab values into fields that don't fit.
 
-## 4. The worker graph (REQ: S3/R4) — [TARGET]
+## 4. The worker graph (REQ: S3/R4) — [SHIPPED: `sidecar/src/graph/` — 5-node StateGraph, deterministic router + LlmRouterModel tie-break (never-throw, fast_path-safe), Zod boundary contracts w/ GraphContractError, ≤5 s evidence budget w/ degraded handoff, per-patient pin store keyed to ingestion, worker_handoff events (worked example: docs/w2/trace-example.md); 15 tests · TARGET: ChatService fast_path delegation + production composer (answer leg), Langfuse span binding (E.4), routing-latency baseline]
 
 **Framework:** LangGraph.js `StateGraph` inside the existing TypeScript
 sidecar. Nodes wrap existing services — the direct Anthropic client, Zod
@@ -173,7 +173,7 @@ child spans of the supervisor span; extraction/retrieval sub-calls are children
 of their worker spans. One correlation ID reconstructs the full multi-agent
 trace — the spec's test, verbatim.
 
-## 5. Hybrid RAG design (REQ: S2/R3, E5) — [SHIPPED: hybrid BM25+dense → RRF → Cohere rerank behind injectable backends, PHI query scrubber + CI canary, disease-tag filters, /api/evidence/search, retrieval goldens · TARGET: pgvector/tsvector backends at deploy (0.1), answer-model wiring (Wave C)]
+## 5. Hybrid RAG design (REQ: S2/R3, E5) — [SHIPPED: hybrid BM25+dense → RRF → Cohere rerank behind injectable backends, PHI query scrubber + CI canary, disease-tag filters, coverage floor w/ stopword-hardening, /api/evidence/search, retrieval goldens · TARGET: pgvector/tsvector backends at deploy (0.1), production composer (answer leg, chat integration)]
 
 **Corpus (locked decisions #3, #6).** 6–10 short authored **practice-protocol
 documents** — "agreed clinical practices the office follows" — each grounded

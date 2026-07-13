@@ -71,6 +71,20 @@ function cosine(a: readonly number[], b: readonly number[]): number {
 const KEYWORD_FLOOR = 0.1;
 const CANDIDATE_POOL = 12;
 
+// Query-frame words ("what should the…") are never evidence of domain overlap — they
+// match every prose chunk and would let an out-of-domain ask clear the coverage floor.
+// Excluded from the coverage ratio ONLY; BM25 keeps them (IDF already discounts them).
+// Entries appear in post-tokenize form: tokenize() plural-stems, so "does"→"doe",
+// "this"→"thi" — both raw and stemmed spellings are listed where they differ.
+const COVERAGE_STOPWORDS = new Set([
+    'the', 'and', 'for', 'with', 'what', 'when', 'where', 'which', 'while', 'who', 'whom', 'why', 'how',
+    'should', 'would', 'could', 'can', 'will', 'shall', 'may', 'might', 'must',
+    'doe', 'does', 'did', 'are', 'was', 'were', 'been', 'being', 'have', 'has', 'had',
+    'thi', 'this', 'that', 'these', 'those', 'they', 'their', 'them', 'there', 'here',
+    'she', 'her', 'his', 'him', 'you', 'your', 'not', 'but', 'all', 'any', 'some', 'such',
+    'than', 'then', 'into', 'onto', 'from', 'about', 'over', 'under', 'per', 'our', 'out',
+]);
+
 export class HybridRetriever {
     private readonly bm25: Bm25Index;
     private readonly byId: Map<string, CorpusChunk>;
@@ -147,7 +161,7 @@ export class HybridRetriever {
         // Confidence floor: at least one (filtered) candidate must be keyword-supported AND
         // cover >=50% of the query's content terms — generic-word overlap ("protocol",
         // "weight") cannot smuggle an out-of-domain question into the corpus (P2).
-        const queryTerms = [...new Set(tokenize(query).filter((term) => term.length >= 3))];
+        const queryTerms = [...new Set(tokenize(query).filter((term) => term.length >= 3 && !COVERAGE_STOPWORDS.has(term)))];
         const coverage = (chunk: CorpusChunk): number => {
             if (queryTerms.length === 0) {
                 return 0;
