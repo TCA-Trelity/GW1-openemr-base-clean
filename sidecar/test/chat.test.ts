@@ -18,6 +18,13 @@ import { imagingToolSummary, registerChatRoutes, type ChatRouteDeps } from '../s
 import { buildServer } from '../src/server.js';
 import type { RegisteredTool } from '../src/chat/tools/index.js';
 import type { FactBundle, StoredBrief } from '../src/store/index.js';
+import { fileURLToPath } from 'node:url';
+import type { AnswerComposer } from '../src/graph/graph.js';
+import { VlmExtractor } from '../src/ingest/extractor.js';
+import { IngestionService, MemoryIngestionRecordStore } from '../src/ingest/service.js';
+import { HashEmbeddings } from '../src/retrieval/embeddings.js';
+import { PassthroughReranker } from '../src/retrieval/rerank.js';
+import { HybridRetriever, loadCorpusChunks } from '../src/retrieval/retriever.js';
 import Fastify from 'fastify';
 
 const silentLogger: PrepLogger = { info: () => {}, warn: () => {}, error: () => {} };
@@ -919,5 +926,133 @@ describe('chat routes', () => {
         const app = buildServer(loadConfig({ NODE_ENV: 'test' }));
         expect((await app.inject({ method: 'POST', url: '/api/chat/x', payload: { message: 'hi' } })).statusCode).toBe(503);
         expect((await app.inject({ method: 'GET', url: '/api/chat/x?conversation_id=c' })).statusCode).toBe(503);
+    });
+});
+
+// E.9 (REQ S3/R4 chat wiring, E1, G2): the evidence lane through the REAL route —
+// supervisor-routed, critic-gated, streaming the new `status` event — while record
+// questions and any graph failure take the Week 1 loop untouched.
+describe('evidence-turn wiring (E.9)', () => {
+    const CORPUS_DIR = fileURLToPath(new URL('../corpus/', import.meta.url));
+    const events = (body: string): Record<string, unknown>[] =>
+        body
+            .split('\n\n')
+            .filter((chunk) => chunk.startsWith('data: '))
+            .map((chunk) => JSON.parse(chunk.slice(6)) as Record<string, unknown>);
+
+    function evidenceComposer(invent: boolean): AnswerComposer {
+        return {
+            compose: async (_ask, evidence) => {
+                const top = evidence[0];
+                if (top === undefined) {
+                    return { text: 'No practice protocol on file covers this question.', claims: [] };
+                }
+                const quote = invent ? 'the guideline says to double the dose immediately' : top.quote.slice(0, 120);
+                return {
+                    text: `Per ${top.guideline_source}: ${quote}`,
+                    claims: [
+                        {
+                            id: 'claim-1',
+                            citations: [
+                                {
+                                    id: 'cit-1', fact_id: null, source_label: top.guideline_source,
+                                    source_type: 'guideline_evidence', excerpt_text: quote, excerpt_location: null,
+                                    attribution: null, source_document_id: top.chunk_id, document_date: null,
+                                    deep_link_url: null, page_or_section: top.section_title, field_or_chunk_id: top.chunk_id,
+                                },
+                            ],
+                        },
+                    ],
+                };
+            },
+        };
+    }
+
+    async function evidenceApp(overrides: { invent?: boolean; retriever?: HybridRetriever } = {}) {
+        const store = new FakeChatStore();
+        const spendGuard = new FakeSpendGuard();
+        const { service } = chatService(store, spendGuard, chatResponse(REPLY));
+        const retriever =
+            overrides.retriever ??
+            (await HybridRetriever.build(loadCorpusChunks(CORPUS_DIR), {
+                embeddings: new HashEmbeddings(),
+                reranker: new PassthroughReranker(),
+            }));
+        const ingestion = new IngestionService({
+            extractor: new VlmExtractor({
+                complete: async () => {
+                    throw new Error('VLM must never run on a chat turn');
+                },
+            }),
+            records: new MemoryIngestionRecordStore(),
+        });
+        const deps: ChatRouteDeps = {
+            store,
+            service,
+            spendGuard,
+            evidenceGraph: { clinical: { retriever, ingestion, composer: evidenceComposer(overrides.invent ?? false) } },
+        };
+        return { app: chatApp(deps), store };
+    }
+
+    it('streams status → delta → done(citations) for a guideline-shaped question', async () => {
+        const { app, store } = await evidenceApp();
+        const res = await app.inject({
+            method: 'POST',
+            url: '/api/chat/margaret-chen',
+            payload: { message: 'What screening interval do the guidelines recommend for hydroxychloroquine?' },
+        });
+        expect(res.statusCode).toBe(200);
+        const stream = events(res.body);
+        const types = stream.map((event) => event['type']);
+        expect(types[0]).toBe('status');
+        expect(stream[0]!['text']).toBe('checking practice protocols…');
+        expect(types).toContain('delta');
+        const done = stream.at(-1)!;
+        expect(done['type']).toBe('done');
+        expect((done['citations'] as unknown[]).length).toBeGreaterThanOrEqual(1);
+        expect((done['citations'] as { source_type: string }[])[0]!.source_type).toBe('guideline_evidence');
+        expect(done['unverified_count']).toBe(0);
+        // Both sides persisted so GET replay shows the evidence turn.
+        expect(store.messages.map((message) => message.role)).toEqual(['user', 'assistant']);
+    });
+
+    it('an inventing composer yields ZERO citations — the critic blocked the claim', async () => {
+        const { app } = await evidenceApp({ invent: true });
+        const res = await app.inject({
+            method: 'POST',
+            url: '/api/chat/margaret-chen',
+            payload: { message: 'What do the guidelines recommend for screening intervals?' },
+        });
+        const done = events(res.body).at(-1)!;
+        expect(done['type']).toBe('done');
+        expect(done['citations']).toEqual([]);
+        expect(done['unverified_count']).toBe(1);
+    });
+
+    it('record-shaped questions bypass the graph — no status event, Week 1 loop unchanged', async () => {
+        const { app } = await evidenceApp();
+        const res = await app.inject({
+            method: 'POST',
+            url: '/api/chat/margaret-chen',
+            payload: { message: 'When did she last have an injection?' },
+        });
+        const stream = events(res.body);
+        expect(stream.some((event) => event['type'] === 'status')).toBe(false);
+        expect(stream.filter((event) => event['type'] === 'delta').map((event) => event['text']).join('')).toBe(REPLY);
+    });
+
+    it('a throwing retriever falls back to the Week 1 loop — never an error event', async () => {
+        const broken = { search: async () => { throw new Error('index offline'); } } as unknown as HybridRetriever;
+        const { app } = await evidenceApp({ retriever: broken });
+        const res = await app.inject({
+            method: 'POST',
+            url: '/api/chat/margaret-chen',
+            payload: { message: 'What screening interval do the guidelines recommend for hydroxychloroquine?' },
+        });
+        const stream = events(res.body);
+        expect(stream.some((event) => event['type'] === 'error')).toBe(false);
+        expect(stream.filter((event) => event['type'] === 'delta').map((event) => event['text']).join('')).toBe(REPLY);
+        expect(stream.at(-1)!['type']).toBe('done');
     });
 });

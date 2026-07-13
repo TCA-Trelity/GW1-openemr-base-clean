@@ -28,6 +28,9 @@ import { GamePlanComposer } from './prep/gamePlan.js';
 import { StoreDocumentSource } from './prep/sources.js';
 import { registerChatRoutes, type ChatRouteDeps } from './routes/chat.js';
 import { registerEvidenceRoutes, registerIngestRoutes, type EvidenceRouteDeps, type IngestRouteDeps } from './routes/ingest.js';
+import { LlmAnswerComposer } from './graph/composer.js';
+import { LlmRouterModel } from './graph/routerModel.js';
+import { MemoryPinnedEvidenceStore } from './graph/pins.js';
 import { registerEhrRoutes, type EhrRouteDeps } from './routes/ehr.js';
 import { registerHealthRoutes } from './routes/health.js';
 import { registerOverviewRoutes, type OverviewRouteDeps } from './routes/overview.js';
@@ -390,8 +393,51 @@ if (process.argv[1]?.endsWith('server.js') || process.argv[1]?.endsWith('server.
     const evidence = await buildEvidenceDeps(loadConfig());
     if (deps !== undefined && evidence !== undefined) {
         deps.evidence = evidence;
+        // E.9: assemble the chat evidence lane — router tie-break + LLM composer over
+        // the same retriever/ingestion the routes use. Keyless deployments skip it and
+        // every turn takes the Week 1 loop (an explicit boot log says so below).
+        if (config.ANTHROPIC_API_KEY !== undefined && deps.ingest !== undefined) {
+            const routerModel = new LlmRouterModel(
+                new AnthropicClient({
+                    apiKey: config.ANTHROPIC_API_KEY,
+                    model: config.ANTHROPIC_MODEL_CHAT,
+                    maxTokens: 16,
+                    idleTimeoutMs: 3_000,
+                    totalTimeoutMs: 5_000,
+                }),
+                console,
+            );
+            const composer = new LlmAnswerComposer(
+                new AnthropicClient({
+                    apiKey: config.ANTHROPIC_API_KEY,
+                    model: config.ANTHROPIC_MODEL_CHAT,
+                    maxTokens: 1500,
+                    idleTimeoutMs: 10_000,
+                    totalTimeoutMs: 20_000,
+                }),
+                deps.chat.spendGuard,
+                console,
+            );
+            deps.chat.evidenceGraph = {
+                clinical: {
+                    retriever: evidence.retriever,
+                    ingestion: deps.ingest.service,
+                    composer,
+                    routerModel,
+                    pins: new MemoryPinnedEvidenceStore(),
+                    logger: {
+                        info: (obj, msg) => console.log(JSON.stringify({ level: 'info', msg, ...obj })),
+                        warn: (obj, msg) => console.warn(JSON.stringify({ level: 'warn', msg, ...obj })),
+                    },
+                },
+                routerModel,
+            };
+        }
     }
     const app = buildServer(config, deps);
+    if (deps?.chat !== undefined && deps.chat.evidenceGraph === undefined) {
+        app.log.info({ composerConfigured: false }, 'evidence turns degrade to fast path — ANTHROPIC_API_KEY absent or ingestion off');
+    }
     app.log.info(
         { corpusRetriever: evidence !== undefined, dense: config.COHERE_API_KEY !== undefined ? 'cohere' : 'hash-offline' },
         evidence !== undefined ? 'guideline retriever ready' : 'guideline corpus absent — evidence routes off',

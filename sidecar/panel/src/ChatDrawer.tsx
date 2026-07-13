@@ -85,6 +85,8 @@ interface ChatBubble {
     /** The user message that produced this assistant bubble — what Retry resends. */
     requestText: string;
     errorText: string | null;
+    /** E.9: transient evidence-lane status line; cleared by the first delta / done. */
+    statusText?: string;
 }
 
 let nextBubbleSeq = 0;
@@ -446,6 +448,11 @@ function AssistantBubble({
                         Includes AI visual observation — not from the record
                     </p>
                 )}
+                {bubble.statusText !== undefined && bubble.status === 'streaming' && (
+                    <p data-testid="evidence-status" className="mb-1 text-xs italic text-slate-500">
+                        {bubble.statusText}
+                    </p>
+                )}
                 {(bubble.content !== '' || bubble.status === 'streaming' || chips.length > 0) && (
                     <div className="rounded-xl rounded-bl-sm bg-slate-100 px-3.5 py-2 text-[13px] text-slate-700 leading-snug whitespace-pre-wrap">
                         {bubble.content}
@@ -589,7 +596,11 @@ export default function ChatDrawer({
                 text,
                 conversationIdRef.current,
                 (delta) => {
-                    patch(assistantId, (bubble) => ({ ...bubble, content: bubble.content + delta }));
+                    // The first delta replaces the transient status line with real prose.
+                    patch(assistantId, (bubble) => {
+                        const { statusText: _cleared, ...rest } = bubble;
+                        return { ...rest, content: bubble.content + delta };
+                    });
                 },
                 (citation) => {
                     // Verified chips render live as they stream; dedupe by document+start.
@@ -630,6 +641,10 @@ export default function ChatDrawer({
                         ...prev,
                     ]);
                 },
+                (statusText) => {
+                    // E.9: evidence-lane progress ("checking practice protocols…").
+                    patch(assistantId, (bubble) => ({ ...bubble, statusText }));
+                },
                 { viewingImageId },
             );
             if (result.kind === 'done') {
@@ -637,6 +652,7 @@ export default function ChatDrawer({
                 storeConversationId(patientId, result.done.conversationId);
                 patch(assistantId, (bubble) => ({
                     ...bubble,
+                    statusText: undefined,
                     status: 'complete',
                     citations: dedupeCitations(result.done.citations),
                     unverifiedCount: result.done.unverifiedCount,

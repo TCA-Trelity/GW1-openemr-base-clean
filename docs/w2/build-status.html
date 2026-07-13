@@ -187,7 +187,7 @@
 // Update in the SAME PR as the code it describes (anti-drift rule #3).
 // ============================================================================
 const DATA = {
-  stamp: "updated 2026-07-13 · session 3 (E.6 probes + E.3 write auth live; spec pack in flight)",
+  stamp: "updated 2026-07-13 · session 3 (E.9 LIVE: evidence turns in chat — composer + critic + status stream)",
   budget: { capPerDay: "$5.00", spentToday: "—", note: "SpendGuard unchanged (locked #16); Cohere rides a ledger line at B.4" },
   w1Floor: "24/24 W1 evals passing · read-path p95 46 ms @10 / 193 ms @50 (regression floor)",
 
@@ -250,7 +250,7 @@ const DATA = {
         { id: "E.6", t: "/ready probes: doc storage (token mint), retriever index, reranker — degraded semantics", reqs: ["G14"], deps: "A.3, B.3", s: "done" },
         { id: "E.7", t: "Sidecar OpenAPI 3.0 + contract tests + freshness check", reqs: ["G16"], deps: "A.3 routes", s: "pending" },
         { id: "E.8", t: "Bruno collection: W2 folder (upload/status/retrieval/full flow)", reqs: ["G10"], deps: "E.3, E.6", s: "pending" },
-        { id: "E.9", t: "Evidence-turn streaming UX + honest degraded message", reqs: ["G2"], deps: "C.3", s: "pending" },
+        { id: "E.9", t: "Evidence turn LIVE: LLM composer + graph in chat SSE (status event, honest fallback)", reqs: ["G2"], deps: "C.3", s: "done" },
       ]},
     { id: "F", title: "Wave F — Hardening + deliverables", band: "Band 3 · Final", tickets: [
         { id: "F.1", t: "W2 baselines (p50/p95) + shared-path regression vs W1", reqs: ["G11"], deps: "E.*", s: "pending" },
@@ -286,7 +286,7 @@ const DATA = {
       { id: "R2", t: "Strict Zod schemas (lab_pdf 7 fields · intake 6+goals)", plan: "A.1", done: 4, total: 5, s: "active" },
       { id: "S2/R3", t: "Hybrid RAG + rerank (corpus, pgvector+tsvector, RRF, Cohere, PHI-free queries)", plan: "0.1, 0.4, B.1–B.6", done: 7, total: 9, s: "active" },
       { id: "S3/R4", t: "Supervisor + intake-extractor + evidence-retriever (LangGraph, logged handoffs)", plan: "C.1–C.6", done: 4, total: 7, s: "active" },
-      { id: "R5", t: "Citation contract v2 + required PDF bbox overlay", plan: "A.2, A.5, E.2", done: 3, total: 5, s: "active" },
+      { id: "R5", t: "Citation contract v2 + required PDF bbox overlay", plan: "A.2, A.5, E.2", done: 4, total: 5, s: "active" },
       { id: "S4/R6", t: "Eval gate: 58 cases, 6 categories baselined, rehearsal proven; required-check flip = user 0.5", plan: "0.5, D.1–D.7", done: 6, total: 7, s: "active" },
       { id: "R7", t: "Observability + cost per encounter (PHI-free)", plan: "0.3, E.4, E.5", done: 0, total: 5, s: "pending" },
       { id: "S5", t: "Integrate, deploy, defend (upload UI, demo auth, traces, UC mapping)", plan: "E.1, E.3, E.9, F.5, F.8", done: 2, total: 5, s: "active" },

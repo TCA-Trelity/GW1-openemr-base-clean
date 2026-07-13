@@ -133,7 +133,7 @@ observation-shaped write is the fixed-field vitals endpoint. Hence the
 persistence split above, with data authority declared per type (§10) rather
 than shoehorning lab values into fields that don't fit.
 
-## 4. The worker graph (REQ: S3/R4) — [SHIPPED: `sidecar/src/graph/` — 5-node StateGraph, deterministic router + LlmRouterModel tie-break (never-throw, fast_path-safe), Zod boundary contracts w/ GraphContractError, ≤5 s evidence budget w/ degraded handoff, per-patient pin store keyed to ingestion, worker_handoff events (worked example: docs/w2/trace-example.md); 15 tests · TARGET: ChatService fast_path delegation + production composer (answer leg), Langfuse span binding (E.4), routing-latency baseline]
+## 4. The worker graph (REQ: S3/R4) — [SHIPPED: `sidecar/src/graph/` — 5-node StateGraph, deterministic router + LlmRouterModel tie-break (never-throw, fast_path-safe), Zod boundary contracts w/ GraphContractError, ≤5 s evidence budget w/ degraded handoff, per-patient pin store keyed to ingestion, worker_handoff events (worked example: docs/w2/trace-example.md); 15 tests · TARGET: Langfuse span binding (E.4), routing-latency baseline (F.1)] — chat delegation + production composer SHIPPED (E.9): `graph/composer.ts` LLM composer (verbatim-quote contract, ledger-priced, never-throws) wired into the chat route behind the router; evidence turns stream status→cited answer; graph failures fall back to the Week 1 loop
 
 **Framework:** LangGraph.js `StateGraph` inside the existing TypeScript
 sidecar. Nodes wrap existing services — the direct Anthropic client, Zod
@@ -173,7 +173,7 @@ child spans of the supervisor span; extraction/retrieval sub-calls are children
 of their worker spans. One correlation ID reconstructs the full multi-agent
 trace — the spec's test, verbatim.
 
-## 5. Hybrid RAG design (REQ: S2/R3, E5) — [SHIPPED: hybrid BM25+dense → RRF → Cohere rerank behind injectable backends, PHI query scrubber + CI canary, disease-tag filters, coverage floor w/ stopword-hardening, /api/evidence/search, retrieval goldens · TARGET: pgvector/tsvector backends at deploy (0.1), production composer (answer leg, chat integration)]
+## 5. Hybrid RAG design (REQ: S2/R3, E5) — [SHIPPED: hybrid BM25+dense → RRF → Cohere rerank behind injectable backends, PHI query scrubber + CI canary, disease-tag filters, coverage floor w/ stopword-hardening, /api/evidence/search, retrieval goldens · TARGET: pgvector/tsvector backends at deploy (0.1)] — answer leg SHIPPED (E.9)
 
 **Corpus (locked decisions #3, #6).** 6–10 short authored **practice-protocol
 documents** — "agreed clinical practices the office follows" — each grounded

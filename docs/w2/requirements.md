@@ -195,8 +195,10 @@ production composer), Langfuse span binding (E.4), routing-latency baseline.
   in ~200–400 ms; `fast_path` delegates to the unchanged Week 1 chat loop;
   document upload events enter the graph directly (Tier 2, prep-time).
   *(Shipped: rules + `LlmRouterModel` tie-break, never-throw, fast_path-safe
-  defaults, tested. Remaining: ChatService delegation wiring + measured
-  ~200–400 ms baseline.)*
+  defaults, tested — and the chat delegation wiring (E.9): needs_evidence
+  turns run the graph and stream status→cited answer; everything else takes
+  the untouched Week 1 loop. Box flips when F.1 measures the ~200–400 ms
+  router baseline.)*
 - [x] Supervisor decides all three spec conditions: extraction needed /
   evidence needed / final answer ready — each decision logged. *(Final-answer
   readiness = the critic's release decision, logged with verified/blocked
@@ -249,8 +251,10 @@ page/bbox variant, no PDF preview overlay.
 - [x] **Visual PDF bounding-box overlay in the panel (required, core):**
   clicking a document citation opens the stored PDF page with the cited
   region highlighted (E2 click-to-source delivered by this same surface).
-- [ ] Guideline citations verify quote-vs-stored-chunk through the same gate
-  path as record citations.
+- [x] Guideline citations verify quote-vs-stored-chunk through the same gate
+  path as record citations. *(E.9: the critic node runs `runCitationGate`
+  over composer claims against snippet bodies; blocked claims release zero
+  citations end-to-end through the chat SSE — route-tested.)*
 
 ### S4/R6 — Eval-driven CI gate
 
