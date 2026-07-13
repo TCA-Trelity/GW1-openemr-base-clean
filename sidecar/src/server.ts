@@ -21,6 +21,7 @@ import { OpenEmrAuthClient } from './openemr/auth.js';
 import { FhirClient } from './openemr/fhir.js';
 import { loadConfig, type Config } from './config.js';
 import { LangfuseTracer } from './obs/langfuse.js';
+import { tracingGraphLogger } from './obs/graphTracer.js';
 import { AnthropicClient } from './prep/anthropic.js';
 import { SpendGuard } from './prep/budget.js';
 import { FactExtractor } from './prep/extraction.js';
@@ -418,6 +419,22 @@ if (process.argv[1]?.endsWith('server.js') || process.argv[1]?.endsWith('server.
                 deps.chat.spendGuard,
                 console,
             );
+            // E.4: when Langfuse is keyed, graph events additionally become spans on a
+            // correlation-scoped trace (adapter over the same logger seam — no new
+            // instrumentation points; docs/w2/trace-example.md is the span skeleton).
+            const graphLogBase = {
+                info: (obj: Record<string, unknown>, msg: string) => console.log(JSON.stringify({ level: 'info', msg, ...obj })),
+                warn: (obj: Record<string, unknown>, msg: string) => console.warn(JSON.stringify({ level: 'warn', msg, ...obj })),
+            };
+            const graphLangfuse =
+                config.LANGFUSE_HOST !== undefined && config.LANGFUSE_PUBLIC_KEY !== undefined && config.LANGFUSE_SECRET_KEY !== undefined
+                    ? new Langfuse({
+                          baseUrl: config.LANGFUSE_HOST,
+                          publicKey: config.LANGFUSE_PUBLIC_KEY,
+                          secretKey: config.LANGFUSE_SECRET_KEY,
+                          requestTimeout: 10_000,
+                      })
+                    : undefined;
             deps.chat.evidenceGraph = {
                 clinical: {
                     retriever: evidence.retriever,
@@ -425,10 +442,7 @@ if (process.argv[1]?.endsWith('server.js') || process.argv[1]?.endsWith('server.
                     composer,
                     routerModel,
                     pins: new MemoryPinnedEvidenceStore(),
-                    logger: {
-                        info: (obj, msg) => console.log(JSON.stringify({ level: 'info', msg, ...obj })),
-                        warn: (obj, msg) => console.warn(JSON.stringify({ level: 'warn', msg, ...obj })),
-                    },
+                    logger: graphLangfuse === undefined ? graphLogBase : tracingGraphLogger(graphLogBase, graphLangfuse, console),
                 },
                 routerModel,
             };

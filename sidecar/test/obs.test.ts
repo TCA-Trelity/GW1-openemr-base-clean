@@ -97,3 +97,79 @@ describe('LangfuseTracer', () => {
         expect(warn).toHaveBeenCalled(); // failures are logged, not raised
     });
 });
+
+// E.4: the graph→Langfuse span adapter. Failure modes guarded: a tracer error eating
+// the log line (inner must ALWAYS receive the event), PHI-shaped metadata sneaking into
+// spans, and per-correlation trace handles duplicating.
+import { tracingGraphLogger } from '../src/obs/graphTracer.js';
+
+describe('tracingGraphLogger (E.4)', () => {
+    function fakeLangfuse() {
+        const traceCalls: Record<string, unknown>[] = [];
+        const spanCalls: Record<string, unknown>[] = [];
+        const client = {
+            trace: (body: Record<string, unknown>) => {
+                traceCalls.push(body);
+                return {
+                    span: (span: Record<string, unknown>) => spanCalls.push(span),
+                    generation: () => undefined,
+                    score: () => undefined,
+                    update: () => undefined,
+                };
+            },
+            flushAsync: async () => undefined,
+        };
+        return { client, traceCalls, spanCalls };
+    }
+
+    function recordingInner() {
+        const lines: string[] = [];
+        return {
+            lines,
+            logger: {
+                info: (_obj: Record<string, unknown>, msg: string) => lines.push(`info:${msg}`),
+                warn: (_obj: Record<string, unknown>, msg: string) => lines.push(`warn:${msg}`),
+            },
+        };
+    }
+
+    it('opens ONE trace per correlation id and maps worker_handoff events to spans', () => {
+        const { client, traceCalls, spanCalls } = fakeLangfuse();
+        const { logger: inner } = recordingInner();
+        const traced = tracingGraphLogger(inner, client, { warn: () => undefined });
+        traced.info({ correlation_id: 'corr-1', from: 'supervisor', to: 'evidence_retriever', routing_reason: 'asks for guideline/protocol (rule)' }, 'worker_handoff');
+        traced.info({ correlation_id: 'corr-1', from: 'evidence_retriever', to: 'critic', routing_reason: '4 chunk(s)' }, 'worker_handoff');
+        expect(traceCalls).toHaveLength(1);
+        expect(traceCalls[0]).toMatchObject({ id: 'corr-1', name: 'graph' });
+        expect(spanCalls.map((span) => span['name'])).toEqual(['supervisor→evidence_retriever', 'evidence_retriever→critic']);
+    });
+
+    it('ALWAYS forwards events to the inner logger, even when the SDK throws everywhere', () => {
+        const broken = {
+            trace: () => {
+                throw new Error('langfuse down');
+            },
+            flushAsync: async () => undefined,
+        };
+        const warnings: string[] = [];
+        const { lines, logger: inner } = recordingInner();
+        const traced = tracingGraphLogger(inner, broken, { warn: (_obj, msg) => warnings.push(msg) });
+        traced.info({ correlation_id: 'corr-2', from: 'supervisor', to: 'critic', routing_reason: 'x' }, 'worker_handoff');
+        traced.warn({ correlation_id: 'corr-2', blocked: 1, prescriptive_flags: 0 }, 'critic_flags');
+        expect(lines).toEqual(['info:worker_handoff', 'warn:critic_flags']);
+        expect(warnings.every((msg) => msg === 'langfuse graph emit failed')).toBe(true);
+    });
+
+    it('maps degraded/critic events to WARNING spans carrying ids and counts only', () => {
+        const { client, spanCalls } = fakeLangfuse();
+        const traced = tracingGraphLogger(undefined, client, { warn: () => undefined });
+        traced.warn({ correlation_id: 'corr-3', budget_ms: 5000 }, 'evidence_degraded');
+        traced.warn({ correlation_id: 'corr-3', blocked: 2, prescriptive_flags: 1 }, 'critic_flags');
+        traced.info({ correlation_id: 'corr-3', patient_id: 'pt-1', ingestion_id: 'ing-abc', pinned: 4 }, 'evidence_pinned');
+        expect(spanCalls[0]).toMatchObject({ name: 'evidence_degraded', level: 'WARNING', metadata: { budget_ms: 5000 } });
+        expect(spanCalls[1]).toMatchObject({ name: 'critic_flags', level: 'WARNING', metadata: { blocked: 2, prescriptive_flags: 1 } });
+        expect(spanCalls[2]).toMatchObject({ name: 'evidence_pinned', metadata: { ingestion_id: 'ing-abc', pinned: 4 } });
+        const metadataKeys = spanCalls.flatMap((span) => Object.keys(span['metadata'] as Record<string, unknown>));
+        expect(metadataKeys.every((key) => ['budget_ms', 'blocked', 'prescriptive_flags', 'ingestion_id', 'pinned', 'routing_reason'].includes(key))).toBe(true);
+    });
+});

@@ -465,10 +465,12 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
 - [ ] Logs searchable by case ID, event ID, correlation ID; PHI-free (R7).
 
 ### G6 — Dashboards
-- [ ] Dashboard (Langfuse + ops-status page) adds W2 tiles: document ingestion
+- [x] Dashboard (Langfuse + ops-status page) adds W2 tiles: document ingestion
   count, extraction field-level pass rate, retrieval hit rate, supervisor
   routing decisions (by outcome), eval pass/fail per category. *"The dashboard
   should tell a grader whether the system is healthy without reading logs."*
+  *(Four W2 tiles on ops-status.html — static from eval output until the
+  Langfuse key-drop; the graph span adapter is live code behind the keys.)*
 
 ### G7 — CI pipeline
 - [ ] On every PR to `main`: build, lint/typecheck, tests, coverage, **npm
@@ -533,10 +535,11 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
   Absent probes degrade to not_configured, never binary-down.)*
 
 ### G15 — Alerts
-- [ ] Three new alert definitions with thresholds + documented response
+- [x] Three new alert definitions with thresholds + documented response
   actions (extending `docs/execution/observability.md` A1–A3): **A4**
   extraction failure rate, **A5** RAG retrieval latency, **A6** eval
   regression (>5% category drop triggers alert as well as gate failure).
+  *(A4–A6 committed in `docs/execution/observability.md`, same table as A1–A3.)*
 
 ### G16 — OpenAPI 3.0
 - [x] Sidecar OpenAPI 3.0 spec committed (today the sidecar has **none**;

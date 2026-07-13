@@ -187,7 +187,7 @@
 // Update in the SAME PR as the code it describes (anti-drift rule #3).
 // ============================================================================
 const DATA = {
-  stamp: "updated 2026-07-13 · session 3 (E.7/E.8/E.9 done — Band 2 nearly closed; specs cover all remaining work)",
+  stamp: "updated 2026-07-13 · session 3 (Band 2 code CLOSED: E.3–E.9 all done; F-wave docs + key-drops remain)",
   budget: { capPerDay: "$5.00", spentToday: "—", note: "SpendGuard unchanged (locked #16); Cohere rides a ledger line at B.4" },
   w1Floor: "24/24 W1 evals passing · read-path p95 46 ms @10 / 193 ms @50 (regression floor)",
 
@@ -245,7 +245,7 @@ const DATA = {
         { id: "E.1", t: "Panel upload: drag-drop + doc-type + live staged progress (front-desk role gate rides E.3)", reqs: ["S5"], deps: "A.3, A.4", s: "done" },
         { id: "E.2", t: "PDF preview + bbox overlay: three distinct grounding outcomes; file preview route", reqs: ["R5","E2"], deps: "A.5", s: "done" },
         { id: "E.3", t: "Write-path auth: documentsWrite capability, 401/403 on upload regardless of AUTH_MODE", reqs: ["#14"], deps: "A.3", s: "done" },
-        { id: "E.4", t: "Langfuse spans + dashboard tiles + alerts A4–A6", reqs: ["R7","G6","G15"], deps: "C.5, 0.3", s: "pending" },
+        { id: "E.4", t: "Graph→Langfuse span adapter (guarded, keyed-off) + ops tiles + alerts A4–A6", reqs: ["R7","G6","G15"], deps: "C.5, 0.3", s: "done" },
         { id: "E.5", t: "LangSmith demo-env wiring (fenced)", reqs: ["R7","P5"], deps: "C.3", s: "pending" },
         { id: "E.6", t: "/ready probes: doc storage (token mint), retriever index, reranker — degraded semantics", reqs: ["G14"], deps: "A.3, B.3", s: "done" },
         { id: "E.7", t: "OpenAPI 3.0 spec (21 endpoints) + two-direction drift contract test", reqs: ["G16"], deps: "A.3 stable routes", s: "done" },
@@ -314,7 +314,7 @@ const DATA = {
       { id: "G3", t: "Raw VLM output never bypasses validation", plan: "A.4", done: 0, total: 1, s: "pending" },
       { id: "G4", t: "Correlation ID through every W2 boundary; trace from ID alone", plan: "C.5", done: 1, total: 2, s: "active" },
       { id: "G5", t: "Structured logs: new W2 event types, searchable, PHI-free", plan: "C.5, E.4", done: 0, total: 2, s: "pending" },
-      { id: "G6", t: "Dashboard tiles for W2 metrics", plan: "E.4", done: 0, total: 1, s: "pending" },
+      { id: "G6", t: "Dashboard tiles for W2 metrics", plan: "E.4", done: 1, total: 1, s: "active" },
       { id: "G7", t: "CI: audit + security scan on main PRs · contract tests · Dependabot sidecar", plan: "0.2, C.1, D.4, D.6", done: 3, total: 4, s: "active" },
       { id: "G8", t: "Testing strategy documented (per-test failure modes)", plan: "P.2 → W2_ARCHITECTURE §11", done: 1, total: 1, s: "done" },
       { id: "G9", t: "Failure-mode runbook (identify in logs + recovery)", plan: "P.2 → W2_ARCHITECTURE §12", done: 1, total: 1, s: "done" },
@@ -323,7 +323,7 @@ const DATA = {
       { id: "G12", t: "One logging convention (no parallel format)", plan: "C.5, E.4", done: 0, total: 1, s: "pending" },
       { id: "G13", t: "Span hierarchy: worker ⊂ supervisor; sub-calls ⊂ worker", plan: "C.5", done: 0, total: 1, s: "pending" },
       { id: "G14", t: "/ready: doc storage + vector index + reranker, degraded status", plan: "E.6", done: 1, total: 1, s: "done" },
-      { id: "G15", t: "Alerts A4–A6 with response actions", plan: "E.4", done: 0, total: 1, s: "pending" },
+      { id: "G15", t: "Alerts A4–A6 with response actions", plan: "E.4", done: 1, total: 1, s: "active" },
       { id: "G16", t: "Sidecar OpenAPI 3.0 committed + contract-tested + fresh", plan: "E.7", done: 1, total: 1, s: "done" },
       { id: "G17", t: "Integration tests: fixtures + stubs, no live APIs in CI", plan: "D.3", done: 1, total: 1, s: "done" },
       { id: "G18", t: "Data model/lineage (shipped §10) · PHI audit in CI · backup/recovery + RPO/RTO", plan: "B.5, D.5, F.4", done: 2, total: 3, s: "active" },
@@ -348,9 +348,9 @@ const DATA = {
   ],
 
   alerts: [
-    { id: "A4", t: "Extraction failure rate", status: "spec at E.4" },
-    { id: "A5", t: "RAG retrieval latency", status: "spec at E.4" },
-    { id: "A6", t: "Eval regression >5% (any category)", status: "spec at E.4" },
+    { id: "A4", t: "Extraction failure rate", status: "committed" },
+    { id: "A5", t: "RAG retrieval latency", status: "committed" },
+    { id: "A6", t: "Eval regression >5% (any category)", status: "committed" },
   ],
 };
 

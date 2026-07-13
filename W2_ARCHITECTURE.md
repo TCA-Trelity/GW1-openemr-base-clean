@@ -283,7 +283,7 @@ drop a citation (`citation_present` hard-fails), plant a canary identifier in
 a log line (`no_phi_in_logs` hard-fails). Three injections, three categories,
 documented and repeatable (REQ: D5 evidence).
 
-## 8. Observability & cost (REQ: R7, G4–G6, G13, G15) — [TARGET on top of SHIPPED spine]
+## 8. Observability & cost (REQ: R7, G4–G6, G13, G15) — [SHIPPED: graph→Langfuse span adapter over the handoff event stream (guarded, keyed-off — src/obs/graphTracer.ts), alerts A4–A6 w/ response actions, W2 ops tiles (static until deploy), correlation-ID trace worked example · TARGET: Langfuse/LangSmith key activation (USER-ACTIONS), live tile feeds, cost report (F.2)]
 
 **Shipped spine:** correlation IDs end-to-end (`server.ts`), pino structured
 logs, `llm_calls` cost ledger + `SpendGuard` ($5/day, unchanged — locked #16)
