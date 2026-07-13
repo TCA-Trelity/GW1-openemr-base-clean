@@ -62,6 +62,7 @@ gate. Week 1 baseline behavior above is unchanged until Week 2 waves land.
 
 | Week 2 deliverable | Location |
 |---|---|
+| **Build status dashboard (tickets, requirements, analytics)** | [`docs/w2/build-status.html`](docs/w2/build-status.html) |
 | **Week 2 architecture (start here for W2)** | [`W2_ARCHITECTURE.md`](W2_ARCHITECTURE.md) |
 | Requirements register (canonical, anti-drift) | [`docs/w2/requirements.md`](docs/w2/requirements.md) |
 | Execution plan (waves, tickets) | [`docs/w2/execution-plan.md`](docs/w2/execution-plan.md) |

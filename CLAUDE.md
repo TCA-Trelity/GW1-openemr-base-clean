@@ -25,6 +25,27 @@
 - **Testing:** PHPUnit 11, Jest 29
 - **Static Analysis:** PHPStan level 10, Rector, custom rules in `tests/PHPStan/Rules/`
 
+## Week 2 session-start ritual (structural requirement)
+
+**At the start of every working session in this repo, before any build work,
+send the tracking dashboards to the user rendered inline** (SendUserFile with
+`display: "render"`; if unavailable on the surface, state the paths):
+
+1. `docs/w2/build-status.html` — Week 2 build board: tickets by wave,
+   requirements coverage, critical path, eval/SLO/cost analytics.
+2. `docs/execution/ops-status.html` — Week 1 operational review surface.
+
+This is a user-mandated structural requirement, not a suggestion — it is also
+enforced by a `SessionStart` hook in `.claude/settings.json`
+(`.claude/hooks/session-start-dashboards.sh`).
+
+**Standing update protocol (anti-drift):** `docs/w2/build-status.html` embeds
+its data as a `DATA` block. Any PR that changes W2 code updates, in the same
+PR: the ticket status in that block, the acceptance counts (mirroring
+`docs/w2/requirements.md` checkboxes), and any measured numbers. The
+requirements register and execution plan in `docs/w2/` are the sources of
+truth; the dashboard mirrors them.
+
 ## Local Development
 
 See `CONTRIBUTING.md` for full setup instructions. Quick start:
