@@ -46,6 +46,8 @@ import { StandardApiClient } from './openemr/standardApi.js';
 export interface AppDeps {
     /** Real readiness probe for /ready (SELECT 1 through the pool). */
     checkPostgres: () => Promise<void>;
+    /** E.6: proves the OpenEMR write client can mint a token (document storage). */
+    checkDocumentStorage?: () => Promise<void>;
     /** Applies pending fact-store migrations (idempotent, advisory-locked). */
     runMigrations: () => Promise<string[]>;
     prep: PrepRouteDeps;
@@ -167,19 +169,23 @@ export function buildDeps(config: Config): AppDeps | undefined {
     // client; EHR document storage engages only when the password-grant user is
     // configured (standard API rejects client_credentials — see openemr/auth.ts).
     const ingestionRecords = new MemoryIngestionRecordStore();
-    const ehrDocsClient =
+    const ehrTokenProvider =
         config.OPENEMR_BASE_URL !== undefined &&
         config.OPENEMR_CLIENT_ID !== undefined &&
         config.OPENEMR_API_USERNAME !== undefined &&
         config.OPENEMR_API_PASSWORD !== undefined
+            ? new OpenEmrPasswordAuthClient({
+                  baseUrl: config.OPENEMR_BASE_URL,
+                  clientId: config.OPENEMR_CLIENT_ID,
+                  username: config.OPENEMR_API_USERNAME,
+                  password: config.OPENEMR_API_PASSWORD,
+              })
+            : undefined;
+    const ehrDocsClient =
+        ehrTokenProvider !== undefined && config.OPENEMR_BASE_URL !== undefined
             ? new StandardApiClient({
                   baseUrl: config.OPENEMR_BASE_URL,
-                  tokenProvider: new OpenEmrPasswordAuthClient({
-                      baseUrl: config.OPENEMR_BASE_URL,
-                      clientId: config.OPENEMR_CLIENT_ID,
-                      username: config.OPENEMR_API_USERNAME,
-                      password: config.OPENEMR_API_PASSWORD,
-                  }),
+                  tokenProvider: ehrTokenProvider,
               })
             : undefined;
     const ingestionService = new IngestionService({
@@ -201,6 +207,16 @@ export function buildDeps(config: Config): AppDeps | undefined {
         checkPostgres: async () => {
             await pool.query('SELECT 1');
         },
+        // E.6: document-storage probe — a token mint proves base URL, client id, and
+        // password-grant credentials in one cheap round trip (cached between probes,
+        // no chart data touched).
+        ...(ehrTokenProvider !== undefined
+            ? {
+                  checkDocumentStorage: async () => {
+                      await ehrTokenProvider.getAccessToken();
+                  },
+              }
+            : {}),
         runMigrations: () => migrate(pool),
         prep: {
             store,
@@ -283,7 +299,32 @@ export function buildServer(config: Config, deps?: AppDeps): FastifyInstance {
     // (a no-op in 'off' mode) before any route is registered, so every /api route is guarded.
     registerAuth(app, deps?.auth);
 
-    registerHealthRoutes(app, config, deps === undefined ? undefined : { checkPostgres: deps.checkPostgres });
+    registerHealthRoutes(
+        app,
+        config,
+        deps === undefined
+            ? undefined
+            : {
+                  checkPostgres: deps.checkPostgres,
+                  ...(deps.checkDocumentStorage === undefined ? {} : { checkDocumentStorage: deps.checkDocumentStorage }),
+                  // E.6: retriever probe — an empty guideline index is a real failure
+                  // once evidence routes are wired (out-of-domain floors depend on it).
+                  ...(deps.evidence === undefined
+                      ? {}
+                      : {
+                            checkRetrieverIndex: async () => {
+                                const size = deps.evidence?.retriever.size ?? 0;
+                                if (size === 0) {
+                                    throw new Error('guideline index holds zero chunks');
+                                }
+                            },
+                        }),
+                  // Reranker: keyed → live Cohere client was constructed at boot; unkeyed
+                  // deployments run PassthroughReranker and report not_configured (degraded,
+                  // accurate — fused order still serves).
+                  ...(config.COHERE_API_KEY === undefined ? {} : { checkReranker: async () => {} }),
+              },
+    );
     registerAuthRoutes(app, deps?.authRoutes);
     registerPrepRoutes(app, deps?.prep);
     registerVerifyRoutes(app, deps?.verify);

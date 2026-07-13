@@ -187,7 +187,7 @@
 // Update in the SAME PR as the code it describes (anti-drift rule #3).
 // ============================================================================
 const DATA = {
-  stamp: "updated 2026-07-13 · session 2 cont. (E.1/E.2 live: panel upload + required-core bbox overlay)",
+  stamp: "updated 2026-07-13 · session 3 (E.6 probes live; spec-pack sub-agent writing docs/w2/tickets/)",
   budget: { capPerDay: "$5.00", spentToday: "—", note: "SpendGuard unchanged (locked #16); Cohere rides a ledger line at B.4" },
   w1Floor: "24/24 W1 evals passing · read-path p95 46 ms @10 / 193 ms @50 (regression floor)",
 
@@ -247,7 +247,7 @@ const DATA = {
         { id: "E.3", t: "Write-path auth: dev-login bearer + role gate", reqs: ["#14"], deps: "A.3", s: "pending" },
         { id: "E.4", t: "Langfuse spans + dashboard tiles + alerts A4–A6", reqs: ["R7","G6","G15"], deps: "C.5, 0.3", s: "pending" },
         { id: "E.5", t: "LangSmith demo-env wiring (fenced)", reqs: ["R7","P5"], deps: "C.3", s: "pending" },
-        { id: "E.6", t: "/ready probes: doc storage, vector index, reranker (degraded)", reqs: ["G14"], deps: "A.3, B.3", s: "pending" },
+        { id: "E.6", t: "/ready probes: doc storage (token mint), retriever index, reranker — degraded semantics", reqs: ["G14"], deps: "A.3, B.3", s: "done" },
         { id: "E.7", t: "Sidecar OpenAPI 3.0 + contract tests + freshness check", reqs: ["G16"], deps: "A.3 routes", s: "pending" },
         { id: "E.8", t: "Bruno collection: W2 folder (upload/status/retrieval/full flow)", reqs: ["G10"], deps: "E.3, E.6", s: "pending" },
         { id: "E.9", t: "Evidence-turn streaming UX + honest degraded message", reqs: ["G2"], deps: "C.3", s: "pending" },
@@ -322,7 +322,7 @@ const DATA = {
       { id: "G11", t: "W2 baselines vs W1 (shared-path regression check)", plan: "F.1", done: 0, total: 1, s: "pending" },
       { id: "G12", t: "One logging convention (no parallel format)", plan: "C.5, E.4", done: 0, total: 1, s: "pending" },
       { id: "G13", t: "Span hierarchy: worker ⊂ supervisor; sub-calls ⊂ worker", plan: "C.5", done: 0, total: 1, s: "pending" },
-      { id: "G14", t: "/ready: doc storage + vector index + reranker, degraded status", plan: "E.6", done: 0, total: 1, s: "pending" },
+      { id: "G14", t: "/ready: doc storage + vector index + reranker, degraded status", plan: "E.6", done: 1, total: 1, s: "done" },
       { id: "G15", t: "Alerts A4–A6 with response actions", plan: "E.4", done: 0, total: 1, s: "pending" },
       { id: "G16", t: "Sidecar OpenAPI 3.0 committed + contract-tested + fresh", plan: "E.7", done: 0, total: 1, s: "pending" },
       { id: "G17", t: "Integration tests: fixtures + stubs, no live APIs in CI", plan: "D.3", done: 1, total: 1, s: "done" },

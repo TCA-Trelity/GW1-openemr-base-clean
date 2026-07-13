@@ -510,10 +510,14 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
   in an integration test.
 
 ### G14 — Health/readiness
-- [ ] `/ready` adds probes: document storage (OpenEMR standard API
+- [x] `/ready` adds probes: document storage (OpenEMR standard API
   reachability with the write-scoped client), vector index (pgvector/table
   presence + count), reranker API (Cohere reachability). Degraded status per
-  dependency, not binary up/down (existing pattern extended).
+  dependency, not binary up/down (existing pattern extended). *(Shipped:
+  document_storage = password-grant token mint (cached provider);
+  retriever_index = fails on zero chunks; reranker = keyed-Cohere presence,
+  unkeyed reports not_configured with the Passthrough fallback active.
+  Absent probes degrade to not_configured, never binary-down.)*
 
 ### G15 — Alerts
 - [ ] Three new alert definitions with thresholds + documented response

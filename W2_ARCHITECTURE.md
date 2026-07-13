@@ -320,7 +320,7 @@ and cost reports contain no patient identifiers, no raw document text, and no
 extracted clinical values — identifiers and hashes only, verified by the CI
 canary check (REQ: G18).
 
-## 9. SLOs, resilience, readiness (REQ: G2, G14) — [TARGET]
+## 9. SLOs, resilience, readiness (REQ: G2, G14) — [SHIPPED: /ready W2 probes (document storage via cached token mint, retriever index fails-on-empty, reranker keyed-presence) with degraded not_configured semantics; timeouts/retries on Cohere + VLM legs; ≤5 s evidence budget w/ honest degrade · TARGET: measured SLO baselines (F.1), circuit-breaker documentation per dependency]
 
 | Flow | SLO (p95) | Where the budget lives |
 |---|---|---|
