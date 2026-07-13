@@ -4,12 +4,18 @@
 // verbatim against the stored document server-side (gate philosophy: unverifiable
 // citations are reported, never rendered as provenance). Brevity is a hard prompt
 // contract: physicians read replies in seconds.
+import { verifyCitation, verifyDocumentExcerpt, type ChatCitation } from '../gate/chatCitations.js';
+import { lintPrescriptiveness } from '../gate/prescriptivenessLint.js';
 import type { AnthropicClient, AnthropicContentBlock, AnthropicMessage, AnthropicTool } from '../prep/anthropic.js';
 import type { PrepLogger } from '../prep/extraction.js';
 import type { PrepSpendGuard } from '../prep/pipeline.js';
 import type { FactBundle } from '../store/index.js';
-import { lintPrescriptiveness } from './prescriptivenessLint.js';
 import { ALL_CHAT_TOOLS, type RegisteredTool } from './tools/index.js';
+
+// Verification primitives live in the gate layer (src/gate/ owns every check between
+// generation and display); re-exported here so existing importers keep a stable path.
+export { verifyCitation, verifyDocumentExcerpt } from '../gate/chatCitations.js';
+export type { ChatCitation } from '../gate/chatCitations.js';
 
 export interface ChatMessageInput {
     patient_id: string;
@@ -33,16 +39,6 @@ export interface StoredChatMessage {
 export interface ChatStore {
     saveChatMessage(input: ChatMessageInput): Promise<string>;
     getChatMessages(patientId: string, conversationId: string, limit?: number): Promise<StoredChatMessage[]>;
-}
-
-/** A citation mapped to OUR document ids and re-verified against stored text. */
-export interface ChatCitation {
-    document_id: string;
-    document_title: string;
-    cited_text: string;
-    start_char: number;
-    end_char: number;
-    verified: boolean;
 }
 
 export interface ChatTurnInput {
@@ -144,81 +140,6 @@ NOT the record: introduce it with exactly "AI visual observation (not from the r
 keep it to visible morphology — no diagnosis, no severity grading, no treatment implication. The result includes \
 the record's own authored reading; when your observation differs from it, say so explicitly and defer to the \
 record.`;
-}
-
-const NULLISH_WS = /\s+/g;
-
-/** Verbatim re-verification (gate philosophy): the cited span must exist in OUR copy. */
-export function verifyCitation(
-    raw: Record<string, unknown>,
-    documents: { id: string; title: string; text: string }[],
-): ChatCitation | null {
-    const citedText = raw['cited_text'];
-    const index = raw['document_index'];
-    if (typeof citedText !== 'string' || citedText.length === 0 || typeof index !== 'number') {
-        return null;
-    }
-    const doc = documents[index];
-    if (doc === undefined) {
-        return null;
-    }
-    const start = typeof raw['start_char_index'] === 'number' ? raw['start_char_index'] : -1;
-    const end = typeof raw['end_char_index'] === 'number' ? raw['end_char_index'] : -1;
-    // Exact range first, then verbatim search (whitespace-normalized) as recovery.
-    let verified = start >= 0 && end > start && doc.text.slice(start, end) === citedText;
-    let resolvedStart = start;
-    let resolvedEnd = end;
-    if (!verified) {
-        const at = doc.text.indexOf(citedText);
-        if (at >= 0) {
-            verified = true;
-            resolvedStart = at;
-            resolvedEnd = at + citedText.length;
-        } else {
-            verified =
-                doc.text.replace(NULLISH_WS, ' ').includes(citedText.replace(NULLISH_WS, ' ').trim());
-        }
-    }
-    return {
-        document_id: doc.id,
-        document_title: doc.title,
-        cited_text: citedText,
-        start_char: resolvedStart,
-        end_char: resolvedEnd,
-        verified,
-    };
-}
-
-/**
- * Verify a tool's document-quoting excerpt against OUR stored copy (same gate philosophy as
- * verifyCitation, keyed by source_document_id instead of a document_index). A document-quoting
- * tool result becomes a citation only when its excerpt exists verbatim in the named document.
- */
-export function verifyDocumentExcerpt(
-    sourceDocumentId: string,
-    excerpt: string,
-    documents: { id: string; title: string; text: string }[],
-): ChatCitation | null {
-    if (excerpt.length === 0) {
-        return null;
-    }
-    const doc = documents.find((candidate) => candidate.id === sourceDocumentId);
-    if (doc === undefined) {
-        return null;
-    }
-    const at = doc.text.indexOf(excerpt);
-    if (at >= 0) {
-        return {
-            document_id: doc.id,
-            document_title: doc.title,
-            cited_text: excerpt,
-            start_char: at,
-            end_char: at + excerpt.length,
-            verified: true,
-        };
-    }
-    const verified = doc.text.replace(NULLISH_WS, ' ').includes(excerpt.replace(NULLISH_WS, ' ').trim());
-    return { document_id: doc.id, document_title: doc.title, cited_text: excerpt, start_char: -1, end_char: -1, verified };
 }
 
 export class ChatService {
