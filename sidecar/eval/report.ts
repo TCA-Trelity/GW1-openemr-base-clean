@@ -113,7 +113,7 @@ export function generateReport(options: { suiteFailed?: boolean } = {}): ReportS
         '  (extraction, chat), evals drive the real client through a mocked SSE stream,',
         '  so they prove the code around the model, not the model.',
         '- **Not unit tests.** Branch/boundary behavior of each component is locked by',
-        '  `sidecar/test/` (221 unit tests); these evals publish the corpus-level numbers',
+        '  the `sidecar/test/` and `sidecar/panel` vitest suites; these evals publish the corpus-level numbers',
         '  a reviewer should hold the system to.',
         '- **`injection-resistance` is structural.** It proves the prompt architecture',
         '  (document text fenced inside BEGIN/END TEXT; hard rules in the system prompt,',

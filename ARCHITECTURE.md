@@ -25,8 +25,8 @@ removable without a trace.
 The product is a **multi-turn, tool-invoking clinical agent**, and its central
 idea is to **move the agent's thinking to where time is free.** After
 check-in, patients wait 5–20 minutes before the doctor enters. In that gap the
-agent works proactively: a deep-reader model (Claude Sonnet 5) reads the full
-record, extracts typed facts — each with a source pointer, confidence,
+agent works proactively: a deep-reader pass (Haiku 4.5, per-document
+map-reduce — model env-tunable) reads the full record, extracts typed facts — each with a source pointer, confidence,
 verification status, and laterality — reconciles contradictions, runs
 medication-risk arithmetic, and pre-selects the visit's scans. What it
 prepared greets the doctor as the agent's **opening move**: a one-page brief
@@ -255,7 +255,10 @@ user need, not technical interest:
 
 ## 6. Models & latency
 
-Two tiers, a consequence of the design rather than a preference:
+One budget-tuned tier on both surfaces today (Haiku 4.5; the failed
+whole-corpus Sonnet mega-call and the per-document redesign are logged in
+`docs/execution/DECISIONS.md`), env-tunable per surface
+(`ANTHROPIC_MODEL_PREP` / `ANTHROPIC_MODEL_CHAT`) as corpus size grows:
 
 | Surface | Model | Latency target | Why achievable |
 |---|---|---|---|
@@ -263,18 +266,22 @@ Two tiers, a consequence of the design rather than a preference:
 | Scan toggle | — (pre-fetched) | < 1 s | Images pre-selected during prep |
 | Chat, first token | Haiku 4.5 | < 2 s | Small prepared input; streams |
 | Chat, full answer | Haiku 4.5 | < 10 s | Nothing searched/re-read in hot path |
-| Preparation / patient | Sonnet 5 | ≤ ~5 min | Hidden inside the 5–20 min gap |
+| Preparation / patient | Haiku 4.5 (per-document) | ≤ ~5 min | Hidden inside the 5–20 min gap |
 
 ## 7. Observability
 
 Every request carries a **correlation ID** from the doctor's click through
 every tool call, model call, and record access — so "what did the agent do, in
 what order, how long did each step take, what did it cost" reconstructs from
-logs alone (the PDF's four required questions). A self-hosted **Langfuse**
-dashboard (traces never leave the boundary) tracks requests, errors, p50/p95
-latency per surface, tool-call and retry counts, verification pass/fail rate,
-and token spend, with three alerts (p95 latency, error rate, tool-failure
-rate). `/health` and `/ready` are separate; `/ready` actually checks OpenEMR,
+logs alone (the PDF's four required questions). A **Langfuse** dashboard
+tracks requests, errors, p50/p95 latency per surface, tool-call and retry
+counts, verification pass/fail rate, and token spend, with three alerts —
+tiles, thresholds, and on-call responses are single-sourced in
+`docs/execution/observability.md`, and the whole operational surface reviews
+on one page at `docs/execution/ops-status.html` (index: `docs/OPERATIONS.md`).
+Traces render in Langfuse Cloud during the synthetic-data demo; the committed
+pilot posture is the self-hosted deploy, so traces never leave the boundary
+(activation: `docs/RUNBOOK.md` §C). `/health` and `/ready` are separate; `/ready` actually checks OpenEMR,
 the model provider, and Langfuse are reachable. OpenEMR's native `api_log`
 gives a second, overlapping audit trail.
 

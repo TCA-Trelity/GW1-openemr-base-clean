@@ -39,6 +39,9 @@ embedded in a brownfield EHR.
 | Early-submission readiness trace | [`docs/defense/early-submission-readiness.md`](docs/defense/early-submission-readiness.md) |
 | Activation runbook (EHR link, Langfuse, auth) | [`docs/RUNBOOK.md`](docs/RUNBOOK.md) |
 | Operations & production readiness | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) |
+| **Operational review dashboard** (load, evals, alerts, cost — one page) | [`docs/execution/ops-status.html`](docs/execution/ops-status.html) |
+| Dashboard tiles & alerts spec | [`docs/execution/observability.md`](docs/execution/observability.md) |
+| Performance baselines (load tests) | [`docs/execution/baselines.md`](docs/execution/baselines.md) |
 | Eval suite & results | [`sidecar/eval/`](sidecar/eval/), [`docs/execution/eval-results.md`](docs/execution/eval-results.md) |
 | AI cost analysis | [`docs/COSTS.md`](docs/COSTS.md) |
 | Runnable API collection (Bruno) | [`sidecar/api-collection/`](sidecar/api-collection/) |
