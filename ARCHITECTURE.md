@@ -62,13 +62,17 @@ organizing, and citing *this* record — not generating medical knowledge).
 Whole-patient context over vector search (one patient's facts fit in the
 model's context, so the hardest retrieval problem never arises).
 
-**Trust and authorization are constructed, not assumed.** A deterministic
-citation gate — plain code, not a model — sits between generation and display;
-an unsourced claim is blocked by construction. Domain rules are arithmetic the
-physician can hand-check. And the agent is a **thought partner, never a
-prescriber**: it never originates treatment, dosing, or diagnosis direction —
-a prompt-level contract backed by a deterministic prescriptiveness lint on
-every reply and published evals (`docs/prompt-guide.md`). Our audit found OpenEMR's per-patient access check
+**Trust and authorization are constructed, not assumed.** A deterministic gate
+layer — plain code, not a model — sits between generation and display on both
+paths: preparation drops any fact whose citation fails verbatim verification,
+and the chat response gate withholds unverified citations at the server, so
+fabricated provenance never reaches any client (the file-by-file walking tour
+is `docs/VERIFICATION.md`). Domain rules are arithmetic the physician can
+hand-check. And the agent is a **thought partner, never a prescriber**: it
+never originates treatment, dosing, or diagnosis direction — a prompt-level
+contract backed by a deterministic prescriptiveness lint on every reply
+(advisory: logged and counted, never redacted mid-consult) and published
+evals (`docs/prompt-guide.md`). Our audit found OpenEMR's per-patient access check
 unimplemented (returns "allow" unconditionally), so the interactive surface
 holds a SMART token bound to one patient and one user, while the preparer
 holds a separate read-only, fully audit-logged credential. The governing
@@ -171,21 +175,30 @@ what Dan requires of a partner he stays responsible for.
 - **Typed facts** carry `{ content · source pointer · confidence ·
   verification status (who, in what role) · laterality }`.
 - **Source attribution:** the chat model answers using only prepared facts and
-  attaches each fact's citation to each claim.
-- **Domain-constraint enforcement, two layers.** (a) A **deterministic
-  citation gate** — code, not a model — runs between generation and display
-  and verifies every citation resolves to a real record entry; an unsourced
-  claim is blocked and rewritten as absence, by construction. (b) **Clinical
-  rules are arithmetic:** hydroxychloroquine toxicity = daily dose × days vs.
-  published thresholds; treat-and-extend = imaging outcomes correlated with
-  injection intervals. The model presents these results; it never performs the
-  calculation, so every number is hand-checkable.
-- **Where verification happens, and its blind spot.** The gate sits after
-  generation and before display — the one point where every claim exists in
-  final form but nothing has reached the user. It guarantees *provenance* (a
-  real source for every claim), not perfect *interpretation* (a model can
-  still summarize a cited fact clumsily). Mitigations: the source is one click
-  from every claim; the eval suite measures faithfulness against ground truth.
+  documents and attaches a native citation to each claim; every cited span is
+  re-verified verbatim against our stored copy, server-side.
+- **Domain-constraint enforcement, two layers.** (a) A **deterministic gate
+  layer** (`sidecar/src/gate/`) — code, not a model — runs between generation
+  and display on both paths. Preparation: a fact whose citations do not all
+  resolve to real record text is blocked and rewritten as absence before the
+  brief is assembled. Chat: an unverified citation is withheld at the server —
+  it reaches no SSE event and no client, surfacing only as a count — so
+  fabricated provenance cannot render anywhere, by construction rather than by
+  client convention. (b) **Clinical rules are arithmetic:** hydroxychloroquine
+  toxicity = daily dose × days vs. published thresholds; treat-and-extend =
+  imaging outcomes correlated with injection intervals. The model presents
+  these results; it never performs the calculation, so every number is
+  hand-checkable.
+- **Where verification happens, and its blind spot.** The brief's gate sits
+  after extraction and before assembly; the chat gate closes every turn after
+  generation — prose streams live for latency, while provenance is enforced at
+  the server boundary and the completed reply is screened at the message
+  boundary. The layer guarantees *provenance* (a real source for every claim),
+  not perfect *interpretation* (a model can still summarize a cited fact
+  clumsily). Mitigations: the source is one click from every claim; the eval
+  suite measures faithfulness against ground truth. The end-to-end trace, with
+  file-and-line pointers and the enforced-vs-advisory boundary stated
+  explicitly, is `docs/VERIFICATION.md`.
 
 ## 5. The agent's surface (traced to users)
 
@@ -228,8 +241,9 @@ user need, not technical interest:
   shaped ask gets the reframe — record facts cited, engine/guideline output
   attributed in the same sentence, questions worth weighing. Enforced at three
   layers: prompt hard rule, a deterministic prescriptiveness lint on every
-  reply (surfaced and counted like citation failures), and published evals
-  (`docs/prompt-guide.md`).
+  reply — advisory by design: flags are logged for the engineering team and
+  counted on the wire, never redacted in front of the physician — and
+  published evals (`docs/prompt-guide.md`).
 - **Contradiction surfacing** → UC-3; **medication-risk computation** → UC-4;
   **interval guidance** → UC-5; **imaging toggle** → UC-6; **patient goals** →
   UC-7.

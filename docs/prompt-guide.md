@@ -95,7 +95,7 @@ relays them; it never adds its own.
 | Layer | What | Where |
 |---|---|---|
 | Prompt (M2) | Hard rule 5 in the chat system prompt; run-sheet tone rules in the game plan prompt | `chat.ts`, `gamePlan.ts`; pinned by `test/chat.test.ts` structural tests |
-| Lint (M3) | Deterministic post-generation check for unattributed directive advice; flagged turns logged + counted like unverified citations | `sidecar/src/chat/prescriptivenessLint.ts`, wired into `ChatService.turn` |
+| Lint (M3) | Deterministic post-generation check for unattributed directive advice; advisory — flagged turns logged + counted on the wire, never redacted | `sidecar/src/gate/prescriptivenessLint.ts`, run by the response gate (`sidecar/src/gate/responseGate.ts`) inside `ChatService.turn` and over the seed |
 | Evals (M4) | Refusal-to-prescribe goldens (reframe shape asserted structurally) | `sidecar/eval/prescriptiveness.eval.ts`, published to `docs/execution/eval-results.md` |
 | Prompt + panel (IC4) | Hard rule 6: visual-observation quarantine (prefix, never cited, morphology-only, defer to record) + panel banner | `chat.ts` rule 6, `ChatDrawer.tsx` banner; pinned by `test/chat.test.ts` + `eval/imaging-cohesion.eval.ts` (see the quarantine section below) |
 

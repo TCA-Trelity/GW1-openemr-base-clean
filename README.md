@@ -35,6 +35,7 @@ embedded in a brownfield EHR.
 | Security & architecture audit | [`AUDIT.md`](AUDIT.md) |
 | Users & use cases | [`USERS.md`](USERS.md) |
 | Agent integration architecture | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
+| Verification path (response → user, traced) | [`docs/VERIFICATION.md`](docs/VERIFICATION.md) |
 | Early-submission readiness trace | [`docs/defense/early-submission-readiness.md`](docs/defense/early-submission-readiness.md) |
 | Activation runbook (EHR link, Langfuse, auth) | [`docs/RUNBOOK.md`](docs/RUNBOOK.md) |
 | Operations & production readiness | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) |
