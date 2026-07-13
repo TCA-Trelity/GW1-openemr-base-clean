@@ -114,7 +114,18 @@ function loadCorpus(fileName: string): LoadedCorpus {
 
 export const margaretChen = loadCorpus('margaret-chen.json');
 export const williamThompson = loadCorpus('william-thompson.json');
-export const CORPORA: readonly LoadedCorpus[] = [margaretChen, williamThompson];
+// Week 2 (D.2): the three previously-idle seed corpora join the eval surface — every
+// authored fact in EVERY corpus now rides the citation-validity gate.
+export const jamesWhitfield = loadCorpus('james-whitfield.json');
+export const patriciaOkafor = loadCorpus('patricia-okafor.json');
+export const robertAlvarez = loadCorpus('robert-alvarez.json');
+export const CORPORA: readonly LoadedCorpus[] = [
+    margaretChen,
+    williamThompson,
+    jamesWhitfield,
+    patriciaOkafor,
+    robertAlvarez,
+];
 
 // ---- Store-shaped views (what the deployed sidecar serves after seeding) ----
 

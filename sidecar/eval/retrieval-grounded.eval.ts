@@ -40,27 +40,29 @@ describe('retrieval-grounded goldens (B.6)', () => {
 
     it('surfaces the right protocol with a verbatim quote for every canonical ask', async () => {
         const retriever = await build();
+        // One record PER golden (D.2): the category gate then weighs retrieval by its
+        // real case count, and the report names exactly which ask regressed. 'soft'
+        // enforce hands the verdict to the tiered baseline math (one miss out of ten
+        // is an 8.3% category drop — still a gate failure, but reported as such).
         let hits = 0;
-        const misses: string[] = [];
         for (const golden of GOLDENS) {
             const result = await retriever.search(golden.query, { topK: 3 });
             const docs = result.snippets.map((snippet) => snippet.doc_id);
             const hit = docs.slice(0, 3).includes(golden.expectDoc) && result.snippets[0]!.quote.length > 40;
             if (hit) {
                 hits += 1;
-            } else {
-                misses.push(`${golden.id} (got ${docs.join(',') || 'EMPTY'})`);
             }
+            recordEval({
+                id: `retrieval-grounded.golden-${golden.id}`,
+                description: `Canonical ask "${golden.query}" retrieves ${golden.expectDoc} in the top-3 with a quotable chunk`,
+                metric: 'top-3 document hit',
+                value: hit ? `hit (got ${docs.join(',')})` : `MISS (got ${docs.join(',') || 'EMPTY'})`,
+                threshold: 'expected doc in top-3, top quote > 40 chars',
+                pass: hit,
+                category: 'retrieval_grounded',
+                enforce: 'soft',
+            });
         }
-        recordEval({
-            id: 'retrieval-grounded.canonical-asks',
-            description: 'Canonical clinical asks retrieve the correct practice protocol in the top-3 with a quotable chunk',
-            metric: 'top-3 document hit rate over 10 goldens',
-            value: `${hits}/10${misses.length > 0 ? ` (missed: ${misses.join('; ')})` : ''}`,
-            threshold: '10/10',
-            pass: hits === 10,
-            category: 'retrieval_grounded',
-        });
         expect(hits).toBe(10);
     });
 

@@ -1,34 +1,40 @@
 {
-  "generated_at": "2026-07-13T18:24:15.406Z",
+  "generated_at": "2026-07-13T19:12:44.543Z",
   "commit": "local",
   "categories": {
-    "citation_present": {
+    "schema_valid": {
       "total": 5,
       "passed": 5,
+      "rate": 1,
+      "threshold": 0.9
+    },
+    "citation_present": {
+      "total": 13,
+      "passed": 13,
       "rate": 1,
       "threshold": 1
     },
     "factually_consistent": {
-      "total": 13,
-      "passed": 13,
+      "total": 17,
+      "passed": 17,
       "rate": 1,
       "threshold": 0.9
     },
     "safe_refusal": {
-      "total": 6,
-      "passed": 6,
+      "total": 8,
+      "passed": 8,
       "rate": 1,
       "threshold": 1
     },
     "no_phi_in_logs": {
-      "total": 1,
-      "passed": 1,
+      "total": 3,
+      "passed": 3,
       "rate": 1,
       "threshold": 1
     },
     "retrieval_grounded": {
-      "total": 2,
-      "passed": 2,
+      "total": 12,
+      "passed": 12,
       "rate": 1,
       "threshold": 0.9
     }

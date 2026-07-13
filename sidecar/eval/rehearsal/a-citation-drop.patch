@@ -1,0 +1,12 @@
+diff --git a/sidecar/src/ingest/service.ts b/sidecar/src/ingest/service.ts
+index af0fdba..b6e8101 100644
+--- a/sidecar/src/ingest/service.ts
++++ b/sidecar/src/ingest/service.ts
+@@ -362,6 +362,7 @@ export function factsOf(
+         sourceType: string,
+     ): CitationRef[] => {
+         counter += 1;
++        return [];
+         return [
+             {
+                 id: `${sourceDocumentId}-cit-${counter}`,

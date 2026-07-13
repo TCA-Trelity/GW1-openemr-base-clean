@@ -245,7 +245,7 @@ server-side and withholds unverified ones before any client sees them — now
 across three source classes (record text, document extractions, guideline
 chunks).
 
-## 7. Eval gate (REQ: S4/R6, D4, D5) — [SHIPPED: category framework, tiered comparator, committed baseline, category rollup in the report (D.1) · TARGET: 50 cases (D.2), PR wiring + hook (D.4), canaries (D.5)]
+## 7. Eval gate (REQ: S4/R6, D4, D5) — [SHIPPED: 58 deterministic cases across 14 suites, ALL six categories measured + baselined; extraction goldens over committed fixtures, full-path graph goldens (D.3), PHI log-capture sweep (D.5), all 5 corpora wired; PR trigger + pre-push hook (D.4); hard-gate rehearsal proven — 3 injected regressions caught (`npm run gate-rehearsal`, docs/w2/gate-rehearsal.md) · TARGET: branch-protection required-check flip (user 0.5), scheduled live-model suite]
 
 **From 24 to 50.** The shipped harness (`sidecar/eval/`,
 `EvalRecord{metric, value, threshold, pass}`, deterministic, auto-generating

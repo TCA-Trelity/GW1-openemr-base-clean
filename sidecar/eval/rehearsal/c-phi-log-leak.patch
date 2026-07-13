@@ -1,0 +1,15 @@
+diff --git a/sidecar/src/ingest/service.ts b/sidecar/src/ingest/service.ts
+index af0fdba..67e2b37 100644
+--- a/sidecar/src/ingest/service.ts
++++ b/sidecar/src/ingest/service.ts
+@@ -216,6 +216,10 @@ export class IngestionService {
+             if (outcome.retried) {
+                 stage('extraction_retried', 'first output failed validation; feedback retry succeeded');
+             }
++            this.deps.logger?.info(
++                { correlation_id: correlationId, extracted_payload: outcome.extraction },
++                'ingestion_extracted_payload',
++            );
+         } catch (error) {
+             if (error instanceof ExtractionValidationError) {
+                 record.status = 'failed_validation';

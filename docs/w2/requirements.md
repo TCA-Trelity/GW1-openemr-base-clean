@@ -265,18 +265,22 @@ page/bbox variant, no PDF preview overlay.
 > gate fails. If the eval gate does not block the regression, the Week 2 build
 > does not pass."*
 
-**Status:** ⚠️ partial. 24/24 deterministic boolean cases across 9 suites
-(`sidecar/eval/`, `EvalRecord{metric, value, threshold, pass}`), auto-generated
-`docs/execution/eval-results.md`; 5 seed corpora but only 2 eval-wired;
-`evals.yml` triggers on **push only** (never on PRs); **no git hooks installed**;
-no baseline/%-regression math; RELEASE.md promotion gate omits evals.
+**Status:** ⚠️ near-complete. **58/58 deterministic cases across 14 suites, all
+six categories measured and baselined** (`eval/baseline.json`); rehearsal
+proves the gate catches injected regressions (`docs/w2/gate-rehearsal.md`).
+Remaining: branch-protection required-check flip (user action 0.5), scheduled
+live-model suite.
 
 **Acceptance criteria:**
-- [ ] 50 committed golden cases, extraction-weighted (locked): ~20 extraction
+- [x] 50 committed golden cases, extraction-weighted (locked): ~20 extraction
   (lab + intake, incl. ≥1 deliberately degraded scan and near-miss values),
   ~10 retrieval/grounding, ~8 citation integrity, ~7 refusal + missing-data,
   ~5 PHI/safety. The 3 idle corpora (`james-whitfield`, `patricia-okafor`,
-  `robert-alvarez`) get wired in.
+  `robert-alvarez`) get wired in. *(58 cases: 13 extraction-pipeline goldens
+  over the committed fixtures + 4 full-path graph goldens, 12 retrieval, 13
+  citation, 8 refusal, 3 PHI-sweep, plus per-corpus citation validity — all 5
+  corpora wired. Deterministic PR leg; live-VLM extraction variants ride the
+  opt-in live suite.)*
 - [x] Rubric categories (booleans, no 1–10 scores): `schema_valid`,
   `citation_present`, `factually_consistent`, `safe_refusal`,
   `no_phi_in_logs`, plus `retrieval_grounded`. Judge configuration committed
@@ -290,17 +294,26 @@ no baseline/%-regression math; RELEASE.md promotion gate omits evals.
   deliberately.
 - [ ] PR-blocking: eval workflow triggers on `pull_request`, is a required
   status check on `main`, **and** a pre-push git hook runs the same suite
-  locally (spec says "Git Hook" — we deliver both).
-- [ ] PR suite is fully deterministic on stubbed VLM/LLM fixtures — no live
+  locally (spec says "Git Hook" — we deliver both). *(Shipped: `evals.yml` on
+  pull_request + installable `.githooks/pre-push`. Remaining: the
+  branch-protection required-check flip — user action 0.5.)*
+- [x] PR suite is fully deterministic on stubbed VLM/LLM fixtures — no live
   keys in CI (G17); live-model suite runs on dispatch/schedule and before
-  milestones (locked decision).
-- [ ] `no_phi_in_logs` is executable: fixtures seed canary identifiers; CI
+  milestones (locked decision). *(All 58 PR-leg cases run keyless — scripted
+  VLM + offline retrieval backends; the 2 live cases stay opt-in-skipped.
+  Remaining: the scheduled live-suite workflow.)*
+- [x] `no_phi_in_logs` is executable: fixtures seed canary identifiers; CI
   captures logs from the integration run and a PHI-detection pass asserts no
   canary (and no raw document text / extracted clinical values) appears (G18
-  privacy audit).
-- [ ] Hard-gate rehearsal documented and repeatable: three injected
+  privacy audit). *(`eval/phi-log-sweep.eval.ts`: capturing logger over real
+  ingestion + graph runs, planted name/DOB/family/allergy canaries, zero-leak
+  threshold; plus the retrieval query-scrub canary case.)*
+- [x] Hard-gate rehearsal documented and repeatable: three injected
   regressions (schema field break, dropped citation, planted canary) each
-  fail the gate in a different category.
+  fail the gate in a different category. *(`npm run gate-rehearsal` +
+  `docs/w2/gate-rehearsal.md` with verbatim caught-regression output —
+  citation_present and no_phi_in_logs via the safety tier, schema_valid via
+  the >5%/threshold quality math.)*
 
 ### R7 — Observability and cost tracking
 
@@ -516,9 +529,11 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
   freshness check mirroring the core `api-docs.yml` pattern).
 
 ### G17 — Integration tests, no live APIs
-- [ ] Full ingestion→answer integration test using fixture documents (stored
+- [x] Full ingestion→answer integration test using fixture documents (stored
   PDFs/images) + stubbed VLM/LLM/embed/rerank responses; passes in CI with no
-  live API access (extends Week 1's mocked-SSE pattern).
+  live API access (extends Week 1's mocked-SSE pattern). *(Graph tests +
+  `eval/graph-path.eval.ts`: committed fixture PDF → scripted VLM → real
+  grounding → offline hybrid retrieval → critic → cited answer, keyless.)*
 
 ### G18 — Data model, privacy audit, backup/recovery
 - [ ] Data-model doc (W2_ARCHITECTURE.md): for each W2 artifact — extracted

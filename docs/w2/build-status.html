@@ -187,7 +187,7 @@
 // Update in the SAME PR as the code it describes (anti-drift rule #3).
 // ============================================================================
 const DATA = {
-  stamp: "updated 2026-07-13 · session 2 cont. (wave C live: graph + router + contracts + budget + pins + trace example)",
+  stamp: "updated 2026-07-13 · session 2 cont. (wave D closed: 58-case gate, all categories baselined, rehearsal proven)",
   budget: { capPerDay: "$5.00", spentToday: "—", note: "SpendGuard unchanged (locked #16); Cohere rides a ledger line at B.4" },
   w1Floor: "24/24 W1 evals passing · read-path p95 46 ms @10 / 193 ms @50 (regression floor)",
 
@@ -234,12 +234,12 @@ const DATA = {
       ]},
     { id: "D", title: "Wave D — Eval gate + CI", band: "Band 1 · MVP · D.1/D.3 start now", tickets: [
         { id: "D.1", t: "Category framework + committed baseline + tiered comparator", reqs: ["S4/R6"], deps: "—", s: "done" },
-        { id: "D.2", t: "Grow to 50 cases — 27 committed so far (mix 20/10/8/7/5; wire 3 idle corpora)", reqs: ["S4/R6","D4"], deps: "A.7, B.6, D.1", s: "active" },
-        { id: "D.3", t: "Stubbed-fixture harness: ingest+retrieval legs shipped; answer leg lands with Wave C", reqs: ["G17"], deps: "A.4, B.4 stubs", s: "active" },
+        { id: "D.2", t: "58 cases committed — all 6 categories measured + baselined; all 5 corpora wired", reqs: ["S4/R6","D4"], deps: "A.7, B.6, D.1", s: "done" },
+        { id: "D.3", t: "Full-path goldens: fixture PDF → stub VLM → grounding → retrieval → critic → cited answer, keyless", reqs: ["G17"], deps: "A.4, B.4 stubs", s: "done" },
         { id: "D.4", t: "PR-blocking: pull_request trigger + pre-push hook shipped; required-check flag = user admin (0.5)", reqs: ["S4/R6","D5"], deps: "D.1, 0.5", s: "active" },
-        { id: "D.5", t: "PHI canaries live in retrieval evals; full log-capture sweep pending", reqs: ["G18"], deps: "D.3", s: "active" },
+        { id: "D.5", t: "PHI sweep: log-capture over real ingestion+graph runs + retrieval query scrub — 0 canaries", reqs: ["G18"], deps: "D.3", s: "done" },
         { id: "D.6", t: "npm audit + semgrep workflow on main PRs + Dependabot sidecar coverage", reqs: ["G7"], deps: "—", s: "done" },
-        { id: "D.7", t: "Hard-gate rehearsal: 3 injected regressions, 3 categories trip", reqs: ["D5","S4/R6"], deps: "D.2–D.5", s: "pending" },
+        { id: "D.7", t: "Hard-gate rehearsal DONE: 3 injected regressions caught (npm run gate-rehearsal + doc)", reqs: ["D5","S4/R6"], deps: "D.2–D.5", s: "done" },
       ]},
     { id: "E", title: "Wave E — Integration, UI, observability", band: "Band 2 · Early Submission", tickets: [
         { id: "E.1", t: "Panel upload UI (front-desk role, drag-drop, live status)", reqs: ["S5"], deps: "A.3, A.4", s: "pending" },
@@ -287,7 +287,7 @@ const DATA = {
       { id: "S2/R3", t: "Hybrid RAG + rerank (corpus, pgvector+tsvector, RRF, Cohere, PHI-free queries)", plan: "0.1, 0.4, B.1–B.6", done: 7, total: 9, s: "active" },
       { id: "S3/R4", t: "Supervisor + intake-extractor + evidence-retriever (LangGraph, logged handoffs)", plan: "C.1–C.6", done: 4, total: 7, s: "active" },
       { id: "R5", t: "Citation contract v2 + required PDF bbox overlay", plan: "A.2, A.5, E.2", done: 2, total: 5, s: "active" },
-      { id: "S4/R6", t: "Eval gate: 50 cases, 5 categories, PR-blocking, tiered >5% math, hard-gate ready", plan: "0.5, D.1–D.7", done: 2, total: 7, s: "active" },
+      { id: "S4/R6", t: "Eval gate: 58 cases, 6 categories baselined, rehearsal proven; required-check flip = user 0.5", plan: "0.5, D.1–D.7", done: 6, total: 7, s: "active" },
       { id: "R7", t: "Observability + cost per encounter (PHI-free)", plan: "0.3, E.4, E.5", done: 0, total: 5, s: "pending" },
       { id: "S5", t: "Integrate, deploy, defend (upload UI, demo auth, traces, UC mapping)", plan: "E.1, E.3, E.9, F.5, F.8", done: 0, total: 5, s: "pending" },
     ]},
@@ -325,8 +325,8 @@ const DATA = {
       { id: "G14", t: "/ready: doc storage + vector index + reranker, degraded status", plan: "E.6", done: 0, total: 1, s: "pending" },
       { id: "G15", t: "Alerts A4–A6 with response actions", plan: "E.4", done: 0, total: 1, s: "pending" },
       { id: "G16", t: "Sidecar OpenAPI 3.0 committed + contract-tested + fresh", plan: "E.7", done: 0, total: 1, s: "pending" },
-      { id: "G17", t: "Integration tests: fixtures + stubs, no live APIs in CI", plan: "D.3", done: 0, total: 1, s: "pending" },
-      { id: "G18", t: "Data model/lineage (shipped §10) · PHI audit in CI · backup/recovery + RPO/RTO", plan: "B.5, D.5, F.4", done: 1, total: 3, s: "active" },
+      { id: "G17", t: "Integration tests: fixtures + stubs, no live APIs in CI", plan: "D.3", done: 1, total: 1, s: "done" },
+      { id: "G18", t: "Data model/lineage (shipped §10) · PHI audit in CI · backup/recovery + RPO/RTO", plan: "B.5, D.5, F.4", done: 2, total: 3, s: "active" },
     ]},
   ],
 

@@ -19,6 +19,7 @@
     "typecheck:eval": "tsc -p eval --noEmit",
     "eval:gate": "tsx eval/gate.ts",
     "eval:baseline": "tsx eval/gate.ts --write-baseline",
+    "gate-rehearsal": "sh eval/rehearsal/run-rehearsal.sh",
     "verify:pgvector": "tsx src/scripts/verify-pgvector.ts",
     "fixtures:documents": "tsx eval/fixtures/generate-documents.ts",
     "hooks:install": "git -C .. config core.hooksPath .githooks && echo pre-push eval gate installed"
