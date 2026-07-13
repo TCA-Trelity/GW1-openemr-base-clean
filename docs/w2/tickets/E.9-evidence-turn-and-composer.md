@@ -2,6 +2,12 @@
 
 REQ: S3/R4 (chat-wiring remainder), R5, E1, G2, §4 Tier 1 · Depends on: C.3 (shipped), B.4 (shipped) · Band: 2
 
+> **Reference (implemented).** This ticket SHIPPED in the same session the spec was
+> written (commit `feat(sidecar): E.9 — evidence turns live in chat`). Kept as the
+> as-built reference: `src/graph/composer.ts`, chat-route `evidenceGraph` wiring,
+> `status` SSE event, panel transient line — `test/composer.test.ts`, the chat-route
+> E.9 describe, and the panel status test are the executable contract.
+
 ## Why
 
 The supervisor/worker graph is SHIPPED (§4) but nothing calls it from chat:
