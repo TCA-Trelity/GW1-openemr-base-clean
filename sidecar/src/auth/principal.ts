@@ -37,17 +37,21 @@ export interface Capabilities {
     readonly read: boolean;
     readonly triggerPrep: boolean;
     readonly verify: 'full' | 'needs_attending_sign_off' | false;
+    /** Week 2 (E.3): attaching outside documents to the chart. Physicians and nurses
+     *  (who staff intake) may; residents may not attach outside records unsupervised —
+     *  an adjustable product default, chosen so the demo shows a live 403. */
+    readonly documentsWrite: boolean;
 }
 
 // Exhaustive over Role (no default branch): adding a role forces a compile error here.
 export function capabilitiesFor(role: Role): Capabilities {
     switch (role) {
         case 'physician':
-            return { read: true, triggerPrep: true, verify: 'full' };
+            return { read: true, triggerPrep: true, verify: 'full', documentsWrite: true };
         case 'resident':
-            return { read: true, triggerPrep: true, verify: 'needs_attending_sign_off' };
+            return { read: true, triggerPrep: true, verify: 'needs_attending_sign_off', documentsWrite: false };
         case 'nurse':
-            return { read: true, triggerPrep: false, verify: false };
+            return { read: true, triggerPrep: false, verify: false, documentsWrite: true };
     }
 }
 

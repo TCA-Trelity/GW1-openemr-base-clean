@@ -4,6 +4,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
+import { DevTokenService } from '../src/auth/devToken.js';
 import { loadConfig } from '../src/config.js';
 import { VlmExtractor } from '../src/ingest/extractor.js';
 import { IngestionService, MemoryIngestionRecordStore } from '../src/ingest/service.js';
@@ -63,6 +64,9 @@ async function makeApp() {
         reranker: new PassthroughReranker(),
     });
     const config = loadConfig({ NODE_ENV: 'test' });
+    // E.3: the upload route demands an attributable principal regardless of AUTH_MODE,
+    // so the harness wires the dev-token verifier and tests mint role-bound bearers.
+    const devTokens = new DevTokenService({ secret: 'ingest-route-test-secret-0123456789abcdef' });
     const app = buildServer(config, {
         checkPostgres: async () => undefined,
         runMigrations: async () => [],
@@ -71,15 +75,25 @@ async function makeApp() {
         chat: {} as never,
         ingest: { service, records },
         evidence: { retriever },
+        auth: { mode: 'off', verifier: devTokens },
     });
-    return app;
+    return { app, devTokens };
+}
+
+function bearer(devTokens: DevTokenService, role: 'physician' | 'nurse' | 'resident', patient: string): Record<string, string> {
+    return { authorization: `Bearer ${devTokens.mint({ username: `${role}-demo`, patient, role }).token}` };
 }
 
 describe('POST /api/patients/:patientId/documents', () => {
     it('accepts a lab PDF and returns 202 with a pollable status URL', async () => {
-        const app = await makeApp();
+        const { app, devTokens } = await makeApp();
         const { payload, headers } = multipart({ doc_type: 'lab_pdf' }, { name: 'file', filename: 'renal.pdf', contentType: 'application/pdf', data: pdfBytes });
-        const response = await app.inject({ method: 'POST', url: '/api/patients/margaret-chen/documents', payload, headers });
+        const response = await app.inject({
+            method: 'POST',
+            url: '/api/patients/margaret-chen/documents',
+            payload,
+            headers: { ...headers, ...bearer(devTokens, 'physician', 'margaret-chen') },
+        });
         expect(response.statusCode).toBe(202);
         const body = response.json() as { ingestion_id: string | null; status_url: string | null; correlation_id: string };
         expect(body.correlation_id).toBeTruthy();
@@ -91,18 +105,60 @@ describe('POST /api/patients/:patientId/documents', () => {
     });
 
     it('rejects unknown doc_type and unsupported mime with structured 4xx', async () => {
-        const app = await makeApp();
+        const { app, devTokens } = await makeApp();
+        const auth = bearer(devTokens, 'physician', 'p');
         const bad = multipart({ doc_type: 'referral_fax' }, { name: 'file', filename: 'x.pdf', contentType: 'application/pdf', data: pdfBytes });
-        expect((await app.inject({ method: 'POST', url: '/api/patients/p/documents', ...bad })).statusCode).toBe(400);
+        expect((await app.inject({ method: 'POST', url: '/api/patients/p/documents', payload: bad.payload, headers: { ...bad.headers, ...auth } })).statusCode).toBe(400);
         const badMime = multipart({ doc_type: 'lab_pdf' }, { name: 'file', filename: 'x.gif', contentType: 'image/gif', data: Buffer.from('GIF89a') });
-        expect((await app.inject({ method: 'POST', url: '/api/patients/p/documents', ...badMime })).statusCode).toBe(415);
+        expect((await app.inject({ method: 'POST', url: '/api/patients/p/documents', payload: badMime.payload, headers: { ...badMime.headers, ...auth } })).statusCode).toBe(415);
+        await app.close();
+    });
+
+    // E.3 (locked decision #14): the upload is a chart WRITE — it demands an attributable
+    // principal with documentsWrite even in AUTH_MODE=off, while reads stay open.
+    it('write-path auth: 401 without a bearer, 403 for a role without documentsWrite, nurse allowed', async () => {
+        const { app, devTokens } = await makeApp();
+        const doc = () => multipart({ doc_type: 'lab_pdf' }, { name: 'file', filename: 'renal.pdf', contentType: 'application/pdf', data: pdfBytes });
+
+        const anonymous = doc();
+        const noToken = await app.inject({ method: 'POST', url: '/api/patients/p/documents', payload: anonymous.payload, headers: anonymous.headers });
+        expect(noToken.statusCode).toBe(401);
+        expect((noToken.json() as { error: string }).error).toBe('document_upload_requires_auth');
+
+        const asResident = doc();
+        const resident = await app.inject({
+            method: 'POST',
+            url: '/api/patients/p/documents',
+            payload: asResident.payload,
+            headers: { ...asResident.headers, ...bearer(devTokens, 'resident', 'p') },
+        });
+        expect(resident.statusCode).toBe(403);
+        expect(resident.json()).toMatchObject({ error: 'role_cannot_upload_documents', role: 'resident' });
+
+        const asNurse = doc();
+        const nurse = await app.inject({
+            method: 'POST',
+            url: '/api/patients/p/documents',
+            payload: asNurse.payload,
+            headers: { ...asNurse.headers, ...bearer(devTokens, 'nurse', 'p') },
+        });
+        expect(nurse.statusCode).toBe(202);
+
+        // Reads stay open: the status route needs no token (grader-friendly posture).
+        const { ingestion_id } = nurse.json() as { ingestion_id: string };
+        expect((await app.inject({ method: 'GET', url: `/api/ingestions/${ingestion_id}` })).statusCode).toBe(200);
         await app.close();
     });
 
     it('serves the uploaded original back for the overlay preview (E.2); unknown id 404s with the storage pointer', async () => {
-        const app = await makeApp();
+        const { app, devTokens } = await makeApp();
         const { payload, headers } = multipart({ doc_type: 'lab_pdf' }, { name: 'file', filename: 'renal.pdf', contentType: 'application/pdf', data: pdfBytes });
-        const upload = await app.inject({ method: 'POST', url: '/api/patients/margaret-chen/documents', payload, headers });
+        const upload = await app.inject({
+            method: 'POST',
+            url: '/api/patients/margaret-chen/documents',
+            payload,
+            headers: { ...headers, ...bearer(devTokens, 'nurse', 'margaret-chen') },
+        });
         const { ingestion_id } = upload.json() as { ingestion_id: string };
         const file = await app.inject({ method: 'GET', url: `/api/ingestions/${ingestion_id}/file` });
         expect(file.statusCode).toBe(200);
@@ -117,7 +173,7 @@ describe('POST /api/patients/:patientId/documents', () => {
 
 describe('POST /api/evidence/search', () => {
     it('serves grounded snippets for an in-corpus query and empty for out-of-domain', async () => {
-        const app = await makeApp();
+        const { app } = await makeApp();
         const hit = await app.inject({
             method: 'POST',
             url: '/api/evidence/search',

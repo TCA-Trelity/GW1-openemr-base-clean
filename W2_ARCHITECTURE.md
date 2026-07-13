@@ -393,7 +393,7 @@ contract against it).
 (Existing Week 1 failure rules — prep didn't run, model down, EHR unreachable —
 are unchanged; see `ARCHITECTURE.md` §9.)
 
-## 13. Security & privacy posture (REQ: G18, P5) — [TARGET deltas on SHIPPED model]
+## 13. Security & privacy posture (REQ: G18, P5) — [SHIPPED: write-path auth — document upload demands an attributable principal with documentsWrite (physician/nurse) regardless of AUTH_MODE, mirroring the verify gate; reads/chat stay open for graders (locked #14) · TARGET: remaining deltas below]
 
 - **Auth (locked #14):** write paths (document upload, vitals write, fact
   verification) require a dev-login bearer with role gate (front-desk/physician)

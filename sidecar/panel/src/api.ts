@@ -212,6 +212,14 @@ export async function uploadDocument(patientId: string, file: File, docType: 'la
         if (res.status === 503) {
             return { ok: false, message: 'Document ingestion is not configured on this deployment.' };
         }
+        // E.3: chart writes require an attributable clinical role — translate the auth
+        // outcomes into demo-friendly guidance instead of raw error codes.
+        if (res.status === 401) {
+            return { ok: false, message: 'Attaching documents requires a signed-in clinical role — pick a role in the header to mint a demo token.' };
+        }
+        if (res.status === 403) {
+            return { ok: false, message: 'This demo role cannot attach documents to the chart (physician or nurse required).' };
+        }
         if (!res.ok) {
             const body = (await res.json().catch(() => null)) as { error?: string } | null;
             return { ok: false, message: body?.error ?? `Upload failed (HTTP ${res.status}).` };

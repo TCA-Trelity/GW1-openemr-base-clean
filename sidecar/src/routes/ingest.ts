@@ -8,6 +8,7 @@
 import multipart from '@fastify/multipart';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { capabilitiesFor } from '../auth/principal.js';
 import { DocTypeSchema } from '../schemas/extraction.js';
 import { ingestionIdOf, type AttachAndExtractInput, type IngestionRecordStore, type IngestionService } from '../ingest/service.js';
 import type { HybridRetriever } from '../retrieval/retriever.js';
@@ -65,6 +66,17 @@ export function registerIngestRoutes(app: FastifyInstance, deps?: IngestRouteDep
     });
 
     app.post<{ Params: { patientId: string } }>('/api/patients/:patientId/documents', async (request, reply) => {
+        // E.3 (locked decision #14): writes into the chart must be ATTRIBUTABLE — this
+        // route requires an authenticated principal with the documentsWrite capability
+        // REGARDLESS of AUTH_MODE (the verify route's pattern). Reads/chat stay open for
+        // graders; the panel dev-login supplies the bearer.
+        const principal = request.principal;
+        if (principal === null) {
+            return reply.status(401).send({ error: 'document_upload_requires_auth' });
+        }
+        if (!capabilitiesFor(principal.role).documentsWrite) {
+            return reply.status(403).send({ error: 'role_cannot_upload_documents', role: principal.role });
+        }
         const file = await request.file();
         if (file === undefined) {
             return reply.status(400).send({ error: 'multipart file field is required' });

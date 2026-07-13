@@ -362,8 +362,13 @@ exists, wired into prep only, **not deployed** ("pending G2" in
 - [ ] Upload UI: panel drag-drop with front-desk persona via existing role
   switcher (locked decision); extraction status + document preview in the
   Sources tab.
-- [ ] Demo auth (locked): write paths (upload, vitals write, verify) require a
+- [x] Demo auth (locked): write paths (upload, vitals write, verify) require a
   dev-login bearer with role gate; read/chat surfaces stay open for graders.
+  *(Shipped: upload requires an attributable principal with the new
+  `documentsWrite` capability REGARDLESS of AUTH_MODE — 401 tokenless, 403
+  resident, physician/nurse allowed; verify already gated; the vitals write
+  gate lands with the dedicated vitals route. Panel maps 401/403 to friendly
+  role guidance.)*
 - [ ] Traces of the demo flow captured and linkable (Langfuse demo project).
 - [ ] Every capability maps to a UC in `USERS.md` (defense-outline slide 1
   carries the mapping).
