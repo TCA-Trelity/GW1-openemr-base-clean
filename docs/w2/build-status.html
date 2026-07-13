@@ -187,7 +187,7 @@
 // Update in the SAME PR as the code it describes (anti-drift rule #3).
 // ============================================================================
 const DATA = {
-  stamp: "updated 2026-07-13 · session 3 (demo script committed — README restructure is the last F item)",
+  stamp: "updated 2026-07-13 · session 3 (F WAVE COMPLETE — remaining: key-drops, video recording, live re-measures: all user actions)",
   budget: { capPerDay: "$5.00", spentToday: "—", note: "SpendGuard unchanged (locked #16); Cohere rides a ledger line at B.4" },
   w1Floor: "24/24 W1 evals passing · read-path p95 46 ms @10 / 193 ms @50 (regression floor)",
 
@@ -255,7 +255,7 @@ const DATA = {
     { id: "F", title: "Wave F — Hardening + deliverables", band: "Band 3 · Final", tickets: [
         { id: "F.1", t: "W2 baselines measured (stub backends, honesty-labeled) + W1 floor git-evidenced", reqs: ["G11"], deps: "E wave", s: "done" },
         { id: "F.2", t: "D7 cost & latency report: COSTS.md §6 — unit costs, Dan-volume projections, bottlenecks, $0 W2 spend", reqs: ["D7","R7"], deps: "F.1", s: "done" },
-        { id: "F.3", t: "README restructure: W1 vs W2 + no-guessing setup", reqs: ["D1"], deps: "E.*", s: "pending" },
+        { id: "F.3", t: "README restructure: W1-vs-W2 split, no-guessing quickstart, 34-key env table, D1–D8 map", reqs: ["D1"], deps: "E wave", s: "done" },
         { id: "F.4", t: "Backup & recovery RUNBOOK §E + EXECUTED restore rehearsal + §10 authority verify", reqs: ["G18","G1"], deps: "—", s: "done" },
         { id: "F.5", t: "Demo script committed (7 shots, REQ/UC captions, keyless fallbacks) — recording = user action", reqs: ["D6","S5"], deps: "E.9, D.7", s: "active" },
         { id: "F.6", t: "Pre-milestone live eval run + live smoke", reqs: ["S5"], deps: "D.2", s: "pending" },
