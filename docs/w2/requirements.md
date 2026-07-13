@@ -535,11 +535,14 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
   regression (>5% category drop triggers alert as well as gate failure).
 
 ### G16 — OpenAPI 3.0
-- [ ] Sidecar OpenAPI 3.0 spec committed (today the sidecar has **none**;
+- [x] Sidecar OpenAPI 3.0 spec committed (today the sidecar has **none**;
   `swagger/openemr-api.yaml` is core-only) covering all W2 HTTP endpoints
   (upload, ingestion status, retrieval/evidence, health/ready, chat entry);
   contract tests verify implementation matches the spec; kept in sync (CI
   freshness check mirroring the core `api-docs.yml` pattern).
+  *(Shipped: `sidecar/openapi.yaml` — all 21 endpoints incl. the W2 surface;
+  `test/openapi.test.ts` gates drift both directions (inventory↔spec) and
+  probes registration; rides the normal CI suite.)*
 
 ### G17 — Integration tests, no live APIs
 - [x] Full ingestion→answer integration test using fixture documents (stored
