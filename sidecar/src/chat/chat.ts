@@ -1,11 +1,12 @@
 // Chat over the stored record (S2.3, reworked R4/R5): source documents are passed as
 // Citations-API document blocks, so every claim carries a native citation with the exact
-// quoted span — no token contract for the model to fumble. Each cited span is re-verified
-// verbatim against the stored document server-side (gate philosophy: unverifiable
-// citations are reported, never rendered as provenance). Brevity is a hard prompt
+// quoted span — no token contract for the model to fumble. Every turn closes through the
+// response gate (gate/responseGate.ts): each cited span is re-verified verbatim against
+// the stored document and an unverifiable citation is withheld at the server — surfaced
+// as a count, never emitted as provenance to any client. Brevity is a hard prompt
 // contract: physicians read replies in seconds.
 import { verifyCitation, verifyDocumentExcerpt, type ChatCitation } from '../gate/chatCitations.js';
-import { lintPrescriptiveness } from '../gate/prescriptivenessLint.js';
+import { ChatResponseGate } from '../gate/responseGate.js';
 import type { AnthropicClient, AnthropicContentBlock, AnthropicMessage, AnthropicTool } from '../prep/anthropic.js';
 import type { PrepLogger } from '../prep/extraction.js';
 import type { PrepSpendGuard } from '../prep/pipeline.js';
@@ -58,7 +59,9 @@ export interface ChatTurnInput {
 export interface ChatTurnResult {
     conversation_id: string;
     reply: string;
+    /** Gate-released citations — verified-only, by construction (gate/responseGate.ts). */
     citations: ChatCitation[];
+    /** Citations withheld by the gate: they failed verbatim re-verification. */
     unverified_count: number;
     /** Names of the tools the model invoked this turn, in call order (may repeat). */
     tools_used: string[];
@@ -68,7 +71,7 @@ export interface ChatTurnResult {
 
 export interface ChatTurnHooks {
     onTextDelta?: (text: string) => void;
-    /** Fired per citation as it streams, already mapped + verified. */
+    /** Fired per gate-released citation as it streams — verified-only, by construction. */
     onCitation?: (citation: ChatCitation) => void;
     /** Fired when the model invokes a tool (before it runs) — the panel shows tool activity. */
     onToolUse?: (event: { name: string; input: Record<string, unknown> }) => void;
@@ -188,17 +191,16 @@ export class ChatService {
         }
         const messages: AnthropicMessage[] = [...historyMessages, { role: 'user' as const, content: latestContent }];
 
-        const citations: ChatCitation[] = [];
         const toolsUsed: string[] = [];
+        // The response gate is the choke point for this turn's provenance: verified
+        // citations release to the stream and the result, unverified ones are withheld
+        // and counted — they never leave the server.
+        const gate = new ChatResponseGate(logger, { correlationId, conversationId }, hooks?.onCitation);
         // Native Citations-API citations stream across every round (document blocks stay in context).
         const completeHooks = {
             ...(hooks?.onTextDelta === undefined ? {} : { onTextDelta: hooks.onTextDelta }),
             onCitation: (raw: Record<string, unknown>) => {
-                const mapped = verifyCitation(raw, documents);
-                if (mapped !== null) {
-                    citations.push(mapped);
-                    hooks?.onCitation?.(mapped);
-                }
+                gate.admit(verifyCitation(raw, documents));
             },
         };
 
@@ -270,13 +272,9 @@ export class ChatService {
                 }
                 const invocation = tool.invoke(bundle, call.input);
                 toolsUsed.push(call.name);
-                // Attach any verifiable document-quoting provenance as citations.
+                // Tool document-quoting provenance rides the same gate as native citations.
                 for (const provenance of invocation.provenance) {
-                    const mapped = verifyDocumentExcerpt(provenance.source_document_id, provenance.excerpt, documents);
-                    if (mapped !== null) {
-                        citations.push(mapped);
-                        hooks?.onCitation?.(mapped);
-                    }
+                    gate.admit(verifyDocumentExcerpt(provenance.source_document_id, provenance.excerpt, documents));
                 }
                 // IC4 media attachment: a tool output carrying attach_image + storage_key
                 // (describe_scan) gets the actual pixels appended as an image block so the
@@ -326,33 +324,18 @@ export class ChatService {
             correlation_id: correlationId,
         });
 
-        const unverified = citations.filter((citation) => !citation.verified).length;
-        if (unverified > 0) {
-            // The chat verification metric: unverifiable spans are surfaced, never provenance.
-            logger.warn({ correlationId, conversationId, unverified }, 'chat citations failed verbatim verification');
-        }
-        // Judgment metric (M3), same surfaced-never-silent philosophy as the citation gate:
-        // directive advice without attribution is counted and logged, per docs/prompt-guide.md.
-        const lint = lintPrescriptiveness(reply);
-        if (lint.flags.length > 0) {
-            logger.warn(
-                {
-                    correlationId,
-                    conversationId,
-                    prescriptive_flags: lint.flags.length,
-                    rules: lint.flags.map((flag) => flag.rule),
-                    excerpts: lint.flags.map((flag) => flag.excerpt),
-                },
-                'chat reply flagged by prescriptiveness lint',
-            );
-        }
+        // Close the gate: withheld provenance is logged + counted, the reply is screened
+        // by the advisory prescriptiveness lint (M3, docs/prompt-guide.md — counted and
+        // logged for the engineering team, never redacted in front of the physician), and
+        // only released citations leave the server.
+        const gated = gate.finalize(reply);
         return {
             conversation_id: conversationId,
             reply,
-            citations,
-            unverified_count: unverified,
+            citations: gated.citations,
+            unverified_count: gated.unverified_count,
             tools_used: toolsUsed,
-            prescriptive_flag_count: lint.flags.length,
+            prescriptive_flag_count: gated.prescriptive_flag_count,
         };
     }
 }

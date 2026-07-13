@@ -105,6 +105,53 @@ function chatResponse(text: string): Response {
     );
 }
 
+// A streamed reply carrying one verified citation and one INVENTED span (absent from every
+// stored document, so it fails verbatim re-verification) — the response gate must withhold
+// the invented one at the server boundary.
+const INVENTED_SPAN = 'patient reports total resolution of all symptoms';
+function chatResponseWithInventedCitation(text: string): Response {
+    const start = DOC_TEXT.indexOf(CITED);
+    return new Response(
+        sse([
+            { type: 'message_start', message: { model: 'claude-haiku-4-5', usage: { input_tokens: 900, output_tokens: 1 } } },
+            { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } },
+            {
+                type: 'content_block_delta',
+                index: 0,
+                delta: {
+                    type: 'citations_delta',
+                    citation: {
+                        type: 'char_location',
+                        cited_text: CITED,
+                        document_index: 0,
+                        document_title: 'pharmacy_record (2024-11-01)',
+                        start_char_index: start,
+                        end_char_index: start + CITED.length,
+                    },
+                },
+            },
+            {
+                type: 'content_block_delta',
+                index: 0,
+                delta: {
+                    type: 'citations_delta',
+                    citation: {
+                        type: 'char_location',
+                        cited_text: INVENTED_SPAN,
+                        document_index: 0,
+                        document_title: 'pharmacy_record (2024-11-01)',
+                        start_char_index: 0,
+                        end_char_index: INVENTED_SPAN.length,
+                    },
+                },
+            },
+            { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 90 } },
+            { type: 'message_stop' },
+        ]),
+        { status: 200 },
+    );
+}
+
 class FakeChatStore {
     messages: (ChatMessageInput & { id: string })[] = [];
     /** M9: the latest completed brief the opening move composes from (null = no seed). */
@@ -364,6 +411,25 @@ describe('ChatService.turn', () => {
         expect(store.messages[0]!.content).toBe('What about this scan?');
     });
 
+    // Guards: the server-boundary invariant — an invented span is withheld by the response
+    // gate: never fired at the citation hook, never in the result citations, surfaced only
+    // as unverified_count.
+    it('withholds an invented citation from the stream and the result', async () => {
+        const store = new FakeChatStore();
+        const { service } = chatService(store, undefined, chatResponseWithInventedCitation(REPLY));
+        const streamed: { cited_text: string }[] = [];
+        const result = await service.turn(
+            { bundle: tinyBundle(), conversationId: 'conv-inv', message: 'Any updates?', correlationId: 'corr-inv' },
+            silentLogger,
+            { onCitation: (citation) => streamed.push(citation) },
+        );
+        expect(result.citations).toHaveLength(1);
+        expect(result.citations[0]).toMatchObject({ cited_text: CITED, verified: true });
+        expect(result.unverified_count).toBe(1);
+        expect(streamed).toHaveLength(1);
+        expect(streamed[0]!.cited_text).toBe(CITED);
+    });
+
     // Guards: a failed LLM call leaving a half-persisted turn in the conversation.
     it('persists nothing when the LLM call fails', async () => {
         const store = new FakeChatStore();
@@ -595,12 +661,36 @@ describe('chat routes', () => {
             .map((chunk) => JSON.parse(chunk.slice(6)) as Record<string, unknown>);
         const text = events.filter((e) => e['type'] === 'delta').map((e) => e['text']).join('');
         expect(text).toBe(REPLY);
-        expect(events.filter((e) => e['type'] === 'citation')).toHaveLength(2);
+        const citationEvents = events.filter((e) => e['type'] === 'citation');
+        expect(citationEvents).toHaveLength(2);
+        // The wire contract of the response gate: every citation event is verified.
+        expect(citationEvents.every((e) => (e['citation'] as { verified: boolean }).verified)).toBe(true);
         const done = events.at(-1)!;
         expect(done['type']).toBe('done');
         expect(done['citations']).toHaveLength(2);
         expect(done['unverified_count']).toBe(0);
         expect(typeof done['conversation_id']).toBe('string');
+    });
+
+    // Guards: the wire itself — no citation event and no done.citations entry may carry a
+    // span that failed verification; every SSE consumer (panel, Bruno, curl) receives
+    // verified-only provenance plus the withheld count.
+    it('POST never streams an unverified citation: withheld from events and done', async () => {
+        const { deps } = routeDeps({ responses: [chatResponseWithInventedCitation(REPLY)] });
+        const res = await chatApp(deps).inject({
+            method: 'POST',
+            url: '/api/chat/margaret-chen',
+            payload: { message: 'Any updates?' },
+        });
+        expect(res.statusCode).toBe(200);
+        expect(res.body).not.toContain(INVENTED_SPAN);
+        const events = sseEvents(res.body);
+        const citationEvents = events.filter((e) => e['type'] === 'citation');
+        expect(citationEvents).toHaveLength(1);
+        expect(citationEvents[0]!['citation']).toMatchObject({ cited_text: CITED, verified: true });
+        const done = events.at(-1)!;
+        expect(done['citations']).toHaveLength(1);
+        expect(done['unverified_count']).toBe(1);
     });
 
     // Guards (M9): a NEW conversation opens with the persisted opening move — the seed

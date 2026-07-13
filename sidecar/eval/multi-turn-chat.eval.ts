@@ -308,7 +308,8 @@ describe('multi-turn-conversation', () => {
             (JSON.parse(errorBlock['content']) as Record<string, unknown>)['error'] !== undefined;
 
         // Structural denial point 2: a span quoted from William's record never verifies
-        // against Margaret's documents — even at turn 2 of an established conversation.
+        // against Margaret's documents — even at turn 2 of an established conversation —
+        // and the response gate withholds it: it never leaves the server as provenance.
         const crossVerified = turn2.citations.filter((citation) => citation.verified).length;
 
         const margaretOnly = store.rows.every((row) => row.patient_id === margaretBundle.patient.id);
@@ -318,17 +319,17 @@ describe('multi-turn-conversation', () => {
             toolDenied &&
             errorSurfaced === true &&
             crossVerified === 0 &&
-            turn2.unverified_count === turn2.citations.length &&
-            turn2.citations.length === 1 &&
+            turn2.citations.length === 0 &&
+            turn2.unverified_count === 1 &&
             margaretOnly;
 
         recordEval({
             id: 'multi-turn-conversation.cross-patient-mid-thread',
             description:
-                "Turn 2 of Margaret's conversation asks about William: his document id errors structurally at the tool layer and his quoted span is reported unverified, never provenance",
-            metric: 'cross-patient tool fetches / cross-patient spans verified (both must be 0)',
-            value: `get_full_document(doc-wt-001) → structured error (is_error=${String(errorSurfaced)}); ${crossVerified}/${turn2.citations.length} cross-patient spans verified; conversation persisted under margaret-chen only=${margaretOnly}`,
-            threshold: 'tool denies foreign document id; 0 cross-patient spans verified; unverified span surfaced in the result',
+                "Turn 2 of Margaret's conversation asks about William: his document id errors structurally at the tool layer and his quoted span is withheld by the response gate — surfaced as a count, never emitted as provenance",
+            metric: 'cross-patient tool fetches / cross-patient spans leaving the server (both must be 0)',
+            value: `get_full_document(doc-wt-001) → structured error (is_error=${String(errorSurfaced)}); ${turn2.citations.length} citations released, ${turn2.unverified_count} withheld unverified; conversation persisted under margaret-chen only=${margaretOnly}`,
+            threshold: 'tool denies foreign document id; 0 cross-patient spans released; withheld span surfaced as unverified_count=1',
             pass,
         });
     });

@@ -418,7 +418,9 @@ function AssistantBubble({
     images: ImageRecord[];
     onOpenScan?: (id: string) => void;
 }) {
-    // Chips: verified citations only, in arrival order — an unverifiable citation is never provenance.
+    // Chips: verified citations only, in arrival order. Defense-in-depth: the sidecar's
+    // response gate already withholds unverified citations server-side, so this filter is
+    // a second layer, not the enforcement point (see docs/VERIFICATION.md).
     const chips = useMemo(
         () => bubble.citations.filter((citation) => citation.verified).map(chatCitationRef),
         [bubble.citations],
