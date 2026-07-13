@@ -5,6 +5,7 @@
 // {validationErrors, internalErrors, data} envelope (src/RestControllers/RestControllerHelper.php:204-300)
 // except the medication list routes, which return the raw service result and 404 on an empty list
 // (RestControllerHelper::responseHandler, :156-169).
+import { createHash } from 'node:crypto';
 import type { FetchLike } from './auth.js';
 import type { TokenProvider } from './fhir.js';
 
@@ -444,6 +445,115 @@ export class StandardApiClient {
         }
         return body;
     }
+
+    // ---- Week 2 documents (Wave 0.2, REQ S1/R1) ----
+    // Route verbatim from apis/routes/_rest_routes_standard.inc.php:496-510: POST|GET
+    // /api/patient/:pid/document?path=<Category> (multipart field name `document`,
+    // DocumentRestController::postWithPath → DocumentService::insertAtPath) and
+    // GET .../document listing {filename, hash, id, mimetype, docdate} rows
+    // (DocumentService::getAllAtPath — the hash is sha3-512 of the file bytes,
+    // Document.class.php:1114). The category must already exist or the upload is rejected.
+
+    /** List the patient's documents filed under a category path (e.g. 'Lab Report'). */
+    async listPatientDocuments(pid: number | string, categoryPath: string): Promise<EhrDocumentRow[]> {
+        const path = `/patient/${pid}/document?path=${encodeURIComponent(categoryPath)}`;
+        const body = await this.request('GET', path);
+        const rows = envelopeData(body, path);
+        if (!Array.isArray(rows)) {
+            return [];
+        }
+        return rows.flatMap((row) => {
+            const record = asRecord(row);
+            const id = record?.['id'];
+            const hash = record?.['hash'];
+            if (record === undefined || (typeof id !== 'number' && typeof id !== 'string')) {
+                return [];
+            }
+            return [
+                {
+                    id: String(id),
+                    filename: typeof record['filename'] === 'string' ? record['filename'] : null,
+                    hash: typeof hash === 'string' ? hash : null,
+                    mimetype: typeof record['mimetype'] === 'string' ? record['mimetype'] : null,
+                    docdate: typeof record['docdate'] === 'string' ? record['docdate'] : null,
+                },
+            ];
+        });
+    }
+
+    /**
+     * Upload a document into the patient's chart with caller-side sha3-512 dedupe:
+     * OpenEMR stores the hash but does NOT enforce uniqueness (Document::createDocument
+     * does no pre-insert lookup), so a byte-identical re-upload would create a second
+     * documents row — the integrity requirement ("no duplicate or untraceable records")
+     * is the caller's job. Byte-identical content → the existing document id, no POST.
+     */
+    async uploadPatientDocumentDeduped(
+        pid: number | string,
+        categoryPath: string,
+        filename: string,
+        bytes: Uint8Array,
+        mimeType: string,
+    ): Promise<EhrDocumentUploadResult> {
+        const hash = sha3_512Hex(bytes);
+        const existing = await this.listPatientDocuments(pid, categoryPath);
+        const match = existing.find((row) => row.hash === hash);
+        if (match !== undefined) {
+            return { documentId: match.id, hash, deduped: true };
+        }
+
+        const path = `/patient/${pid}/document?path=${encodeURIComponent(categoryPath)}`;
+        const token = await this.tokenProvider.getAccessToken();
+        const form = new FormData();
+        // Copy into a fresh ArrayBuffer so a Uint8Array view over a larger/shared buffer
+        // (or a SharedArrayBuffer) can never leak sibling bytes into the Blob.
+        const payload = new Uint8Array(bytes);
+        form.append('document', new Blob([payload.buffer as ArrayBuffer], { type: mimeType }), filename);
+        // No manual content-type: fetch sets the multipart boundary itself.
+        const response = await this.fetchImpl(`${this.apiBase}${path}`, {
+            method: 'POST',
+            headers: {
+                authorization: `Bearer ${token}`,
+                accept: 'application/json',
+                'x-correlation-id': this.correlationId,
+            },
+            body: form,
+        });
+        const body = await parseJson(response);
+        if (!response.ok) {
+            throw new StandardApiError(path, response.status, failureDetail(body));
+        }
+        const data = asRecord(envelopeData(body, path));
+        const id = data?.['id'];
+        return {
+            documentId: typeof id === 'number' || typeof id === 'string' ? String(id) : null,
+            hash,
+            deduped: false,
+        };
+    }
+}
+
+export interface EhrDocumentRow {
+    id: string;
+    filename: string | null;
+    /** sha3-512 hex of the stored bytes (Document.class.php:1114) — the dedupe key. */
+    hash: string | null;
+    mimetype: string | null;
+    docdate: string | null;
+}
+
+export interface EhrDocumentUploadResult {
+    /** OpenEMR documents.id; null only if the server envelope omitted it on create. */
+    documentId: string | null;
+    /** sha3-512 hex of the uploaded bytes (matches OpenEMR's stored hash). */
+    hash: string;
+    /** true → byte-identical document already existed; no new row was created. */
+    deduped: boolean;
+}
+
+/** sha3-512 hex digest — the same algorithm OpenEMR stores in documents.hash. */
+export function sha3_512Hex(bytes: Uint8Array): string {
+    return createHash('sha3-512').update(bytes).digest('hex');
 }
 
 // The envelope's data member ({validationErrors, internalErrors, data} — RestControllerHelper.php:254-259).

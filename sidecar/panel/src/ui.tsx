@@ -41,6 +41,7 @@ export const SOURCE_TYPE_CONFIG: Record<string, TypeConfig> = {
     patient_self_report: { icon: User, color: 'bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100', label: 'Patient Report' },
     clinical_observation: { icon: FileText, color: 'bg-cyan-50 text-cyan-700 border-cyan-200 hover:bg-cyan-100', label: 'Clinical Obs' },
     referral_letter: { icon: ExternalLink, color: 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100', label: 'Referral' },
+    guideline_evidence: { icon: FileText, color: 'bg-lime-50 text-lime-700 border-lime-200 hover:bg-lime-100', label: 'Practice Protocol' },
     // Corpus document_type spellings (sidecar schemas/sources.ts DOCUMENT_TYPES):
     clinical_note: { icon: FileText, color: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100', label: 'Clinical Note' },
     tech_workup: { icon: ClipboardList, color: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100', label: 'Tech Workup' },

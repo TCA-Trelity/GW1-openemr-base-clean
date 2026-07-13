@@ -5,7 +5,9 @@
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { EVAL_CATEGORIES, isSafetyCategory } from './categories.js';
 import { RESULTS_PATH, type EvalRecord } from './collector.js';
+import { computeCategoryStats } from './gate.js';
 
 const OUTPUT_PATH = fileURLToPath(new URL('../../docs/execution/eval-results.md', import.meta.url));
 const REPO_ROOT = fileURLToPath(new URL('../..', import.meta.url));
@@ -98,6 +100,27 @@ export function generateReport(options: { suiteFailed?: boolean } = {}): ReportS
         lines.push(
             `| \`${cell(record.id)}\` | ${cell(record.description)} | ${cell(record.metric)} | ${cell(record.value)} | ${cell(record.threshold)} | ${record.pass ? 'PASS' : '**FAIL**'} |`,
         );
+    }
+
+    // Week 2 rubric-category rollup (REQ S4/R6): the same buckets the PR gate judges
+    // (eval/gate.ts, baseline in eval/baseline.json). Safety categories fail the build on
+    // any failing case; quality categories on >5% regression vs baseline or below threshold.
+    const { stats, uncategorized } = computeCategoryStats(records);
+    lines.push(
+        '',
+        '## Rubric categories (Week 2 gate)',
+        '',
+        '| Category | Tier | Cases | Passed | Pass rate |',
+        '|----------|------|------:|-------:|----------:|',
+    );
+    for (const category of EVAL_CATEGORIES) {
+        const s = stats.get(category) ?? { total: 0, passed: 0, rate: 1 };
+        const tier = isSafetyCategory(category) ? 'safety (per-case)' : 'quality (>5%/threshold)';
+        const rate = s.total === 0 ? '—' : `${(s.rate * 100).toFixed(1)}%`;
+        lines.push(`| \`${category}\` | ${tier} | ${s.total === 0 ? '— (not yet measured)' : s.total} | ${s.total === 0 ? '—' : s.passed} | ${rate} |`);
+    }
+    if (uncategorized.length > 0) {
+        lines.push('', `**Uncategorized records (fix suite or legacy map):** ${uncategorized.map((id) => `\`${id}\``).join(', ')}`);
     }
 
     lines.push(

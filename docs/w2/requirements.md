@@ -108,20 +108,20 @@ additional eval fixture only.
 char-range variant; attribution block). No extraction schemas yet.
 
 **Acceptance criteria:**
-- [ ] `LabPdfExtraction` Zod schema: per-result `{test_name, value, unit,
+- [x] `LabPdfExtraction` Zod schema: per-result `{test_name, value, unit,
   reference_range, collection_date, abnormal_flag, citation}` — all seven spec
   fields present and required (nullable only where the document genuinely lacks
   the field, never silently defaulted).
-- [ ] `IntakeFormExtraction` Zod schema: `{demographics, chief_concern
+- [x] `IntakeFormExtraction` Zod schema: `{demographics, chief_concern
   (laterality-tagged), current_medications, allergies, family_history,
   patient_goals, citation}` — spec's six + goals (UC-7) + laterality (domain
   requirement).
-- [ ] Citation contract v2 (R5 shape) embedded in both schemas; every field
+- [x] Citation contract v2 (R5 shape) embedded in both schemas; every field
   group carries `source citation`.
 - [ ] Schemas exported from the shared schema module (same one-schema-serves-
   API-and-UI pattern as Week 1) and used by: extraction validation, fact-store
   persistence, panel rendering, eval assertions.
-- [ ] Validation tests exist per schema (valid fixture parses; each missing
+- [x] Validation tests exist per schema (valid fixture parses; each missing
   required field fails; malformed VLM output fails closed) — part of D3.
 
 ### S2/R3 — Basic hybrid RAG plus rerank
@@ -147,7 +147,7 @@ code). Postgres fact store exists; pgvector availability on Railway Postgres
   treat-and-extend protocol — committed to the repo (license-clean, zero PHI,
   reproducible per G18), with per-doc metadata `{guideline_source, section,
   recommendation_strength, disease_tags, laterality_applicability, version/date}`.
-- [ ] Structure-aware chunker keeps thresholds with their conditions
+- [x] Structure-aware chunker keeps thresholds with their conditions
   (dose/interval/staging tables never split from their qualifying text);
   chunks carry stable `chunk_id`.
 - [ ] Hybrid retrieval: Postgres `tsvector` keyword + `pgvector` dense (Cohere
@@ -220,7 +220,7 @@ withhold-at-server exists (`sidecar/src/gate/chatCitations.ts`,
 page/bbox variant, no PDF preview overlay.
 
 **Acceptance criteria:**
-- [ ] `CitationRefSchema` v2: adds `guideline_evidence` to the `source_type`
+- [x] `CitationRefSchema` v2: adds `guideline_evidence` to the `source_type`
   enum; adds `page_or_section` + `field_or_chunk_id` + `quote_or_value`
   fields; adds `page_bbox` location variant `{page, x, y, w, h}` (normalized
   coords) alongside the existing `character_range` variant. Migration note
@@ -269,7 +269,7 @@ no baseline/%-regression math; RELEASE.md promotion gate omits evals.
   `no_phi_in_logs`, plus `retrieval_grounded`. Judge configuration committed
   (deterministic checks preferred; any LLM-judge is boolean-rubric with
   committed config — D4).
-- [ ] Tiered regression math (locked): safety categories (`safe_refusal`,
+- [x] Tiered regression math (locked): safety categories (`safe_refusal`,
   `no_phi_in_logs`, `citation_present`) hard-fail on **any** newly-failing
   case; quality categories (`schema_valid`, `factually_consistent`,
   `retrieval_grounded`) fail on **>5% drop vs committed per-category baseline
@@ -389,7 +389,7 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
 - [ ] Zod contracts on: upload API, ingestion job state, extraction outputs
   (R2), retriever query/response, graph state + handoffs, vitals write
   payload, citation v2.
-- [ ] `docs/w2/migration-notes.md` (or section in W2_ARCHITECTURE.md) records
+- [x] `docs/w2/migration-notes.md` (or section in W2_ARCHITECTURE.md) records
   every schema change from Week 1 (citation v2 is the first entry).
 - [ ] Data-authority table (in W2_ARCHITECTURE.md §data-model): per data type —
   owner system, writers, readers, overwrite policy. Idempotent re-processing

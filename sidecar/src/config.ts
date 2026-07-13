@@ -67,6 +67,25 @@ const EnvSchema = z.object({
     // OAuth site under /oauth2/<site>/ (OpenEMR default is 'default'); shapes the SMART issuer,
     // JWKS, and introspection URLs the resource-server verifier uses.
     OPENEMR_OAUTH_SITE: z.string().min(1).default('default').catch(orWarn('default', 'OPENEMR_OAUTH_SITE')),
+    // ---- Week 2 (Wave 0.4) ----
+    // Cohere powers the guideline-corpus dense embeddings + rerank (REQ S2/R3; the one
+    // new vendor, the one the spec names). The corpus is public text and retrieval
+    // queries are PHI-scrubbed by construction — Cohere never sees patient data.
+    // Absent key → retrieval features disable cleanly; /ready reports not_configured.
+    COHERE_API_KEY: z.string().min(1).optional().catch(orWarn(undefined, 'COHERE_API_KEY')),
+    COHERE_EMBED_MODEL: z.string().min(1).default('embed-english-v3.0').catch(orWarn('embed-english-v3.0', 'COHERE_EMBED_MODEL')),
+    COHERE_RERANK_MODEL: z.string().min(1).default('rerank-english-v3.0').catch(orWarn('rerank-english-v3.0', 'COHERE_RERANK_MODEL')),
+    // Dense index backend (Wave 0.1): 'pgvector' on deployments whose Postgres ships the
+    // extension (verify with `npm run verify:pgvector`); 'memory' is the in-process cosine
+    // fallback behind the same retriever interface — viable at this corpus size (10²–10³
+    // chunks) so an infra gap can never block the feature.
+    RETRIEVER_DENSE_BACKEND: z.enum(['pgvector', 'memory']).default('pgvector').catch(orWarn('pgvector' as const, 'RETRIEVER_DENSE_BACKEND')),
+    // LangSmith is FENCED TO THE DEMO ENVIRONMENT (locked decision #2; synthetic data
+    // only — assignment pitfall P5). Tracing engages only when explicitly 'true' AND the
+    // API key is present; production configs simply never set these.
+    LANGSMITH_TRACING: z.enum(['true', 'false']).default('false').catch(orWarn('false' as const, 'LANGSMITH_TRACING')),
+    LANGSMITH_API_KEY: z.string().min(1).optional().catch(orWarn(undefined, 'LANGSMITH_API_KEY')),
+    LANGSMITH_PROJECT: z.string().min(1).default('clinical-copilot-w2-demo').catch(orWarn('clinical-copilot-w2-demo', 'LANGSMITH_PROJECT')),
 });
 
 export type Config = z.infer<typeof EnvSchema>;

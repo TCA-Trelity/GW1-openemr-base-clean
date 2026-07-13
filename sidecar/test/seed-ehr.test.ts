@@ -603,13 +603,15 @@ describe('registerSystemClient with seed scopes', () => {
             'patient', 'medical_problem', 'allergy', 'medication',
             // P4 record depth
             'encounter', 'vital', 'soap_note', 'appointment', 'insurance', 'insurance_company',
+            // Week 2 document ingestion (Wave 0.2): the source-PDF write path
+            'document',
         ];
         for (const resource of resources) {
             expect(STANDARD_API_SEED_SCOPES).toContain(`user/${resource}.read`);
             expect(STANDARD_API_SEED_SCOPES).toContain(`user/${resource}.write`);
         }
         expect(STANDARD_API_SEED_SCOPES).toContain('user/facility.read'); // facility id resolution
-        expect(STANDARD_API_SEED_SCOPES).toHaveLength(22);
+        expect(STANDARD_API_SEED_SCOPES).toHaveLength(24);
     });
 });
 

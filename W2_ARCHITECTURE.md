@@ -72,7 +72,7 @@ both scopes still hold:
   can be called a graph, its nodes wrap services that already exist, and the
   fast path pays only a bounded ~200–400 ms routing decision (REQ: S3/R4).
 
-## 3. Document ingestion flow (REQ: S1/R1, R2, G3) — [TARGET]
+## 3. Document ingestion flow (REQ: S1/R1, R2, G3) — [TARGET · shipped so far: extraction schemas (A.1), OpenEMR dedupe-upload client + document scopes (0.2), fixture set incl. degraded scans (A.7)]
 
 ```
 panel upload (front-desk role)                    chat/graph tool
@@ -173,7 +173,7 @@ child spans of the supervisor span; extraction/retrieval sub-calls are children
 of their worker spans. One correlation ID reconstructs the full multi-agent
 trace — the spec's test, verbatim.
 
-## 5. Hybrid RAG design (REQ: S2/R3, E5) — [TARGET]
+## 5. Hybrid RAG design (REQ: S2/R3, E5) — [TARGET · shipped so far: structure-aware chunker + chunk contract (B.2), Cohere/backend config (0.4), pgvector verify script (0.1)]
 
 **Corpus (locked decisions #3, #6).** 6–10 short authored **practice-protocol
 documents** — "agreed clinical practices the office follows" — each grounded
@@ -225,7 +225,7 @@ The seam exists (embeddings live in their own table keyed by source id), but
 retrieval over scan pixels is sequenced behind the two document types working
 reliably (REQ: P1).
 
-## 6. Citation contract v2 (REQ: R5) — [TARGET]
+## 6. Citation contract v2 (REQ: R5) — [SHIPPED: schema v2 + gate narrowing + panel mirrors (A.2) · TARGET: grounding producer (A.5) and overlay UI (E.2)]
 
 Extends the shipped `CitationRefSchema` (`sidecar/src/schemas/citations.ts`)
 — migration note per G1:
@@ -245,7 +245,7 @@ server-side and withholds unverified ones before any client sees them — now
 across three source classes (record text, document extractions, guideline
 chunks).
 
-## 7. Eval gate (REQ: S4/R6, D4, D5) — [TARGET]
+## 7. Eval gate (REQ: S4/R6, D4, D5) — [SHIPPED: category framework, tiered comparator, committed baseline, category rollup in the report (D.1) · TARGET: 50 cases (D.2), PR wiring + hook (D.4), canaries (D.5)]
 
 **From 24 to 50.** The shipped harness (`sidecar/eval/`,
 `EvalRecord{metric, value, threshold, pass}`, deterministic, auto-generating

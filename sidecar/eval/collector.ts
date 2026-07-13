@@ -3,8 +3,15 @@
 // enforces the verdict: a failing record throws, so the vitest run (and CI) fails on any
 // eval failure while the ledger still carries the failing row for the published report.
 // No vitest import here — report.ts and run.ts import this module outside a test run.
+//
+// Week 2 (REQ S4/R6, D.1): records carry a rubric `category` (eval/categories.ts) and an
+// `enforce` tier. 'hard' (default, and forced for safety categories) throws on failure —
+// any newly-failing case fails the suite. 'soft' records the failure without throwing;
+// the category gate (eval/gate.ts) then applies the baseline math: >5% category drop vs
+// the committed baseline, or a rate below the category threshold, fails the run instead.
 import { appendFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { isSafetyCategory, type EvalCategory } from './categories.js';
 
 export interface EvalRecord {
     /** Stable id, `<suite>.<case>` (e.g. `citation-validity-100.margaret-chen`). */
@@ -20,13 +27,23 @@ export interface EvalRecord {
     pass: boolean;
     /** Honest caveats surfaced in the report's notes section. */
     notes?: string;
+    /** Rubric category (Week 2). Legacy suites map via eval/categories.ts when absent. */
+    category?: EvalCategory;
+    /**
+     * 'hard' (default): a failing record throws, failing the suite on that case.
+     * 'soft': the failure is recorded for the category gate's baseline math only.
+     * Safety categories are always hard — 'soft' is ignored for them by design.
+     */
+    enforce?: 'hard' | 'soft';
 }
 
 export const RESULTS_PATH = fileURLToPath(new URL('./.results.jsonl', import.meta.url));
 
 export function recordEval(record: EvalRecord): void {
     appendFileSync(RESULTS_PATH, `${JSON.stringify(record)}\n`, 'utf8');
-    if (!record.pass) {
+    const safetyForcedHard = record.category !== undefined && isSafetyCategory(record.category);
+    const hard = record.enforce !== 'soft' || safetyForcedHard;
+    if (!record.pass && hard) {
         throw new Error(
             `eval failed — ${record.id}: ${record.metric} = ${String(record.value)} (threshold: ${String(record.threshold)})`,
         );

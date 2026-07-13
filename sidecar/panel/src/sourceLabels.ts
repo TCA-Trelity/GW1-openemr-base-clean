@@ -16,6 +16,7 @@ export const SOURCE_CHIP_LABELS: Record<string, string> = {
     clinical_observation: 'Exam',
     external_ehr_import: 'EHR',
     scribe_transcript: 'Scribe',
+    guideline_evidence: 'Practice protocol',
 };
 
 /** Fallback for unmapped types: underscores to spaces, first letter capitalized ('clinical_note' -> 'Clinical note'). */

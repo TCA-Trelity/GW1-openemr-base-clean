@@ -1,0 +1,24 @@
+{
+  "generated_at": "2026-07-13T17:38:35.323Z",
+  "commit": "local",
+  "categories": {
+    "citation_present": {
+      "total": 5,
+      "passed": 5,
+      "rate": 1,
+      "threshold": 1
+    },
+    "factually_consistent": {
+      "total": 13,
+      "passed": 13,
+      "rate": 1,
+      "threshold": 0.9
+    },
+    "safe_refusal": {
+      "total": 6,
+      "passed": 6,
+      "rate": 1,
+      "threshold": 1
+    }
+  }
+}
