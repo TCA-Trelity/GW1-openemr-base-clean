@@ -18,14 +18,48 @@ export interface IngestRouteDeps {
     /** Chart identity lookup for the printed-patient mismatch check. */
     expectedPatientOf?: (patientId: string) => Promise<{ name: string; dob?: string } | undefined>;
     maxFileBytes?: number;
+    /** Preview cache for the panel's bbox overlay (E.2). Defaults to an in-memory cache. */
+    files?: UploadFileStore;
 }
 
 const ACCEPTED_MIME = new Set(['application/pdf', 'image/png', 'image/jpeg']);
+
+/** Recently-uploaded originals, served back for the panel's citation overlay (E.2).
+ *  This is a PREVIEW CACHE, not storage: the system of record for the file is OpenEMR
+ *  Documents (A.3); evicted entries 404 with that pointer. Capped FIFO — the demo needs
+ *  the last few uploads, never unbounded memory. */
+export interface UploadFileStore {
+    save(ingestionId: string, bytes: Buffer, mimeType: string): void;
+    get(ingestionId: string): { bytes: Buffer; mimeType: string } | undefined;
+}
+
+export class MemoryUploadFileStore implements UploadFileStore {
+    private readonly entries = new Map<string, { bytes: Buffer; mimeType: string }>();
+
+    constructor(private readonly maxEntries = 24) {}
+
+    save(ingestionId: string, bytes: Buffer, mimeType: string): void {
+        this.entries.delete(ingestionId); // re-insert moves it to newest
+        this.entries.set(ingestionId, { bytes, mimeType });
+        while (this.entries.size > this.maxEntries) {
+            const oldest = this.entries.keys().next().value;
+            if (oldest === undefined) {
+                break;
+            }
+            this.entries.delete(oldest);
+        }
+    }
+
+    get(ingestionId: string): { bytes: Buffer; mimeType: string } | undefined {
+        return this.entries.get(ingestionId);
+    }
+}
 
 export function registerIngestRoutes(app: FastifyInstance, deps?: IngestRouteDeps): void {
     if (deps === undefined) {
         return; // ingestion not configured (no extractor) — routes absent, /ready says why
     }
+    const files = deps.files ?? new MemoryUploadFileStore();
     void app.register(multipart, {
         limits: { fileSize: deps.maxFileBytes ?? 10 * 1024 * 1024, files: 1 },
     });
@@ -66,6 +100,7 @@ export function registerIngestRoutes(app: FastifyInstance, deps?: IngestRouteDep
         // deterministic from the bytes, so the 202 carries it immediately and the status
         // route serves the staged record as the pipeline advances.
         const ingestionId = ingestionIdOf(bytes);
+        files.save(ingestionId, bytes, file.mimetype);
         deps.service.attachAndExtract(input).catch((error: unknown) => {
             request.log.warn({ err: error, correlation_id: request.id, ingestion_id: ingestionId }, 'ingestion_unhandled_failure');
         });
@@ -86,6 +121,18 @@ export function registerIngestRoutes(app: FastifyInstance, deps?: IngestRouteDep
 
     app.get<{ Params: { patientId: string } }>('/api/patients/:patientId/ingestions', async (request, reply) => {
         return reply.send({ ingestions: deps.records.listForPatient(request.params.patientId) });
+    });
+
+    // E.2: the original file back, for the panel's PDF preview + bbox overlay. Preview
+    // cache only — after eviction/restart the durable copy lives in OpenEMR Documents.
+    app.get<{ Params: { id: string } }>('/api/ingestions/:id/file', async (request, reply) => {
+        const entry = files.get(request.params.id);
+        if (entry === undefined) {
+            return reply.status(404).send({
+                error: 'file not in the preview cache (evicted or uploaded before last restart) — the stored original lives in OpenEMR Documents',
+            });
+        }
+        return reply.header('content-type', entry.mimeType).header('cache-control', 'private, max-age=300').send(entry.bytes);
     });
 }
 

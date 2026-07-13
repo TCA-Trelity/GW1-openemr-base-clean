@@ -375,7 +375,14 @@ export default function App() {
                                                     {factsState.message}
                                                 </p>
                                             )}
-                                            <SourcesTab documents={documents} focus={sourceFocus} onClearFocus={() => setSourceFocus(null)} />
+                                            <SourcesTab
+                                                documents={documents}
+                                                focus={sourceFocus}
+                                                onClearFocus={() => setSourceFocus(null)}
+                                                patientId={patientId ?? undefined}
+                                                facts={factsState.kind === 'ready' ? factsState.bundle.facts : []}
+                                                onIngested={() => setReloadNonce((nonce) => nonce + 1)}
+                                            />
                                         </>
                                     )}
                                 </div>

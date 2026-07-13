@@ -98,6 +98,21 @@ describe('POST /api/patients/:patientId/documents', () => {
         expect((await app.inject({ method: 'POST', url: '/api/patients/p/documents', ...badMime })).statusCode).toBe(415);
         await app.close();
     });
+
+    it('serves the uploaded original back for the overlay preview (E.2); unknown id 404s with the storage pointer', async () => {
+        const app = await makeApp();
+        const { payload, headers } = multipart({ doc_type: 'lab_pdf' }, { name: 'file', filename: 'renal.pdf', contentType: 'application/pdf', data: pdfBytes });
+        const upload = await app.inject({ method: 'POST', url: '/api/patients/margaret-chen/documents', payload, headers });
+        const { ingestion_id } = upload.json() as { ingestion_id: string };
+        const file = await app.inject({ method: 'GET', url: `/api/ingestions/${ingestion_id}/file` });
+        expect(file.statusCode).toBe(200);
+        expect(file.headers['content-type']).toContain('application/pdf');
+        expect(file.rawPayload.equals(pdfBytes)).toBe(true);
+        const missing = await app.inject({ method: 'GET', url: '/api/ingestions/ing-nope/file' });
+        expect(missing.statusCode).toBe(404);
+        expect((missing.json() as { error: string }).error).toContain('OpenEMR Documents');
+        await app.close();
+    });
 });
 
 describe('POST /api/evidence/search', () => {

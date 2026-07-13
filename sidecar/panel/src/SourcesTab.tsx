@@ -3,8 +3,11 @@
 // (port of SourcesView.jsx: char-range first, excerpt-text fallback).
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FileText, Inbox, MapPin, ScanText, X } from 'lucide-react';
+import type { IngestionRecordView } from './api';
+import DocumentOverlay, { citationsForDocument } from './DocumentOverlay';
 import type { SourceDocumentRecord } from './types';
 import { Card, formatDate, sourceTypeConfig, titleCase } from './ui';
+import UploadCard from './UploadCard';
 
 export interface SourceFocus {
     documentId: string | null;
@@ -109,11 +112,19 @@ export default function SourcesTab({
     documents,
     focus,
     onClearFocus,
+    patientId,
+    facts,
+    onIngested,
 }: {
     documents: SourceDocumentRecord[];
     focus: SourceFocus | null;
     onClearFocus: () => void;
+    /** Week 2 E.1/E.2 — when present, the tab offers upload + the citation bbox overlay. */
+    patientId?: string;
+    facts?: unknown[];
+    onIngested?: () => void;
 }) {
+    const [preview, setPreview] = useState<IngestionRecordView | null>(null);
     const [selectedId, setSelectedId] = useState<string | null>(null);
     // Q1: closing the viewer must stick — without this flag the auto-select below would
     // instantly reopen the document the user just dismissed.
@@ -173,18 +184,43 @@ export default function SourcesTab({
     }, [documents]);
     const visibleDocuments = typeFilter === null ? documents : documents.filter((doc) => doc.document_type === typeFilter);
 
+    // E.1/E.2: upload + overlay ride the tab whenever a patient context exists.
+    const uploadSection =
+        patientId === undefined ? null : (
+            <UploadCard
+                patientId={patientId}
+                onIngested={() => onIngested?.()}
+                onPreview={(record) => setPreview(record)}
+            />
+        );
+    const overlay =
+        preview === null ? null : (
+            <DocumentOverlay
+                ingestionId={preview.id}
+                filename={preview.filename}
+                citations={citationsForDocument(facts ?? [], preview.source_document_id)}
+                onClose={() => setPreview(null)}
+            />
+        );
+
     if (documents.length === 0) {
         return (
-            <div className="text-center py-12 text-slate-500">
-                <FileText className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-                <p>No source documents available for this patient.</p>
-                {focusMissing && <p className="text-sm mt-2 text-amber-600">The cited document could not be loaded from the fact bundle.</p>}
+            <div className="space-y-4">
+                {uploadSection}
+                {overlay}
+                <div className="text-center py-12 text-slate-500">
+                    <FileText className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+                    <p>No source documents available for this patient.</p>
+                    {focusMissing && <p className="text-sm mt-2 text-amber-600">The cited document could not be loaded from the fact bundle.</p>}
+                </div>
             </div>
         );
     }
 
     return (
         <div className="space-y-4">
+            {uploadSection}
+            {overlay}
             <div className="flex items-center justify-between pb-4 border-b border-slate-200">
                 <div>
                     <h2 className="text-lg font-semibold text-slate-800">Data Sources</h2>

@@ -246,7 +246,7 @@ page/bbox variant, no PDF preview overlay.
   geometry → tight bbox; page-level fallback (VLM page citation) → page-region
   highlight; unlocatable → fact renders **unverified and is never citable**.
   Three visibly distinct UI outcomes.
-- [ ] **Visual PDF bounding-box overlay in the panel (required, core):**
+- [x] **Visual PDF bounding-box overlay in the panel (required, core):**
   clicking a document citation opens the stored PDF page with the cited
   region highlighted (E2 click-to-source delivered by this same surface).
 - [ ] Guideline citations verify quote-vs-stored-chunk through the same gate

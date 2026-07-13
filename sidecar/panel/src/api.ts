@@ -178,6 +178,68 @@ export async function fetchFacts(patientId: string): Promise<FactsFetchResult> {
     }
 }
 
+// ---- Document ingestion (Week 2 E.1/E.2) ----
+
+export interface IngestionStageRecord {
+    stage: string;
+    at: string;
+    detail?: string;
+}
+
+export interface IngestionRecordView {
+    id: string;
+    patient_id: string;
+    doc_type: 'lab_pdf' | 'intake_form';
+    filename: string;
+    status: string;
+    stages: IngestionStageRecord[];
+    source_document_id: string | null;
+    grounding: { total: number; word_box: number; page: number; unverified: number; confidence: number } | null;
+    facts_persisted: number;
+    vitals_written: boolean;
+    error: string | null;
+}
+
+export type UploadDocumentResult = { ok: true; ingestionId: string } | { ok: false; message: string };
+
+/** POST the file to attach_and_extract; the 202 carries the pollable ingestion id. */
+export async function uploadDocument(patientId: string, file: File, docType: 'lab_pdf' | 'intake_form'): Promise<UploadDocumentResult> {
+    try {
+        const form = new FormData();
+        form.append('doc_type', docType);
+        form.append('file', file, file.name);
+        const res = await apiFetch(`/api/patients/${encodeURIComponent(patientId)}/documents`, { method: 'POST', body: form });
+        if (res.status === 503) {
+            return { ok: false, message: 'Document ingestion is not configured on this deployment.' };
+        }
+        if (!res.ok) {
+            const body = (await res.json().catch(() => null)) as { error?: string } | null;
+            return { ok: false, message: body?.error ?? `Upload failed (HTTP ${res.status}).` };
+        }
+        const body = (await res.json()) as { ingestion_id: string };
+        return { ok: true, ingestionId: body.ingestion_id };
+    } catch {
+        return { ok: false, message: UNREACHABLE };
+    }
+}
+
+export async function fetchIngestion(ingestionId: string): Promise<IngestionRecordView | null> {
+    try {
+        const res = await apiFetch(`/api/ingestions/${encodeURIComponent(ingestionId)}`);
+        if (!res.ok) {
+            return null;
+        }
+        return (await res.json()) as IngestionRecordView;
+    } catch {
+        return null;
+    }
+}
+
+/** The uploaded original, for the PDF preview + bbox overlay (preview cache; E.2). */
+export function ingestionFileUrl(ingestionId: string): string {
+    return `/api/ingestions/${encodeURIComponent(ingestionId)}/file`;
+}
+
 export type EhrSyncFetchResult =
     | { kind: 'synced'; factCount: number; resourceCounts: Record<string, number>; syncedAt: string }
     /** 409 not_linked_to_openemr — the patient has no OpenEMR chart to pull from yet. */

@@ -187,7 +187,7 @@
 // Update in the SAME PR as the code it describes (anti-drift rule #3).
 // ============================================================================
 const DATA = {
-  stamp: "updated 2026-07-13 · session 2 cont. (wave D closed: 58-case gate, all categories baselined, rehearsal proven)",
+  stamp: "updated 2026-07-13 · session 2 cont. (E.1/E.2 live: panel upload + required-core bbox overlay)",
   budget: { capPerDay: "$5.00", spentToday: "—", note: "SpendGuard unchanged (locked #16); Cohere rides a ledger line at B.4" },
   w1Floor: "24/24 W1 evals passing · read-path p95 46 ms @10 / 193 ms @50 (regression floor)",
 
@@ -242,8 +242,8 @@ const DATA = {
         { id: "D.7", t: "Hard-gate rehearsal DONE: 3 injected regressions caught (npm run gate-rehearsal + doc)", reqs: ["D5","S4/R6"], deps: "D.2–D.5", s: "done" },
       ]},
     { id: "E", title: "Wave E — Integration, UI, observability", band: "Band 2 · Early Submission", tickets: [
-        { id: "E.1", t: "Panel upload UI (front-desk role, drag-drop, live status)", reqs: ["S5"], deps: "A.3, A.4", s: "pending" },
-        { id: "E.2", t: "PDF preview + bbox overlay + click-to-source (3 outcomes)", reqs: ["R5","E2"], deps: "A.5", s: "pending" },
+        { id: "E.1", t: "Panel upload: drag-drop + doc-type + live staged progress (front-desk role gate rides E.3)", reqs: ["S5"], deps: "A.3, A.4", s: "done" },
+        { id: "E.2", t: "PDF preview + bbox overlay: three distinct grounding outcomes; file preview route", reqs: ["R5","E2"], deps: "A.5", s: "done" },
         { id: "E.3", t: "Write-path auth: dev-login bearer + role gate", reqs: ["#14"], deps: "A.3", s: "pending" },
         { id: "E.4", t: "Langfuse spans + dashboard tiles + alerts A4–A6", reqs: ["R7","G6","G15"], deps: "C.5, 0.3", s: "pending" },
         { id: "E.5", t: "LangSmith demo-env wiring (fenced)", reqs: ["R7","P5"], deps: "C.3", s: "pending" },
@@ -286,7 +286,7 @@ const DATA = {
       { id: "R2", t: "Strict Zod schemas (lab_pdf 7 fields · intake 6+goals)", plan: "A.1", done: 4, total: 5, s: "active" },
       { id: "S2/R3", t: "Hybrid RAG + rerank (corpus, pgvector+tsvector, RRF, Cohere, PHI-free queries)", plan: "0.1, 0.4, B.1–B.6", done: 7, total: 9, s: "active" },
       { id: "S3/R4", t: "Supervisor + intake-extractor + evidence-retriever (LangGraph, logged handoffs)", plan: "C.1–C.6", done: 4, total: 7, s: "active" },
-      { id: "R5", t: "Citation contract v2 + required PDF bbox overlay", plan: "A.2, A.5, E.2", done: 2, total: 5, s: "active" },
+      { id: "R5", t: "Citation contract v2 + required PDF bbox overlay", plan: "A.2, A.5, E.2", done: 3, total: 5, s: "active" },
       { id: "S4/R6", t: "Eval gate: 58 cases, 6 categories baselined, rehearsal proven; required-check flip = user 0.5", plan: "0.5, D.1–D.7", done: 6, total: 7, s: "active" },
       { id: "R7", t: "Observability + cost per encounter (PHI-free)", plan: "0.3, E.4, E.5", done: 0, total: 5, s: "pending" },
       { id: "S5", t: "Integrate, deploy, defend (upload UI, demo auth, traces, UC mapping)", plan: "E.1, E.3, E.9, F.5, F.8", done: 0, total: 5, s: "pending" },

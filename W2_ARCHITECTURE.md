@@ -225,7 +225,7 @@ The seam exists (embeddings live in their own table keyed by source id), but
 retrieval over scan pixels is sequenced behind the two document types working
 reliably (REQ: P1).
 
-## 6. Citation contract v2 (REQ: R5) — [SHIPPED: schema v2 + gate narrowing + panel mirrors (A.2) · TARGET: grounding producer (A.5) and overlay UI (E.2)]
+## 6. Citation contract v2 (REQ: R5) — [SHIPPED: schema v2 + gate narrowing + panel mirrors (A.2); grounding producer on real word geometry (A.5); panel upload card + PDF bbox overlay with three visibly distinct grounding outcomes + preview-cache file route (E.1/E.2) · TARGET: click-to-source from chat citation chips into the overlay, guideline-citation deep link]
 
 Extends the shipped `CitationRefSchema` (`sidecar/src/schemas/citations.ts`)
 — migration note per G1:
