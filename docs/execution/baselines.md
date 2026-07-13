@@ -46,3 +46,56 @@ cd sidecar && LOAD_BASE_URL=https://<sidecar-host> LOAD_CONCURRENCY=10 npm run l
 ```
 
 `LOAD_BEARER` (a dev-login token) is required while `AUTH_MODE=enforced`; the CI workflow mints one automatically.
+
+## Week 2 flows (2026-07-13, in-process — stub LLM/VLM backends)
+
+Measured with `npm run baseline:w2` (`sidecar/src/scripts/w2-baselines.ts`):
+the same code paths the product runs, with the model legs on the test suite's
+scripted stubs. **These are pipeline-mechanics numbers** — strict-schema parse,
+real pdf.js word geometry + deterministic grounding, BM25 + hash-dense fusion,
+the full supervisor graph with the real router/critic/gate. What the stubs
+exclude (live VLM/composer/rerank round trips) is measured after the key drop
+(`docs/w2/tickets/USER-ACTIONS.md`).
+
+| Flow | Backends | Runs | p50 | p95 | p99 | max |
+|---|---|---|---|---|---|---|
+| ingestion — renal-panel-clean.pdf | stub VLM · real pdf.js geometry + grounding | 25 | 17.0 ms | 32.7 ms | 1019.6 ms | 1019.6 ms |
+| ingestion — renal-panel-lowdpi.pdf | stub VLM · real pdf.js geometry + grounding | 25 | 1.8 ms | 2.6 ms | 3.2 ms | 3.2 ms |
+| retrieval — hybrid search | BM25 + hash-dense (offline) · Passthrough rerank | 200 | 0.39 ms | 0.78 ms | 1.9 ms | 10.2 ms |
+| full graph — evidence turn | stub composer · offline retrieval · real router/critic/gate | 50 | 4.4 ms | 9.5 ms | 36.7 ms | 36.7 ms |
+| router — deterministic rules path | no model call | 50 | 0.00 ms | 0.00 ms | 0.05 ms | 0.05 ms |
+
+Retriever index build (one-time boot cost): **14 ms for 71 chunks**. The
+clean-panel p99/max outlier (1019.6 ms) is the FIRST run only — it pays the
+pdf.js dynamic import; steady-state sits at the 32.7 ms p95. The low-dpi scan
+is *faster* than the clean one because its image-only page yields zero words —
+there is no geometry to ground (every field lands honestly `unverified`).
+
+### SLO verdicts (three-way honesty)
+
+| SLO | Verdict on stub backends | What awaits the key drop |
+|---|---|---|
+| Ingestion ≤ 90 s/doc p95 | **Trivially met** (32.7 ms) — but the stub excludes the live VLM call, which will dominate | Live-VLM per-doc numbers (expect seconds-to-tens-of-seconds; budget holds) |
+| Retrieval ≤ 2.5 s p95 incl. rerank | **Met** at 0.78 ms with Passthrough rerank | Cohere embed+rerank adds ~2 network round trips — re-measure; fallback path stays at these numbers |
+| Evidence turn ≤ 5 s | Graph mechanics cost **9.5 ms p95** — the budget is effectively all composer | Live Haiku composition (bounded at maxTokens 1500, 20 s hard timeout, ≤5 s budget enforced by the graph) |
+| Router ≤ 0.4 s | Rules path is **µs-scale**; most turns never pay a model call | `LlmRouterModel` tie-break (live Haiku, maxTokens 16, 5 s cap) — the 200–400 ms figure stays a stated target until measured |
+
+### Week 1 regression check (shared read path)
+
+The W1 floor (p95 **46 ms @10 / 193 ms @50**, 2026-07-10) guards the
+deterministic read path. This branch's evidence that it holds:
+`git log main..HEAD -- sidecar/src/routes/overview.ts sidecar/src/store/`
+is **empty** — the measured handlers and the store are byte-identical to the
+measured commit; Week 2 additions are new routes beside them. This sandbox has
+no Postgres/docker daemon to re-boot a store-backed sidecar, so the floor was
+not re-measured here — re-measuring is one command (below) on any store-backed
+machine and SHOULD be run against the Railway deploy after the next release.
+
+## Reproducing (Week 2)
+
+```bash
+cd sidecar && npm run baseline:w2          # in-process W2 flows (this table)
+# W1 floor, against any store-backed deployment:
+LOAD_BASE_URL=https://<sidecar-host> LOAD_CONCURRENCY=10 npm run load-test
+LOAD_BASE_URL=https://<sidecar-host> LOAD_CONCURRENCY=50 npm run load-test
+```

@@ -320,15 +320,17 @@ and cost reports contain no patient identifiers, no raw document text, and no
 extracted clinical values — identifiers and hashes only, verified by the CI
 canary check (REQ: G18).
 
-## 9. SLOs, resilience, readiness (REQ: G2, G14) — [SHIPPED: /ready W2 probes (document storage via cached token mint, retriever index fails-on-empty, reranker keyed-presence) with degraded not_configured semantics; timeouts/retries on Cohere + VLM legs; ≤5 s evidence budget w/ honest degrade · TARGET: measured SLO baselines (F.1), circuit-breaker documentation per dependency]
+## 9. SLOs, resilience, readiness (REQ: G2, G14) — [SHIPPED: /ready W2 probes (document storage via cached token mint, retriever index fails-on-empty, reranker keyed-presence) with degraded not_configured semantics; timeouts/retries on Cohere + VLM legs; ≤5 s evidence budget w/ honest degrade ; measured stub-backend baselines + W1 byte-identical regression evidence (F.1) · TARGET: live-backend numbers post key-drop, circuit-breaker documentation per dependency]
 
-| Flow | SLO (p95) | Where the budget lives |
-|---|---|---|
-| Document ingestion (upload → facts + pinned evidence) | ≤ 90 s/doc | Inside the 5–20-min waiting gap |
-| Evidence retrieval (hybrid + rerank) | ≤ 2.5 s | Tool time, streamed status |
-| Evidence chat turn (full answer) | ≤ 5 s | Tier 1, visible progress |
-| Fast-path chat first token | < 2 s (+ ≤ 0.4 s router) | Unchanged Week 1 target |
-| Week 1 read path (regression floor) | p95 46 ms @10 / 193 ms @50 | Measured baseline, must hold |
+| Flow | SLO (p95) | Measured (stub backends, 2026-07-13) | Where the budget lives |
+|---|---|---|---|
+| Document ingestion (upload → facts + pinned evidence) | ≤ 90 s/doc | 32.7 ms pipeline mechanics — live VLM leg awaits keys | Inside the 5–20-min waiting gap |
+| Evidence retrieval (hybrid + rerank) | ≤ 2.5 s | 0.78 ms w/ Passthrough — Cohere adds round trips, re-measure post-keys | Tool time, streamed status |
+| Evidence chat turn (full answer) | ≤ 5 s | 9.5 ms graph mechanics — budget is effectively all composer (live) | Tier 1, visible progress |
+| Fast-path chat first token | < 2 s (+ ≤ 0.4 s router) | router rules path µs-scale; model tie-break measured post-keys | Unchanged Week 1 target |
+| Week 1 read path (regression floor) | p95 46 ms @10 / 193 ms @50 | read handlers + store byte-identical on this branch (git-verified); re-measure on deploy | Measured baseline, must hold |
+
+*(Full tables + reproduction commands: `docs/execution/baselines.md` §Week 2.)*
 
 - **Timeouts + bounded retries on every outbound call** — VLM, embed, rerank,
   FHIR, vitals write (closing the Week 1 gap where the FHIR client had no

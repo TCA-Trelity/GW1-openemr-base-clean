@@ -187,7 +187,7 @@
 // Update in the SAME PR as the code it describes (anti-drift rule #3).
 // ============================================================================
 const DATA = {
-  stamp: "updated 2026-07-13 · session 3 (Band 2 code CLOSED: E.3–E.9 all done; F-wave docs + key-drops remain)",
+  stamp: "updated 2026-07-13 · session 3 (F.1 baselines measured — F.2–F.5 docs remain)",
   budget: { capPerDay: "$5.00", spentToday: "—", note: "SpendGuard unchanged (locked #16); Cohere rides a ledger line at B.4" },
   w1Floor: "24/24 W1 evals passing · read-path p95 46 ms @10 / 193 ms @50 (regression floor)",
 
@@ -253,7 +253,7 @@ const DATA = {
         { id: "E.9", t: "Evidence turn LIVE: LLM composer + graph in chat SSE (status event, honest fallback)", reqs: ["G2"], deps: "C.3", s: "done" },
       ]},
     { id: "F", title: "Wave F — Hardening + deliverables", band: "Band 3 · Final", tickets: [
-        { id: "F.1", t: "W2 baselines (p50/p95) + shared-path regression vs W1", reqs: ["G11"], deps: "E.*", s: "pending" },
+        { id: "F.1", t: "W2 baselines measured (stub backends, honesty-labeled) + W1 floor git-evidenced", reqs: ["G11"], deps: "E wave", s: "done" },
         { id: "F.2", t: "Cost & latency report (ledger-backed)", reqs: ["D7"], deps: "F.1", s: "pending" },
         { id: "F.3", t: "README restructure: W1 vs W2 + no-guessing setup", reqs: ["D1"], deps: "E.*", s: "pending" },
         { id: "F.4", t: "Backup/recovery runbook + RPO/RTO", reqs: ["G18"], deps: "—", s: "pending" },
@@ -319,7 +319,7 @@ const DATA = {
       { id: "G8", t: "Testing strategy documented (per-test failure modes)", plan: "P.2 → W2_ARCHITECTURE §11", done: 1, total: 1, s: "done" },
       { id: "G9", t: "Failure-mode runbook (identify in logs + recovery)", plan: "P.2 → W2_ARCHITECTURE §12", done: 1, total: 1, s: "done" },
       { id: "G10", t: "Bruno collection covers all W2 workflows", plan: "E.8", done: 1, total: 1, s: "done" },
-      { id: "G11", t: "W2 baselines vs W1 (shared-path regression check)", plan: "F.1", done: 0, total: 1, s: "pending" },
+      { id: "G11", t: "W2 baselines vs W1 (shared-path regression check)", plan: "F.1", done: 1, total: 1, s: "done" },
       { id: "G12", t: "One logging convention (no parallel format)", plan: "C.5, E.4", done: 0, total: 1, s: "pending" },
       { id: "G13", t: "Span hierarchy: worker ⊂ supervisor; sub-calls ⊂ worker", plan: "C.5", done: 0, total: 1, s: "pending" },
       { id: "G14", t: "/ready: doc storage + vector index + reranker, degraded status", plan: "E.6", done: 1, total: 1, s: "done" },

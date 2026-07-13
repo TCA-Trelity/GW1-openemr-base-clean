@@ -511,11 +511,15 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
   DEV_LOGIN_SECRET there — USER-ACTIONS.md.)*
 
 ### G11 — Baseline profiles
-- [ ] Baselines recorded for W2 flows (ingestion, extraction, retrieval, full
+- [x] Baselines recorded for W2 flows (ingestion, extraction, retrieval, full
   graph run) — latency p50/p95, CPU/memory where obtainable, throughput —
   and **compared against Week 1 baselines** (p95 46 ms @10 / 193 ms @50) to
   verify no regression in shared paths (`docs/execution/baselines.md`
   extended).
+  *(`npm run baseline:w2`: ingestion 32.7 ms p95 / retrieval 0.78 ms p95 /
+  graph 9.5 ms p95 on stub backends, honestly labeled; W1 floor evidenced
+  byte-identical via git (no Postgres in this sandbox — re-measure command
+  documented); live-backend numbers await the key drop.)*
 
 ### G12 — Consistent structured logging
 - [ ] No plain-text log output from W2 components; same pino schema/format;

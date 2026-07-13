@@ -14,6 +14,7 @@
     "test": "vitest run",
     "seed-ehr": "tsx src/scripts/seed-ehr.ts",
     "load-test": "tsx src/scripts/load-test.ts",
+    "baseline:w2": "tsx src/scripts/w2-baselines.ts",
     "eval": "tsx eval/run.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:eval": "tsc -p eval --noEmit",
