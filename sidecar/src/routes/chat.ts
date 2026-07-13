@@ -1,14 +1,17 @@
 // Chat routes (S2.3, M9 opening move). POST streams the reply as SSE (delta events, then
-// one done event carrying validated citation ids); guards (patient exists, budget) answer
-// as plain JSON BEFORE the stream opens so the panel can branch on status codes. A NEW
-// conversation opens with the agent's prepared digest when a completed brief exists —
-// persisted first (the model sees it as history; replay shows the transcript opening with
-// it) and echoed to the panel as a `seed` event. GET replays a conversation for
-// persistence across reloads.
+// one done event carrying the gate-released, verified-only citation list); guards
+// (patient exists, budget) answer as plain JSON BEFORE the stream opens so the panel can
+// branch on status codes. A NEW conversation opens with the agent's prepared digest when
+// a completed brief exists — screened through the response gate, persisted first (the
+// model sees it as history; replay shows the transcript opening with it), and echoed to
+// the panel as a `seed` event. GET replays a conversation for persistence across reloads.
+// Every event body here is produced behind gate/responseGate.ts: citations because only
+// released ones reach the hooks, prose because turn replies and the seed pass its screen.
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { ChatService, ChatStore } from '../chat/chat.js';
 import { composeOpeningMove } from '../chat/openingMove.js';
+import { screenOutboundText } from '../gate/responseGate.js';
 import { BudgetExceededError } from '../prep/budget.js';
 import type { PrepSpendGuard } from '../prep/pipeline.js';
 import type { FactBundle, StoredBrief } from '../store/index.js';
@@ -147,6 +150,13 @@ export function registerChatRoutes(app: FastifyInstance, deps: ChatRouteDeps | u
             if (brief !== null) {
                 openingMove = composeOpeningMove(brief.content, brief.prepared_at);
                 if (openingMove !== null) {
+                    // The opening move is outbound prose like any reply: it passes the
+                    // gate's advisory screen before it is persisted or streamed.
+                    screenOutboundText(openingMove, request.log, {
+                        correlationId: String(request.id),
+                        conversationId,
+                        surface: 'opening_move',
+                    });
                     await deps.store.saveChatMessage({
                         patient_id: request.params.patientId,
                         conversation_id: conversationId,
@@ -178,7 +188,8 @@ export function registerChatRoutes(app: FastifyInstance, deps: ChatRouteDeps | u
                 request.log,
                 {
                     onTextDelta: (text) => writeEvent({ type: 'delta', text }),
-                    // Verified citations stream live so chips render as the text arrives.
+                    // Gate-released citations stream live so chips render as the text
+                    // arrives — verified-only leaves the server (gate/responseGate.ts).
                     onCitation: (citation) => writeEvent({ type: 'citation', citation }),
                     // Tool activity streams so the panel can show what the model is doing (TC3).
                     onToolUse: (event) => writeEvent({ type: 'tool_use', name: event.name, input: event.input }),

@@ -1,0 +1,382 @@
+<!--
+  SOURCE OF TRUTH for the operational-review dashboard artifact (closes S2.6).
+  Live URL: https://claude.ai/code/artifact/0b31ea79-5e53-4469-95c1-9e184f94b706
+  Refresh flow (any session): edit THIS file, then republish it via the Artifact
+  tool passing url: <the URL above> so the link never changes. Favicon stays 📊.
+  This page is a RENDER, never a source: a visual read of
+  docs/execution/baselines.md · docs/execution/eval-results.md ·
+  docs/execution/observability.md · docs/COSTS.md · docs/OPERATIONS.md ·
+  docs/VERIFICATION.md — when any of those change, refresh this page in the
+  same commit (same rule as build-status.html ↔ execution-plan.md).
+-->
+<title>Clinical Co-Pilot — Operations</title>
+<style>
+  :root {
+    --ground: #121714;
+    --card: #191f1b;
+    --card-inner: #1f2621;
+    --border: #29332d;
+    --border-soft: #222b26;
+    --text: #e4eae6;
+    --text-2: #96a39b;
+    --text-3: #6f7d75;
+    --accent: #8fd3ae;
+    --accent-strong: #b5e6cb;
+    --done: #7fd0a0;
+    --partial: #e2c078;
+    --open: #77857c;
+    --flag: #e2a678;
+    --pill-bg: rgba(127, 208, 160, 0.12);
+    --pill-border: rgba(127, 208, 160, 0.35);
+    --pill-new-bg: rgba(143, 211, 174, 0.10);
+    --quote-bar: #3b4a41;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --ground: #f3f6f4; --card: #ffffff; --card-inner: #f6f9f7; --border: #d8e1da;
+      --border-soft: #e3eae5; --text: #1c241f; --text-2: #55645b; --text-3: #7d8a82;
+      --accent: #17754a; --accent-strong: #0d5c38; --done: #1d8a55; --partial: #a97d14;
+      --open: #8b968f; --flag: #b2691f; --pill-bg: rgba(29, 138, 85, 0.10);
+      --pill-border: rgba(29, 138, 85, 0.35); --pill-new-bg: rgba(23, 117, 74, 0.08);
+      --quote-bar: #bcd0c4;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #121714; --card: #191f1b; --card-inner: #1f2621; --border: #29332d;
+    --border-soft: #222b26; --text: #e4eae6; --text-2: #96a39b; --text-3: #6f7d75;
+    --accent: #8fd3ae; --accent-strong: #b5e6cb; --done: #7fd0a0; --partial: #e2c078;
+    --open: #77857c; --flag: #e2a678; --pill-bg: rgba(127, 208, 160, 0.12);
+    --pill-border: rgba(127, 208, 160, 0.35); --pill-new-bg: rgba(143, 211, 174, 0.10);
+    --quote-bar: #3b4a41;
+  }
+  :root[data-theme="light"] {
+    --ground: #f3f6f4; --card: #ffffff; --card-inner: #f6f9f7; --border: #d8e1da;
+    --border-soft: #e3eae5; --text: #1c241f; --text-2: #55645b; --text-3: #7d8a82;
+    --accent: #17754a; --accent-strong: #0d5c38; --done: #1d8a55; --partial: #a97d14;
+    --open: #8b968f; --flag: #b2691f; --pill-bg: rgba(29, 138, 85, 0.10);
+    --pill-border: rgba(29, 138, 85, 0.35); --pill-new-bg: rgba(23, 117, 74, 0.08);
+    --quote-bar: #bcd0c4;
+  }
+
+  body { background: var(--ground); color: var(--text); font-family: var(--sans);
+         font-size: 15px; line-height: 1.55; margin: 0; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 56px 32px 72px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { color: var(--accent-strong); text-decoration: underline; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+  code { font-family: var(--mono); font-size: 0.86em; background: var(--card-inner);
+         border: 1px solid var(--border-soft); border-radius: 4px; padding: 0.08em 0.35em; }
+
+  .eyebrow { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+             color: var(--text-3); font-weight: 600; margin-bottom: 10px; }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 14px; text-wrap: balance; }
+  .statusline { font-family: var(--mono); font-size: 12.5px; color: var(--text-2);
+                line-height: 1.9; margin-bottom: 18px; }
+  .statusline b { color: var(--text); font-weight: 600; }
+  .statusline .new { color: var(--accent-strong); font-weight: 700; }
+  .toplinks { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 14px; font-weight: 500;
+              padding-bottom: 26px; border-bottom: 1px solid var(--border); }
+
+  section { margin-top: 44px; }
+  .seclabel { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+              color: var(--text-3); font-weight: 700; margin-bottom: 16px; }
+  .seclabel span { color: var(--text-3); font-weight: 400; text-transform: none; letter-spacing: 0; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+          padding: 22px 22px 10px; }
+  .card h3 { font-size: 16px; font-weight: 650; margin: 0 0 4px; }
+  .card .sub { font-size: 13px; color: var(--text-2); margin: 0 0 8px; }
+  .item { padding: 12px 0; border-top: 1px solid var(--border-soft); font-size: 13.5px; }
+  .item:first-of-type { border-top: none; }
+  .item .t { font-weight: 600; font-size: 14px; }
+  .item .d { color: var(--text-2); margin-top: 2px; }
+  .dotsep { color: var(--text-3); padding: 0 4px; }
+
+  .statgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+              gap: 18px; margin-top: 26px; }
+  .stat { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+          padding: 18px 20px 16px; }
+  .stat .k { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+             color: var(--text-3); font-weight: 700; margin-bottom: 6px; }
+  .stat .v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 26px;
+             font-weight: 700; letter-spacing: -0.01em; }
+  .stat .u { font-size: 12.5px; color: var(--text-2); margin-top: 4px; line-height: 1.5; }
+
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+           padding: 26px 28px; }
+  .panel-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .panel-head h2 { font-size: 19px; font-weight: 700; margin: 0; text-wrap: balance; }
+  .pill { font-size: 12px; font-weight: 600; color: var(--done); background: var(--pill-bg);
+          border: 1px solid var(--pill-border); border-radius: 999px; padding: 3px 12px;
+          white-space: nowrap; }
+  .pill::before { content: "●"; font-size: 8px; vertical-align: 2px; margin-right: 6px; }
+  .pill.amber { color: var(--partial); background: rgba(226, 192, 120, 0.10);
+                border-color: rgba(226, 192, 120, 0.35); }
+  .panel p { margin: 0 0 12px; color: var(--text); max-width: 78ch; }
+  .panel .muted { color: var(--text-2); }
+
+  .checkline { display: flex; gap: 10px; font-size: 13.5px; padding: 7px 0; align-items: baseline; }
+  .checkline .g { font-family: var(--mono); flex: none; }
+  .g.done { color: var(--done); } .g.part { color: var(--partial); }
+  .g.open { color: var(--open); } .g.flag { color: var(--flag); }
+
+  .meterrow { margin: 14px 0 4px; }
+  .meterrow .lbl { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline;
+                   font-size: 13.5px; margin-bottom: 6px; }
+  .meterrow .lbl b { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .meter { position: relative; height: 8px; background: var(--card-inner);
+           border: 1px solid var(--border-soft); border-radius: 5px; overflow: hidden; }
+  .meter .fill { position: absolute; inset: 0 auto 0 0; background: var(--done);
+                 border-radius: 4px; min-width: 10px; }
+  .meter .slo { position: absolute; top: -2px; bottom: -2px; right: 0; width: 2px;
+                background: var(--text-3); }
+  .meternote { font-size: 12px; color: var(--text-3); margin-top: 5px; }
+
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th { text-align: left; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+       color: var(--text-3); font-weight: 700; padding: 8px 14px 8px 0; border-bottom: 1px solid var(--border); }
+  td { padding: 9px 14px 9px 0; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td .note { color: var(--text-2); }
+
+  footer { margin-top: 52px; padding-top: 20px; border-top: 1px solid var(--border);
+           font-size: 12.5px; color: var(--text-3); line-height: 1.8; }
+  @media (prefers-reduced-motion: no-preference) { a { transition: color 120ms ease; } }
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">TCA-Trelity / GW1-openemr-base-clean · AgentForge Week 1</div>
+  <h1>Clinical Co-Pilot — Operations</h1>
+  <div class="statusline">
+    Hand-refreshed <b>2026-07-13</b> UTC · the operational review in one place:
+    <b>load</b> · <b>evals</b> · <b>alerts</b> · <b>dashboard</b> · <b>health</b> · <b>verification signals</b> · <b>cost</b> ·
+    renders <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/baselines.md">baselines.md</a> +
+    <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/eval-results.md">eval-results.md</a> +
+    <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/observability.md">observability.md</a> +
+    <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/COSTS.md">COSTS.md</a> (the sources of truth) ·
+    prose index: <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/OPERATIONS.md">docs/OPERATIONS.md</a>
+  </div>
+  <div class="toplinks">
+    <a href="https://enchanting-mercy-production-5d32.up.railway.app">Live sidecar + panel</a>
+    <a href="https://enchanting-mercy-production-5d32.up.railway.app/health">/health</a>
+    <a href="https://enchanting-mercy-production-5d32.up.railway.app/ready">/ready</a>
+    <a href="https://gw1-openemr-base-clean-production.up.railway.app">Live EHR</a>
+    <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions">CI runs</a>
+    <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/VERIFICATION.md">Verification path</a>
+    <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/EVALUATION.html">Evaluation guide</a>
+  </div>
+
+  <div class="statgrid">
+    <div class="stat">
+      <div class="k">Evals</div>
+      <div class="v">24/24</div>
+      <div class="u">structural acceptance over the ground-truthed corpus · regenerated on every run</div>
+    </div>
+    <div class="stat">
+      <div class="k">Tests</div>
+      <div class="v">391 + 88</div>
+      <div class="u">sidecar + panel vitest suites, green in CI on every push</div>
+    </div>
+    <div class="stat">
+      <div class="k">Load · p95 @ 10 users</div>
+      <div class="v">46 ms</div>
+      <div class="u">read path, live capture 2026-07-10 · SLO 1500 ms → 32× headroom</div>
+    </div>
+    <div class="stat">
+      <div class="k">Errors under load</div>
+      <div class="v">0%</div>
+      <div class="u">5,804 + 8,590 requests across both concurrency levels</div>
+    </div>
+  </div>
+
+  <section>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Load &amp; latency — deterministic read path</h2>
+        <span class="pill">SLO PASS · both levels</span>
+      </div>
+      <p class="muted">The probe (<code>npm run load-test</code>, dependency-free Node) fires concurrent GETs at
+      <code>/api/patients</code> + <code>/api/overview/:patient</code> — the reads that render the whole overview screen,
+      no LLM in the path. Live capture against production, <code>AUTH_MODE=enforced</code>, levels serialized.
+      Source of truth: <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/baselines.md">baselines.md</a>.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Concurrency</th><th>Requests (20 s)</th><th>Throughput</th><th>Errors</th><th>p50</th><th>p95</th><th>p99</th><th>max</th><th>p95 SLO 1500 ms</th></tr></thead>
+          <tbody>
+            <tr><td class="num"><b>10</b></td><td class="num">5,804</td><td class="num">290 req/s</td><td class="num">0%</td><td class="num">35 ms</td><td class="num"><b>46 ms</b></td><td class="num">76 ms</td><td class="num">295 ms</td><td>✅ PASS <span class="note">(32× headroom)</span></td></tr>
+            <tr><td class="num"><b>50</b></td><td class="num">8,590</td><td class="num">430 req/s</td><td class="num">0%</td><td class="num">124 ms</td><td class="num"><b>193 ms</b></td><td class="num">219 ms</td><td class="num">374 ms</td><td>✅ PASS <span class="note">(7.8× headroom)</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="meterrow">
+        <div class="lbl"><span>p95 @ 10 users</span><b>46 ms</b><span class="muted">of 1500 ms SLO — PASS</span></div>
+        <div class="meter"><div class="fill" style="width: 3.1%"></div><div class="slo"></div></div>
+      </div>
+      <div class="meterrow">
+        <div class="lbl"><span>p95 @ 50 users</span><b>193 ms</b><span class="muted">of 1500 ms SLO — PASS</span></div>
+        <div class="meter"><div class="fill" style="width: 12.9%"></div><div class="slo"></div></div>
+        <div class="meternote">bar = measured p95 against the full SLO track; right edge marks 1500 ms</div>
+      </div>
+      <div class="checkline"><span class="g done">✓</span><span><b>Gate, not just a measurement</b> — the probe exits non-zero on any error or p95 &gt; SLO; CI workflow <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions/workflows/sidecar-load.yml">sidecar-load.yml</a> (dispatchable, levels serialized <code>max-parallel: 1</code>)</span></div>
+      <div class="checkline"><span class="g done">✓</span><span><b>First capture discarded honestly</b> — 2026-07-10 00:21 failed its own gate (readiness fan-out in rotation + parallel levels); both harness flaws fixed in <code>2491b76</code>, clean rerun passed first attempt — the before/after is the evidence the harness isolates the service</span></div>
+      <div class="checkline"><span class="g part">◐</span><span><b>CPU/memory</b> — read off the Railway metrics panel for the capture windows (runner can't reach Railway's metrics API); no restarts or OOM either window; metrics-panel screenshot still to attach in baselines.md</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Eval coverage — every demo is a test run</h2>
+        <span class="pill">24/24 PASS</span>
+      </div>
+      <p class="muted">Structural acceptance checks over the seeded, ground-truthed corpus (planted contradictions with
+      recorded answers; no live LLM). Committed results with run SHA + timestamp:
+      <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/eval-results.md">eval-results.md</a> —
+      regenerated by <code>npm run eval</code> and uploaded as a CI artifact on every sidecar push
+      (<a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions/workflows/evals.yml">evals.yml</a>).</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Family</th><th>Cases</th><th>What it proves</th></tr></thead>
+          <tbody>
+            <tr><td><b>citation-validity</b></td><td class="num">2</td><td>100% citation validity over the corpus — the hard invariant, guaranteed by construction, tested anyway</td></tr>
+            <tr><td><b>response-gate</b></td><td class="num">3</td><td><span class="note">new</span> — wire-level: an unverified citation never leaves the server; clean turns pass undiminished; the seed is screened</td></tr>
+            <tr><td><b>multi-turn-conversation</b></td><td class="num">5</td><td>history threading, tool-chain goldens, mid-thread cross-patient denial (withheld, not annotated), round cap, tool-error recovery</td></tr>
+            <tr><td><b>prescriptiveness</b></td><td class="num">2</td><td>the lint catches every originated-direction shape; the sanctioned reframe passes with 0 flags</td></tr>
+            <tr><td><b>injection-resistance</b></td><td class="num">2</td><td>prompt confinement (fenced document text) + invented provenance withheld</td></tr>
+            <tr><td><b>cross-patient-denial</b></td><td class="num">2</td><td>foreign spans and foreign document ids both deny structurally</td></tr>
+            <tr><td><b>calculator-goldens</b></td><td class="num">3</td><td>medication-risk + interval arithmetic locked to hand-checkable numbers</td></tr>
+            <tr><td><b>imaging-cohesion</b></td><td class="num">3</td><td>chat and analytics rail quote one derived source; describe_scan quarantine holds</td></tr>
+            <tr><td><b>contradiction-ground-truth</b></td><td class="num">1</td><td>planted contradictions surface with the recorded correct answer</td></tr>
+            <tr><td><b>empty-record-boundary</b></td><td class="num">1</td><td>absence renders as absence — a no-data bundle yields a well-formed empty payload</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="checkline"><span class="g done">✓</span><span><b>Unit/contract layer</b> — 391 sidecar + 88 panel tests (boundaries, invariants, named regressions) in <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions/workflows/sidecar-ci.yml">sidecar-ci.yml</a></span></div>
+      <div class="checkline"><span class="g done">✓</span><span><b>Live layer</b> — <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions/workflows/live-smoke.yml">live-smoke.yml</a> drives the deployed URL through readiness → EHR sync → full prep → gate assertions</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Alerts — three, with on-call responses</h2>
+        <span class="pill amber">spec committed · Langfuse config pending (G2)</span>
+      </div>
+      <p class="muted">Canonical definitions (conditions, thresholds, full on-call runbook):
+      <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/observability.md">observability.md</a> — this table renders it.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>#</th><th>Alert</th><th>Condition</th><th>On-call response (short form)</th></tr></thead>
+          <tbody>
+            <tr><td class="num">A1</td><td><b>p95 latency breach</b></td><td>chat first-token p95 &gt; 4 s or prep p95 &gt; 4 min, sustained 5 min</td><td>Langfuse spans name the slow stage: <code>llm_extraction</code> → Anthropic/corpus; <code>load_sources</code> → Postgres pool + <code>/ready</code></td></tr>
+            <tr><td class="num">A2</td><td><b>Error-rate breach</b></td><td>5xx &gt; 5% over 10 min</td><td>group failing correlation IDs by route; 503s → <code>DATABASE_URL</code>/pool; prep failures → <code>/api/prep-runs/:id</code> stage + error</td></tr>
+            <tr><td class="num">A3</td><td><b>Verification / tool failure</b> <span class="note">— the clinical-safety alert</span></td><td>any prep run with <code>citations_failed &gt; 0</code>, or chat <code>unverified_count &gt; 0</code> rate &gt; 1%, or tool-error rate &gt; 10%</td><td>inspect the trace; confirm the gate withheld it (it does, by construction); a rising rate = extraction drift → failing case joins the eval corpus, prompt re-tuned</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Dashboard — ten tiles over already-emitted signals</h2>
+        <span class="pill amber">signals live · tiles pending Langfuse deploy (G2)</span>
+      </div>
+      <p class="muted">Every tile maps to data the sidecar already emits (Langfuse traces keyed by correlation ID +
+      the <code>llm_calls</code> Postgres ledger + pino request logs) — the dashboard is a view, not new
+      instrumentation. Tile → signal mapping: <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/observability.md">observability.md</a>.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Tile</th><th>Metric</th><th>Source</th></tr></thead>
+          <tbody>
+            <tr><td>Requests</td><td>count over time, by route</td><td>request logs</td></tr>
+            <tr><td>Error rate</td><td>5xx / total, by route</td><td>request logs</td></tr>
+            <tr><td>Latency</td><td>p50 / p95 per surface (overview · chat first-token · prep)</td><td>spans + request logs</td></tr>
+            <tr><td>LLM calls</td><td>generations/min by purpose (prep_extraction · chat_turn)</td><td>Langfuse generations</td></tr>
+            <tr><td>Retries</td><td>transient + validation retry counts</td><td>generation metadata</td></tr>
+            <tr><td><b>Verification pass/fail</b></td><td><code>citations_failed</code> = 0 rate · <code>facts_blocked</code> · chat <code>unverified_count</code></td><td>outcome scores</td></tr>
+            <tr><td><b>Prescriptiveness lint</b></td><td><code>prescriptive_flag_count</code> per turn (advisory — logged for engineering, invisible to the physician)</td><td>request logs + SSE done</td></tr>
+            <tr><td>Token spend</td><td><code>est_cost_usd</code> 24h rolling vs $5 budget</td><td><code>llm_calls</code> ledger</td></tr>
+            <tr><td>Run outcomes</td><td><code>run_success</code> rate · failed-stage histogram · gate outcomes</td><td>scores + <code>prep_runs</code></td></tr>
+            <tr><td>In-flight work</td><td>running prep runs (count + age) — the no-queue architecture's honest "queue depth"</td><td><code>prep_runs</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="checkline"><span class="g done">✓</span><span><b>Traces render today</b> — Langfuse Cloud receives every prep/chat trace during the synthetic-data demo (token + cost per run)</span></div>
+      <div class="checkline"><span class="g open">☐</span><span><b>Committed pilot posture</b> — self-hosted Langfuse inside the deployment boundary (traces never leave); activation is <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/RUNBOOK.md">RUNBOOK §C</a> (G2), where the tiles above + the three alerts get configured</span></div>
+      <div class="checkline"><span class="g done">✓</span><span><b>Interim, no external service needed</b> — <code>GET /api/usage</code> (rolling 24h spend) · <code>GET /api/prep-runs/:id</code> (stage + error) · Railway logs by correlation ID</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="seclabel">Health · verification signals · cost <span>— the rest of the operational surface</span></div>
+    <div class="grid">
+      <div class="card">
+        <h3>Health &amp; readiness</h3>
+        <p class="sub">Liveness and real dependency readiness are separate questions.</p>
+        <div class="item">
+          <div class="t"><a href="https://enchanting-mercy-production-5d32.up.railway.app/health">/health</a></div>
+          <div class="d">dependency-free process liveness — Railway's deploy health gate</div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://enchanting-mercy-production-5d32.up.railway.app/ready">/ready</a></div>
+          <div class="d">real checks: OpenEMR · Anthropic · Postgres · Langfuse (configured deps that fail ⇒ 503)</div>
+        </div>
+        <div class="item">
+          <div class="t">Bruno probes</div>
+          <div class="d"><code>sidecar/api-collection/01-health/</code> — runnable without reading source</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Verification signals</h3>
+        <p class="sub">The safety half of the operational story — <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/VERIFICATION.md">docs/VERIFICATION.md</a>.</p>
+        <div class="item">
+          <div class="t"><code>unverified_count</code></div>
+          <div class="d">citations withheld by the response gate this turn — rides every SSE <code>done</code>; feeds A3</div>
+        </div>
+        <div class="item">
+          <div class="t"><code>facts_blocked</code> · <code>citations_failed</code></div>
+          <div class="d">prep-gate outcomes per run — Langfuse trace scores</div>
+        </div>
+        <div class="item">
+          <div class="t"><code>prescriptive_flag_count</code></div>
+          <div class="d">advisory lint flags (rule + excerpt in logs) — engineering signal, never shown to the physician</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Cost</h3>
+        <p class="sub">Ledger-priced at insert time; the narrative is <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/COSTS.md">COSTS.md</a>.</p>
+        <div class="item">
+          <div class="t">~$0.10–0.16 / prep · &lt;$0.01 / chat turn</div>
+          <div class="d">Haiku 4.5 on both surfaces ($1/$5 per MTok), per-document map-reduce prep</div>
+        </div>
+        <div class="item">
+          <div class="t">$5/day spend guard</div>
+          <div class="d">prep + chat precheck the rolling budget and answer <code>429</code> rather than overspend</div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://enchanting-mercy-production-5d32.up.railway.app/api/usage">GET /api/usage</a></div>
+          <div class="d">trailing-24h totals vs budget, straight from the <code>llm_calls</code> ledger</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Refreshed 2026-07-13 by the working session · this page is a <b>render</b> of
+    <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/baselines.md">baselines.md</a> ·
+    <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/eval-results.md">eval-results.md</a> ·
+    <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/observability.md">observability.md</a> ·
+    <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/COSTS.md">COSTS.md</a> — when a source changes,
+    refresh this page in the same commit (rule shared with <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/build-status.html">build-status.html</a>).<br>
+    Prose index &amp; production-readiness narrative: <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/OPERATIONS.md">docs/OPERATIONS.md</a> ·
+    verification path: <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/VERIFICATION.md">docs/VERIFICATION.md</a>
+  </footer>
+</div>

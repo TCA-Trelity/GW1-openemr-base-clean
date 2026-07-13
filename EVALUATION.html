@@ -1,0 +1,315 @@
+<!--
+  SOURCE OF TRUTH for the grader landing-page artifact.
+  Live URL: https://claude.ai/code/artifact/0384c196-a2e1-4887-92f8-918d355ff0c0
+  Refresh flow (any session): edit THIS file, then republish it via the Artifact
+  tool passing url: <the URL above> so the link never changes. Favicon stays 🧭.
+  This page is a RENDER, never a source: the one-stop navigation sheet for an
+  evaluator — every live surface, graded document, runnable check, and record
+  of the build, with the repo (README deliverables table + the linked docs) as
+  the source of truth. When deliverables move or live URLs change, refresh this
+  page in the same commit (same rule as docs/execution/build-status.html and
+  docs/execution/ops-status.html).
+-->
+<title>Clinical Co-Pilot — Evaluation Guide</title>
+<style>
+  :root {
+    --ground: #121714;
+    --card: #191f1b;
+    --card-inner: #1f2621;
+    --border: #29332d;
+    --border-soft: #222b26;
+    --text: #e4eae6;
+    --text-2: #96a39b;
+    --text-3: #6f7d75;
+    --accent: #8fd3ae;
+    --accent-strong: #b5e6cb;
+    --done: #7fd0a0;
+    --partial: #e2c078;
+    --open: #77857c;
+    --flag: #e2a678;
+    --pill-bg: rgba(127, 208, 160, 0.12);
+    --pill-border: rgba(127, 208, 160, 0.35);
+    --quote-bar: #3b4a41;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --ground: #f3f6f4; --card: #ffffff; --card-inner: #f6f9f7; --border: #d8e1da;
+      --border-soft: #e3eae5; --text: #1c241f; --text-2: #55645b; --text-3: #7d8a82;
+      --accent: #17754a; --accent-strong: #0d5c38; --done: #1d8a55; --partial: #a97d14;
+      --open: #8b968f; --flag: #b2691f; --pill-bg: rgba(29, 138, 85, 0.10);
+      --pill-border: rgba(29, 138, 85, 0.35); --quote-bar: #bcd0c4;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #121714; --card: #191f1b; --card-inner: #1f2621; --border: #29332d;
+    --border-soft: #222b26; --text: #e4eae6; --text-2: #96a39b; --text-3: #6f7d75;
+    --accent: #8fd3ae; --accent-strong: #b5e6cb; --done: #7fd0a0; --partial: #e2c078;
+    --open: #77857c; --flag: #e2a678; --pill-bg: rgba(127, 208, 160, 0.12);
+    --pill-border: rgba(127, 208, 160, 0.35); --quote-bar: #3b4a41;
+  }
+  :root[data-theme="light"] {
+    --ground: #f3f6f4; --card: #ffffff; --card-inner: #f6f9f7; --border: #d8e1da;
+    --border-soft: #e3eae5; --text: #1c241f; --text-2: #55645b; --text-3: #7d8a82;
+    --accent: #17754a; --accent-strong: #0d5c38; --done: #1d8a55; --partial: #a97d14;
+    --open: #8b968f; --flag: #b2691f; --pill-bg: rgba(29, 138, 85, 0.10);
+    --pill-border: rgba(29, 138, 85, 0.35); --quote-bar: #bcd0c4;
+  }
+
+  body { background: var(--ground); color: var(--text); font-family: var(--sans);
+         font-size: 15px; line-height: 1.55; margin: 0; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 56px 32px 72px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { color: var(--accent-strong); text-decoration: underline; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+  code { font-family: var(--mono); font-size: 0.86em; background: var(--card-inner);
+         border: 1px solid var(--border-soft); border-radius: 4px; padding: 0.08em 0.35em; }
+
+  .eyebrow { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+             color: var(--text-3); font-weight: 600; margin-bottom: 10px; }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 14px; text-wrap: balance; }
+  .statusline { font-family: var(--mono); font-size: 12.5px; color: var(--text-2);
+                line-height: 1.9; margin-bottom: 18px; }
+  .statusline b { color: var(--text); font-weight: 600; }
+  .toplinks { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 14px; font-weight: 500;
+              padding-bottom: 26px; border-bottom: 1px solid var(--border); }
+
+  section { margin-top: 44px; }
+  .seclabel { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+              color: var(--text-3); font-weight: 700; margin-bottom: 16px; }
+  .seclabel span { color: var(--text-3); font-weight: 400; text-transform: none; letter-spacing: 0; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+          padding: 22px 22px 10px; }
+  .card h3 { font-size: 16px; font-weight: 650; margin: 0 0 4px; }
+  .card .sub { font-size: 13px; color: var(--text-2); margin: 0 0 8px; }
+  .item { padding: 12px 0; border-top: 1px solid var(--border-soft); font-size: 13.5px; }
+  .item:first-of-type { border-top: none; }
+  .item .t { font-weight: 600; font-size: 14px; }
+  .item .d { color: var(--text-2); margin-top: 2px; }
+  .dotsep { color: var(--text-3); padding: 0 4px; }
+
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+           padding: 26px 28px; }
+  .panel-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .panel-head h2 { font-size: 19px; font-weight: 700; margin: 0; text-wrap: balance; }
+  .pill { font-size: 12px; font-weight: 600; color: var(--done); background: var(--pill-bg);
+          border: 1px solid var(--pill-border); border-radius: 999px; padding: 3px 12px;
+          white-space: nowrap; }
+  .pill::before { content: "●"; font-size: 8px; vertical-align: 2px; margin-right: 6px; }
+  .panel p { margin: 0 0 12px; color: var(--text); max-width: 78ch; }
+  .panel .muted { color: var(--text-2); }
+
+  .stepline { display: flex; gap: 12px; font-size: 14px; padding: 9px 0; align-items: baseline; }
+  .stepline .n { font-family: var(--mono); font-weight: 700; color: var(--accent);
+                 flex: none; min-width: 18px; }
+  .stepline .d { color: var(--text-2); }
+
+  .checkline { display: flex; gap: 10px; font-size: 13.5px; padding: 7px 0; align-items: baseline; }
+  .checkline .g { font-family: var(--mono); flex: none; }
+  .g.done { color: var(--done); }
+
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th { text-align: left; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+       color: var(--text-3); font-weight: 700; padding: 8px 14px 8px 0; border-bottom: 1px solid var(--border); }
+  td { padding: 9px 14px 9px 0; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+  td .note { color: var(--text-2); }
+
+  footer { margin-top: 52px; padding-top: 20px; border-top: 1px solid var(--border);
+           font-size: 12.5px; color: var(--text-3); line-height: 1.8; }
+  @media (prefers-reduced-motion: no-preference) { a { transition: color 120ms ease; } }
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">TCA-Trelity / GW1-openemr-base-clean · AgentForge Week 1</div>
+  <h1>Clinical Co-Pilot — Evaluation Guide</h1>
+  <div class="statusline">
+    The grader's landing sheet — every <b>live surface</b>, <b>graded document</b>, <b>runnable check</b>,
+    and <b>build record</b> from one page · hand-refreshed <b>2026-07-13</b> UTC ·
+    the repo (<a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean#readme">README deliverables table</a>) is the source of truth
+  </div>
+  <div class="toplinks">
+    <a href="https://enchanting-mercy-production-5d32.up.railway.app">Live panel (the graded UI)</a>
+    <a href="https://gw1-openemr-base-clean-production.up.railway.app">Live EHR</a>
+    <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean">Repository</a>
+    <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions">CI runs</a>
+    <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/ops-status.html">Ops dashboard</a>
+    <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/build-status.html">Build status</a>
+  </div>
+
+  <section>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>The first five minutes</h2>
+        <span class="pill">no credentials needed — dev-login is built for grading</span>
+      </div>
+      <div class="stepline"><span class="n">1</span><span>Open the <a href="https://enchanting-mercy-production-5d32.up.railway.app">live panel</a> and sign in via the role picker as <b>Physician</b> <span class="d">(dev-login; nurse and resident show the role-capability gate)</span>.</span></div>
+      <div class="stepline"><span class="n">2</span><span>The panel opens on a patient — try <b>William R. Thompson</b> (wet-AMD, 7 OCTs, 4 injections). At desktop width the chat pane is already open, and its first message is the <b>agent's opening move</b>: what it prepared during check-in. <span class="d">The brief is turn zero of the conversation, not a separate report.</span></span></div>
+      <div class="stepline"><span class="n">3</span><span>Imaging tab → <b>"Ask about this scan"</b> → send. Watch the tool chips stream live (<code>get_measurement_trend</code>, <code>compare_scans</code>), the sparkline render in the bubble, and citations attach — click a chip to land on the source text, click a trend point to land on the exact scan.</span></div>
+      <div class="stepline"><span class="n">4</span><span>Ask a recommendation-shaped question — <i>"Should I shorten his interval?"</i> — and check the shape of the answer: record facts cited, engine/guideline output attributed in the same sentence, questions worth weighing. <b>Never originated direction.</b></span></div>
+      <div class="stepline"><span class="n">5</span><span>Try to cross patients mid-thread — <i>"What were Margaret Chen's medications?"</i> — and watch the structural denial: bundle-bound tools error, foreign spans never verify, and the response gate withholds them from the wire.</span></div>
+      <p class="muted" style="margin-top: 10px;">Scripted walkthrough with narration beats: <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/defense/demo-script.md">docs/defense/demo-script.md</a>.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="seclabel">Read <span>— the graded documents, in reading order</span></div>
+    <div class="grid">
+      <div class="card">
+        <h3>Root hard-gates</h3>
+        <p class="sub">The four documents the build answers to.</p>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/AUDIT.md">AUDIT.md</a></div>
+          <div class="d">the brownfield security/architecture audit whose findings shaped the design</div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/USERS.md">USERS.md</a></div>
+          <div class="d">users &amp; use cases — every capability traces to one</div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/ARCHITECTURE.md">ARCHITECTURE.md</a></div>
+          <div class="d">the AI integration architecture — agent surface, models, authz, observability, failure modes</div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/VERIFICATION.md">docs/VERIFICATION.md</a></div>
+          <div class="d">how every chat response is checked before it reaches the user — file:line trace, choke-point table, enforced-vs-advisory boundary</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Defense &amp; plan</h3>
+        <p class="sub">The full argument, with rejected alternatives.</p>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/defense/architecture-defense.md">Architecture defense</a><span class="dotsep">·</span><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/defense/architecture-defense-slides.md">slides</a></div>
+          <div class="d">≤4pp defense + the 8-slide deck (economics slide included)</div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/defense/PRD-clinical-copilot.md">Tiered PRD</a><span class="dotsep">·</span><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/defense/presearch.md">pre-search Q1–16</a></div>
+          <div class="d">the T0→T3 build plan and the appendix checklist</div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/prompt-guide.md">Prompt &amp; tone guide</a></div>
+          <div class="d">the thought-partner contract and its enforcement map (prompt → lint → evals)</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Requirement trace</h3>
+        <p class="sub">Requirement-by-requirement, with pointers.</p>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/defense/early-submission-readiness.md">Submission readiness trace</a></div>
+          <div class="d">point-in-time (2026-07-10) requirement map</div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/ops-status.html">Operational review (live numbers)</a></div>
+          <div class="d">load · evals · alerts · dashboard · cost, one page</div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/sidecar/README.md">Sidecar code map</a></div>
+          <div class="d">orientation for reading the service cold — <code>src/gate/</code> is the verification layer</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Run — verify the claims yourself</h2>
+        <span class="pill">sidecar 391 · panel 88 · evals 24/24 — green</span>
+      </div>
+      <div class="checkline"><span class="g done">▸</span><span><b>Bruno API collection</b> — <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/tree/main/sidecar/api-collection">sidecar/api-collection/</a>: health → patient data → prep → a true multi-turn chat (follow-up reuses <code>conversation_id</code>) → images, runnable against local or the live URL without reading source</span></div>
+      <div class="checkline"><span class="g done">▸</span><span><b>Tests</b> — <code>cd sidecar &amp;&amp; npm ci &amp;&amp; npm test</code> (391) and <code>cd sidecar/panel &amp;&amp; npm ci &amp;&amp; npm test</code> (88): boundaries, invariants, named regressions</span></div>
+      <div class="checkline"><span class="g done">▸</span><span><b>Evals</b> — <code>npm run eval</code> regenerates <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/eval-results.md">eval-results.md</a> (committed, 24/24): citation validity, response-gate wire invariants, multi-turn conversation, cross-patient denial, injection resistance, prescriptiveness, calculator goldens</span></div>
+      <div class="checkline"><span class="g done">▸</span><span><b>Load probe</b> — <code>npm run load-test</code> against any deployment (SLO-gated); committed live baselines in <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/baselines.md">baselines.md</a></span></div>
+      <div class="checkline"><span class="g done">▸</span><span><b>CI</b> — <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions/workflows/sidecar-ci.yml">sidecar-ci</a> · <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions/workflows/evals.yml">evals</a> · <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions/workflows/sidecar-load.yml">load probe</a> · <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions/workflows/live-smoke.yml">live smoke</a> (drives the deployed URL through readiness → sync → prep → gate assertions)</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Five claims worth checking, and where each is proven</h2>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Claim</th><th>Where it is enforced</th><th>Where it is proven</th></tr></thead>
+          <tbody>
+            <tr><td><b>Unverified provenance never reaches any client</b></td><td>the response gate withholds it server-side (<code>sidecar/src/gate/responseGate.ts</code>)</td><td><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/VERIFICATION.md">VERIFICATION.md</a> trace · eval <code>response-gate.wire-invariant</code></td></tr>
+            <tr><td><b>An unsourced fact cannot reach the brief</b></td><td>the prep citation gate blocks it before assembly</td><td><code>test/gate.test.ts</code> · eval <code>citation-validity</code> (100%)</td></tr>
+            <tr><td><b>The agent never originates clinical direction</b></td><td>prompt hard rule + advisory lint (logged + counted)</td><td>evals <code>prescriptiveness.*</code> · <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/prompt-guide.md">prompt-guide.md</a></td></tr>
+            <tr><td><b>It structurally cannot reach another patient</b></td><td>patient-bound credential + bundle-bound tools + the gate</td><td>evals <code>cross-patient-denial.*</code>, <code>multi-turn-conversation.cross-patient-mid-thread</code></td></tr>
+            <tr><td><b>Every number is hand-checkable</b></td><td>deterministic engines; the model presents, never computes</td><td>eval <code>calculator-goldens.*</code> (AAO arithmetic locked)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="seclabel">Operate &amp; record <span>— the operational side and the build history</span></div>
+    <div class="grid">
+      <div class="card">
+        <h3>Live surfaces</h3>
+        <p class="sub">Synthetic data only, throughout.</p>
+        <div class="item">
+          <div class="t"><a href="https://enchanting-mercy-production-5d32.up.railway.app">Co-Pilot panel + sidecar</a></div>
+          <div class="d">the graded UI — dev-login role picker (physician · nurse · resident)</div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://enchanting-mercy-production-5d32.up.railway.app/health">/health</a><span class="dotsep">·</span><a href="https://enchanting-mercy-production-5d32.up.railway.app/ready">/ready</a><span class="dotsep">·</span><a href="https://enchanting-mercy-production-5d32.up.railway.app/api/usage">/api/usage</a></div>
+          <div class="d">liveness · real dependency readiness · rolling 24h LLM spend vs the $5/day guard</div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://gw1-openemr-base-clean-production.up.railway.app">OpenEMR EHR</a><span class="dotsep">·</span><a href="https://gw1-openemr-base-clean-production.up.railway.app/apis/default/fhir/metadata">FHIR metadata</a></div>
+          <div class="d">the system of record the sidecar reads via FHIR R4; the graded surface is the panel (no EHR credentials needed to evaluate)</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Operations</h3>
+        <p class="sub">The one-page review, then the sources.</p>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/ops-status.html">ops-status.html</a></div>
+          <div class="d">load · evals · alerts · dashboard tiles · health · verification signals · cost</div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/OPERATIONS.md">OPERATIONS.md</a><span class="dotsep">·</span><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/RUNBOOK.md">RUNBOOK.md</a></div>
+          <div class="d">production-readiness narrative · activation runbook (EHR link, Langfuse, auth)</div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/COSTS.md">COSTS.md</a></div>
+          <div class="d">measured actuals + the 100→100K-patient projection</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Build record</h3>
+        <p class="sub">How it was built, decision by decision.</p>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/build-status.html">build-status.html</a><span class="dotsep">·</span><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/execution-plan.md">execution-plan.md</a></div>
+          <div class="d">the ticket board render and its source of truth</div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/DECISIONS.md">DECISIONS.md</a></div>
+          <div class="d">the append-only judgment ledger — block swaps, postmortems, model-tier calls</div>
+        </div>
+        <div class="item">
+          <div class="t"><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/RELEASE.md">RELEASE.md</a><span class="dotsep">·</span><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/tags">stable-* tags</a></div>
+          <div class="d">branch model — <code>main</code> is stable/instructor-facing; tagged checkpoints are e2e-proven</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Refreshed 2026-07-13 by the working session · this page is a <b>render</b> of the repo's deliverables
+    (source of truth: the <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean#readme">README deliverables table</a> and the documents it links) —
+    when deliverables move or live URLs change, refresh this page in the same commit.<br>
+    Siblings: <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/build-status.html">build-status.html</a> (ticket board) ·
+    <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/ops-status.html">ops-status.html</a> (operational review)
+  </footer>
+</div>

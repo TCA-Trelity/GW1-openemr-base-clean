@@ -22,6 +22,9 @@ This is a fork of [OpenEMR](https://github.com/openemr/openemr) used for the
 AgentForge Clinical Co-Pilot project: an AI co-pilot for ophthalmology
 embedded in a brownfield EHR.
 
+> **Evaluating this project? Start at [`EVALUATION.html`](EVALUATION.html)** —
+> the one-page guide to every live surface, graded document, and runnable check.
+
 - **Live EHR:** https://gw1-openemr-base-clean-production.up.railway.app
   (demo instance, synthetic data only)
 - **Live agent (sidecar API + panel):** https://enchanting-mercy-production-5d32.up.railway.app
@@ -32,12 +35,17 @@ embedded in a brownfield EHR.
 
 | Deliverable | Location |
 |---|---|
+| **Evaluation guide (graders start here)** | [`EVALUATION.html`](EVALUATION.html) |
 | Security & architecture audit | [`AUDIT.md`](AUDIT.md) |
 | Users & use cases | [`USERS.md`](USERS.md) |
 | Agent integration architecture | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
+| Verification path (response → user, traced) | [`docs/VERIFICATION.md`](docs/VERIFICATION.md) |
 | Early-submission readiness trace | [`docs/defense/early-submission-readiness.md`](docs/defense/early-submission-readiness.md) |
 | Activation runbook (EHR link, Langfuse, auth) | [`docs/RUNBOOK.md`](docs/RUNBOOK.md) |
 | Operations & production readiness | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) |
+| **Operational review dashboard** (load, evals, alerts, cost — one page) | [`docs/execution/ops-status.html`](docs/execution/ops-status.html) |
+| Dashboard tiles & alerts spec | [`docs/execution/observability.md`](docs/execution/observability.md) |
+| Performance baselines (load tests) | [`docs/execution/baselines.md`](docs/execution/baselines.md) |
 | Eval suite & results | [`sidecar/eval/`](sidecar/eval/), [`docs/execution/eval-results.md`](docs/execution/eval-results.md) |
 | AI cost analysis | [`docs/COSTS.md`](docs/COSTS.md) |
 | Runnable API collection (Bruno) | [`sidecar/api-collection/`](sidecar/api-collection/) |

@@ -2,8 +2,10 @@
 // brief, persisted as the first assistant message of every NEW conversation when a
 // completed brief exists — so the transcript literally opens with what the agent prepared
 // during check-in (visible live via the SSE `seed` event, in GET replay, and in Bruno).
-// Composed from citation-gated brief content only; it is not model output, so the
-// prescriptiveness lint does not apply (nothing here is generated free text).
+// Composed from citation-gated brief content only — but brief points are still
+// model-derived prose (and clip() can truncate an attribution), so the route passes the
+// digest through the response gate's advisory screen before persisting or streaming it,
+// like every other outbound payload.
 
 const MAX_POINTS = 3;
 const MAX_POINT_CHARS = 110;

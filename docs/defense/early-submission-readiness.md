@@ -1,5 +1,11 @@
 # Early Submission — Readiness
 
+> **Point-in-time trace** (early submission, 2026-07-10) — numbers here are the
+> snapshot at submission. The **live** operational review (current test/eval
+> counts, baselines, dashboard, alerts) is
+> [`docs/execution/ops-status.html`](../execution/ops-status.html), indexed from
+> [`docs/OPERATIONS.md`](../OPERATIONS.md).
+
 *Requirement-by-requirement trace of the Week 1 AgentForge case study against this
 repository, as of 2026-07-09. Live EHR:
 `https://gw1-openemr-base-clean-production.up.railway.app` · Live agent (sidecar + panel):

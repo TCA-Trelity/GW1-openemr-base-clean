@@ -25,8 +25,8 @@ removable without a trace.
 The product is a **multi-turn, tool-invoking clinical agent**, and its central
 idea is to **move the agent's thinking to where time is free.** After
 check-in, patients wait 5–20 minutes before the doctor enters. In that gap the
-agent works proactively: a deep-reader model (Claude Sonnet 5) reads the full
-record, extracts typed facts — each with a source pointer, confidence,
+agent works proactively: a deep-reader pass (Haiku 4.5, per-document
+map-reduce — model env-tunable) reads the full record, extracts typed facts — each with a source pointer, confidence,
 verification status, and laterality — reconciles contradictions, runs
 medication-risk arithmetic, and pre-selects the visit's scans. What it
 prepared greets the doctor as the agent's **opening move**: a one-page brief
@@ -62,13 +62,17 @@ organizing, and citing *this* record — not generating medical knowledge).
 Whole-patient context over vector search (one patient's facts fit in the
 model's context, so the hardest retrieval problem never arises).
 
-**Trust and authorization are constructed, not assumed.** A deterministic
-citation gate — plain code, not a model — sits between generation and display;
-an unsourced claim is blocked by construction. Domain rules are arithmetic the
-physician can hand-check. And the agent is a **thought partner, never a
-prescriber**: it never originates treatment, dosing, or diagnosis direction —
-a prompt-level contract backed by a deterministic prescriptiveness lint on
-every reply and published evals (`docs/prompt-guide.md`). Our audit found OpenEMR's per-patient access check
+**Trust and authorization are constructed, not assumed.** A deterministic gate
+layer — plain code, not a model — sits between generation and display on both
+paths: preparation drops any fact whose citation fails verbatim verification,
+and the chat response gate withholds unverified citations at the server, so
+fabricated provenance never reaches any client (the file-by-file walking tour
+is `docs/VERIFICATION.md`). Domain rules are arithmetic the physician can
+hand-check. And the agent is a **thought partner, never a prescriber**: it
+never originates treatment, dosing, or diagnosis direction — a prompt-level
+contract backed by a deterministic prescriptiveness lint on every reply
+(advisory: logged and counted, never redacted mid-consult) and published
+evals (`docs/prompt-guide.md`). Our audit found OpenEMR's per-patient access check
 unimplemented (returns "allow" unconditionally), so the interactive surface
 holds a SMART token bound to one patient and one user, while the preparer
 holds a separate read-only, fully audit-logged credential. The governing
@@ -171,21 +175,30 @@ what Dan requires of a partner he stays responsible for.
 - **Typed facts** carry `{ content · source pointer · confidence ·
   verification status (who, in what role) · laterality }`.
 - **Source attribution:** the chat model answers using only prepared facts and
-  attaches each fact's citation to each claim.
-- **Domain-constraint enforcement, two layers.** (a) A **deterministic
-  citation gate** — code, not a model — runs between generation and display
-  and verifies every citation resolves to a real record entry; an unsourced
-  claim is blocked and rewritten as absence, by construction. (b) **Clinical
-  rules are arithmetic:** hydroxychloroquine toxicity = daily dose × days vs.
-  published thresholds; treat-and-extend = imaging outcomes correlated with
-  injection intervals. The model presents these results; it never performs the
-  calculation, so every number is hand-checkable.
-- **Where verification happens, and its blind spot.** The gate sits after
-  generation and before display — the one point where every claim exists in
-  final form but nothing has reached the user. It guarantees *provenance* (a
-  real source for every claim), not perfect *interpretation* (a model can
-  still summarize a cited fact clumsily). Mitigations: the source is one click
-  from every claim; the eval suite measures faithfulness against ground truth.
+  documents and attaches a native citation to each claim; every cited span is
+  re-verified verbatim against our stored copy, server-side.
+- **Domain-constraint enforcement, two layers.** (a) A **deterministic gate
+  layer** (`sidecar/src/gate/`) — code, not a model — runs between generation
+  and display on both paths. Preparation: a fact whose citations do not all
+  resolve to real record text is blocked and rewritten as absence before the
+  brief is assembled. Chat: an unverified citation is withheld at the server —
+  it reaches no SSE event and no client, surfacing only as a count — so
+  fabricated provenance cannot render anywhere, by construction rather than by
+  client convention. (b) **Clinical rules are arithmetic:** hydroxychloroquine
+  toxicity = daily dose × days vs. published thresholds; treat-and-extend =
+  imaging outcomes correlated with injection intervals. The model presents
+  these results; it never performs the calculation, so every number is
+  hand-checkable.
+- **Where verification happens, and its blind spot.** The brief's gate sits
+  after extraction and before assembly; the chat gate closes every turn after
+  generation — prose streams live for latency, while provenance is enforced at
+  the server boundary and the completed reply is screened at the message
+  boundary. The layer guarantees *provenance* (a real source for every claim),
+  not perfect *interpretation* (a model can still summarize a cited fact
+  clumsily). Mitigations: the source is one click from every claim; the eval
+  suite measures faithfulness against ground truth. The end-to-end trace, with
+  file-and-line pointers and the enforced-vs-advisory boundary stated
+  explicitly, is `docs/VERIFICATION.md`.
 
 ## 5. The agent's surface (traced to users)
 
@@ -228,8 +241,9 @@ user need, not technical interest:
   shaped ask gets the reframe — record facts cited, engine/guideline output
   attributed in the same sentence, questions worth weighing. Enforced at three
   layers: prompt hard rule, a deterministic prescriptiveness lint on every
-  reply (surfaced and counted like citation failures), and published evals
-  (`docs/prompt-guide.md`).
+  reply — advisory by design: flags are logged for the engineering team and
+  counted on the wire, never redacted in front of the physician — and
+  published evals (`docs/prompt-guide.md`).
 - **Contradiction surfacing** → UC-3; **medication-risk computation** → UC-4;
   **interval guidance** → UC-5; **imaging toggle** → UC-6; **patient goals** →
   UC-7.
@@ -241,7 +255,10 @@ user need, not technical interest:
 
 ## 6. Models & latency
 
-Two tiers, a consequence of the design rather than a preference:
+One budget-tuned tier on both surfaces today (Haiku 4.5; the failed
+whole-corpus Sonnet mega-call and the per-document redesign are logged in
+`docs/execution/DECISIONS.md`), env-tunable per surface
+(`ANTHROPIC_MODEL_PREP` / `ANTHROPIC_MODEL_CHAT`) as corpus size grows:
 
 | Surface | Model | Latency target | Why achievable |
 |---|---|---|---|
@@ -249,18 +266,22 @@ Two tiers, a consequence of the design rather than a preference:
 | Scan toggle | — (pre-fetched) | < 1 s | Images pre-selected during prep |
 | Chat, first token | Haiku 4.5 | < 2 s | Small prepared input; streams |
 | Chat, full answer | Haiku 4.5 | < 10 s | Nothing searched/re-read in hot path |
-| Preparation / patient | Sonnet 5 | ≤ ~5 min | Hidden inside the 5–20 min gap |
+| Preparation / patient | Haiku 4.5 (per-document) | ≤ ~5 min | Hidden inside the 5–20 min gap |
 
 ## 7. Observability
 
 Every request carries a **correlation ID** from the doctor's click through
 every tool call, model call, and record access — so "what did the agent do, in
 what order, how long did each step take, what did it cost" reconstructs from
-logs alone (the PDF's four required questions). A self-hosted **Langfuse**
-dashboard (traces never leave the boundary) tracks requests, errors, p50/p95
-latency per surface, tool-call and retry counts, verification pass/fail rate,
-and token spend, with three alerts (p95 latency, error rate, tool-failure
-rate). `/health` and `/ready` are separate; `/ready` actually checks OpenEMR,
+logs alone (the PDF's four required questions). A **Langfuse** dashboard
+tracks requests, errors, p50/p95 latency per surface, tool-call and retry
+counts, verification pass/fail rate, and token spend, with three alerts —
+tiles, thresholds, and on-call responses are single-sourced in
+`docs/execution/observability.md`, and the whole operational surface reviews
+on one page at `docs/execution/ops-status.html` (index: `docs/OPERATIONS.md`).
+Traces render in Langfuse Cloud during the synthetic-data demo; the committed
+pilot posture is the self-hosted deploy, so traces never leave the boundary
+(activation: `docs/RUNBOOK.md` §C). `/health` and `/ready` are separate; `/ready` actually checks OpenEMR,
 the model provider, and Langfuse are reachable. OpenEMR's native `api_log`
 gives a second, overlapping audit trail.
 
