@@ -433,9 +433,10 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
   payload, citation v2.
 - [x] `docs/w2/migration-notes.md` (or section in W2_ARCHITECTURE.md) records
   every schema change from Week 1 (citation v2 is the first entry).
-- [ ] Data-authority table (in W2_ARCHITECTURE.md §data-model): per data type —
+- [x] Data-authority table (in W2_ARCHITECTURE.md §data-model): per data type —
   owner system, writers, readers, overwrite policy. Idempotent re-processing
   is wipe-and-rewrite by deterministic ID, never silent accretion.
+  *(§10 as verified; overwrite policy = deterministic ids + wipe-and-rewrite.)*
 
 ### G2 — SLOs, timeouts, retries, circuit breakers
 - [x] SLOs stated (locked): ingestion p95 ≤ 90 s/doc; retrieval p95 ≤ 2.5 s
@@ -570,10 +571,12 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
   grounding → offline hybrid retrieval → critic → cited answer, keyless.)*
 
 ### G18 — Data model, privacy audit, backup/recovery
-- [ ] Data-model doc (W2_ARCHITECTURE.md): for each W2 artifact — extracted
+- [x] Data-model doc (W2_ARCHITECTURE.md): for each W2 artifact — extracted
   lab observations, intake facts, guideline chunks, citation records —
   defined owner (authoritative system), lineage (where it came from), access
   control (who reads/writes), validation rules.
+  *(§10 verified against code 2026-07-13; the native-vitals row carries an
+  honest TARGET annotation — seam shipped, server wiring pending.)*
 - [ ] Privacy audit: traces, logs, eval datasets, and cost reports contain
   **no patient identifiers, no raw document text, no extracted clinical
   values**; scrubbing approach documented; **verified in CI with a

@@ -82,14 +82,18 @@ there is no geometry to ground (every field lands honestly `unverified`).
 
 ### Week 1 regression check (shared read path)
 
-The W1 floor (p95 **46 ms @10 / 193 ms @50**, 2026-07-10) guards the
-deterministic read path. This branch's evidence that it holds:
-`git log main..HEAD -- sidecar/src/routes/overview.ts sidecar/src/store/`
-is **empty** — the measured handlers and the store are byte-identical to the
-measured commit; Week 2 additions are new routes beside them. This sandbox has
-no Postgres/docker daemon to re-boot a store-backed sidecar, so the floor was
-not re-measured here — re-measuring is one command (below) on any store-backed
-machine and SHOULD be run against the Railway deploy after the next release.
+The W1 floor (p95 **46 ms @10 / 193 ms @50**, 2026-07-10, Railway) guards the
+deterministic read path. Two pieces of evidence it holds on this branch:
+
+1. **Byte-identical code**: `git log main..HEAD -- sidecar/src/routes/overview.ts
+   sidecar/src/store/` is empty — the measured handlers and store are unchanged;
+   Week 2 additions are new routes beside them.
+2. **Re-measured locally (2026-07-13)**: the branch sidecar booted against a
+   scratch Postgres 16 (seeded, migrations at boot) and re-ran the SAME
+   harness — **0% errors, p95 18 ms @10 / 92 ms @50** (local hardware, so
+   absolute numbers beat Railway's network path as expected; the claim is the
+   shape: zero errors, same-order latency, comfortably under the floor).
+   Re-run against the Railway deploy after the next release for like-for-like.
 
 ## Reproducing (Week 2)
 

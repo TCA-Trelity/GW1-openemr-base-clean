@@ -187,7 +187,7 @@
 // Update in the SAME PR as the code it describes (anti-drift rule #3).
 // ============================================================================
 const DATA = {
-  stamp: "updated 2026-07-13 · session 3 (F.1+F.2 done — backup runbook, demo script, README remain)",
+  stamp: "updated 2026-07-13 · session 3 (backup rehearsal EXECUTED + W1 floor re-measured live — demo script + README remain)",
   budget: { capPerDay: "$5.00", spentToday: "—", note: "SpendGuard unchanged (locked #16); Cohere rides a ledger line at B.4" },
   w1Floor: "24/24 W1 evals passing · read-path p95 46 ms @10 / 193 ms @50 (regression floor)",
 
@@ -256,7 +256,7 @@ const DATA = {
         { id: "F.1", t: "W2 baselines measured (stub backends, honesty-labeled) + W1 floor git-evidenced", reqs: ["G11"], deps: "E wave", s: "done" },
         { id: "F.2", t: "D7 cost & latency report: COSTS.md §6 — unit costs, Dan-volume projections, bottlenecks, $0 W2 spend", reqs: ["D7","R7"], deps: "F.1", s: "done" },
         { id: "F.3", t: "README restructure: W1 vs W2 + no-guessing setup", reqs: ["D1"], deps: "E.*", s: "pending" },
-        { id: "F.4", t: "Backup/recovery runbook + RPO/RTO", reqs: ["G18"], deps: "—", s: "pending" },
+        { id: "F.4", t: "Backup & recovery RUNBOOK §E + EXECUTED restore rehearsal + §10 authority verify", reqs: ["G18","G1"], deps: "—", s: "done" },
         { id: "F.5", t: "Demo video (3–5 min, six spec items)", reqs: ["D6"], deps: "E.*, D.7", s: "pending" },
         { id: "F.6", t: "Pre-milestone live eval run + live smoke", reqs: ["S5"], deps: "D.2", s: "pending" },
         { id: "F.7", t: "Anti-drift sweep: every checkbox verified or re-scoped", reqs: ["G1"], deps: "all", s: "pending" },
@@ -309,7 +309,7 @@ const DATA = {
       { id: "D8", t: "Deployed app, W2 flow public", plan: "F.8", done: 0, total: 1, s: "pending" },
     ]},
     { name: "Engineering (graded, non-optional)", rows: [
-      { id: "G1", t: "Typed contracts everywhere · migration notes · explicit data authority", plan: "A.2, F.7 (+table shipped in W2_ARCHITECTURE §10)", done: 2, total: 3, s: "active" },
+      { id: "G1", t: "Typed contracts everywhere · migration notes · explicit data authority", plan: "A.2, F.7 (+table shipped in W2_ARCHITECTURE §10)", done: 3, total: 3, s: "done" },
       { id: "G2", t: "SLOs · timeouts + retries on all egress · circuit behavior", plan: "A.4, B.4, E.9", done: 1, total: 3, s: "active" },
       { id: "G3", t: "Raw VLM output never bypasses validation", plan: "A.4", done: 0, total: 1, s: "pending" },
       { id: "G4", t: "Correlation ID through every W2 boundary; trace from ID alone", plan: "C.5", done: 1, total: 2, s: "active" },
@@ -326,7 +326,7 @@ const DATA = {
       { id: "G15", t: "Alerts A4–A6 with response actions", plan: "E.4", done: 1, total: 1, s: "active" },
       { id: "G16", t: "Sidecar OpenAPI 3.0 committed + contract-tested + fresh", plan: "E.7", done: 1, total: 1, s: "done" },
       { id: "G17", t: "Integration tests: fixtures + stubs, no live APIs in CI", plan: "D.3", done: 1, total: 1, s: "done" },
-      { id: "G18", t: "Data model/lineage (shipped §10) · PHI audit in CI · backup/recovery + RPO/RTO", plan: "B.5, D.5, F.4", done: 2, total: 3, s: "active" },
+      { id: "G18", t: "Data model/lineage (shipped §10) · PHI audit in CI · backup/recovery + RPO/RTO", plan: "B.5, D.5, F.4", done: 3, total: 3, s: "done" },
     ]},
   ],
 

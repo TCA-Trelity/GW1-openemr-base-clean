@@ -347,7 +347,7 @@ canary check (REQ: G18).
   reachability) — joining the existing OpenEMR/Anthropic/Langfuse/Postgres
   probes.
 
-## 10. Data model, authority, lineage (REQ: G1, G18) — [TARGET]
+## 10. Data model, authority, lineage (REQ: G1, G18) — [SHIPPED: authority table + wipe-and-rewrite overwrite policy, verified against code 2026-07-13 · TARGET: native vitals write (vitalsWriter seam exists, not yet wired in server.ts — the table row is annotated)]
 
 | Artifact | Authoritative owner | Writers | Readers | Lineage | Validation |
 |---|---|---|---|---|---|
@@ -418,7 +418,7 @@ are unchanged; see `ARCHITECTURE.md` §9.)
   the synthetic demo environment; Langfuse Cloud sees synthetic-demo traces
   with the self-hosted posture documented for pilot.
 
-## 14. Backup & recovery (REQ: G18) — [TARGET]
+## 14. Backup & recovery (REQ: G18) — [SHIPPED: RUNBOOK §E — procedures + executed dump→drop→restore rehearsal (2026-07-13, counts verified, live reads post-restore) · TARGET: Railway scheduled-backup toggle (user click)]
 
 - **Postures by store:** OpenEMR (documents + vitals) is the system of record —
   its existing DB/documents backup guidance applies (deploy runbook). The fact
