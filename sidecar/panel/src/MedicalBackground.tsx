@@ -203,6 +203,18 @@ export function factSummary(fact: PatientFact): { primary: string; secondary: st
             return { primary: fact.content.statement, secondary: [fact.content.onset ?? ''].filter((part) => part !== '') };
         case 'patient_goal':
             return { primary: fact.content.goal, secondary: [] };
+        case 'lab_result': {
+            const c = fact.content;
+            return {
+                primary: [c.test_name, c.value, c.unit ?? ''].filter((part) => part !== '').join(' '),
+                secondary: [
+                    c.abnormal_flag != null && c.abnormal_flag !== 'normal' ? `Flag: ${c.abnormal_flag.toUpperCase()}` : '',
+                    c.reference_range != null ? `Ref: ${c.reference_range}` : '',
+                    c.collection_date != null ? `Collected ${formatDate(c.collection_date)}` : '',
+                    c.performing_lab != null ? c.performing_lab : '',
+                ].filter((part) => part !== ''),
+            };
+        }
     }
 }
 

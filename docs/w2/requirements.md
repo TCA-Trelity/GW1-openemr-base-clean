@@ -57,24 +57,24 @@ requires password-grant token + `user/document.write` scope (sidecar does
 **not** register that scope today — `sidecar/src/openemr/auth.ts`).
 
 **Acceptance criteria:**
-- [ ] Sidecar endpoint `POST /api/patients/:patientId/documents` (multipart)
+- [x] Sidecar endpoint `POST /api/patients/:patientId/documents` (multipart)
   accepts `doc_type ∈ {lab_pdf, intake_form}` for PDF/PNG/JPEG; returns `202`
   with `{ingestion_id, correlation_id}`; rejects other types/oversize with a
   structured 4xx.
 - [ ] Equivalent chat/graph tool `attach_and_extract(patient_id, file_path,
   doc_type)` wraps the same service path (name preserved from spec).
-- [ ] Original file is stored in OpenEMR Documents under a per-doc-type
+- [x] Original file is stored in OpenEMR Documents under a per-doc-type
   category, associated to the correct patient (`documents.foreign_id = pid`),
   before extraction begins. OpenEMR remains the system of record for the file.
-- [ ] Idempotency: re-uploading byte-identical content creates **no** second
+- [x] Idempotency: re-uploading byte-identical content creates **no** second
   OpenEMR document row and no duplicate facts (caller-side sha3-512 check —
   OpenEMR stores the hash but does not enforce uniqueness; sidecar
   `source_documents.id` derived deterministically from content hash,
   wipe-and-rewrite on re-process per `ehrSync.ts` pattern).
-- [ ] Extraction returns JSON that parses under the strict Zod schema for its
+- [x] Extraction returns JSON that parses under the strict Zod schema for its
   doc type (R2); non-conforming output is rejected and retried, never persisted
   (G3).
-- [ ] Every derived fact row carries `source_document_id` + citation back to
+- [x] Every derived fact row carries `source_document_id` + citation back to
   the stored document (no untraceable records); ingestion status queryable
   (`GET /api/ingestions/:id`) and fully reconstructable by correlation ID (G4).
 - [ ] Persistence split (locked decision): source PDF → OpenEMR Documents;
@@ -154,18 +154,18 @@ code). Postgres fact store exists; pgvector availability on Railway Postgres
   embeddings) run in parallel → reciprocal-rank fusion. If pgvector is
   unavailable on Railway, in-process cosine over the same interface (corpus is
   10²–10³ chunks) — the retriever interface hides the backend.
-- [ ] Rerank: Cohere Rerank on fused candidates (locked decision — the vendor
+- [x] Rerank: Cohere Rerank on fused candidates (locked decision — the vendor
   the spec names); only top-k (k ≤ 5) chunks reach the answer model.
-- [ ] Evidence snippets returned with full source metadata (doc, section,
+- [x] Evidence snippets returned with full source metadata (doc, section,
   chunk_id, quote) — consumable as `guideline_evidence` citations (R5).
-- [ ] PHI boundary: retrieval queries constructed from de-identified clinical
+- [x] PHI boundary: retrieval queries constructed from de-identified clinical
   concepts only; deterministic scrubber in code + CI check (extends
   `no_phi_in_logs` to queries); corpus contains zero PHI by construction.
-- [ ] Timeouts + bounded retry on Cohere calls; on retrieval failure the
+- [x] Timeouts + bounded retry on Cohere calls; on retrieval failure the
   answer path degrades to "record-only, guidelines unreachable" — stated, not
   silent (G2, failure-mode F3).
-- [ ] E5 (committed): query rewriting + disease/laterality metadata filters.
-- [ ] ColQwen2 / multi-vector: **not built** (stretch per spec); index schema
+- [x] E5 (committed): query rewriting + disease/laterality metadata filters.
+- [x] ColQwen2 / multi-vector: **not built** (stretch per spec); index schema
   leaves a seam (embeddings in their own table keyed by source id).
 
 ### S3/R4 — Supervisor plus two workers
@@ -229,7 +229,7 @@ page/bbox variant, no PDF preview overlay.
   citation of the minimum spec shape — enforced by the existing deterministic
   gate (unverified citations withheld server-side), extended to the two new
   source classes (document-extraction facts, guideline chunks).
-- [ ] Geometric grounding: extracted values are located in OCR word-box
+- [x] Geometric grounding: extracted values are located in OCR word-box
   geometry → tight bbox; page-level fallback (VLM page citation) → page-region
   highlight; unlocatable → fact renders **unverified and is never citable**.
   Three visibly distinct UI outcomes.
@@ -264,7 +264,7 @@ no baseline/%-regression math; RELEASE.md promotion gate omits evals.
   ~10 retrieval/grounding, ~8 citation integrity, ~7 refusal + missing-data,
   ~5 PHI/safety. The 3 idle corpora (`james-whitfield`, `patricia-okafor`,
   `robert-alvarez`) get wired in.
-- [ ] Rubric categories (booleans, no 1–10 scores): `schema_valid`,
+- [x] Rubric categories (booleans, no 1–10 scores): `schema_valid`,
   `citation_present`, `factually_consistent`, `safe_refusal`,
   `no_phi_in_logs`, plus `retrieval_grounded`. Judge configuration committed
   (deterministic checks preferred; any LLM-judge is boolean-rubric with
@@ -396,7 +396,7 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
   is wipe-and-rewrite by deterministic ID, never silent accretion.
 
 ### G2 — SLOs, timeouts, retries, circuit breakers
-- [ ] SLOs stated (locked): ingestion p95 ≤ 90 s/doc; retrieval p95 ≤ 2.5 s
+- [x] SLOs stated (locked): ingestion p95 ≤ 90 s/doc; retrieval p95 ≤ 2.5 s
   incl. rerank; evidence turns ≤ 5 s streamed; fast-path chat < 2 s first
   token + ≤ 0.4 s router. Measured against baselines (G11).
 - [ ] Every outbound LLM/VLM/embed/rerank/FHIR call has an explicit timeout +

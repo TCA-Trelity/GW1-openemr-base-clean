@@ -72,7 +72,7 @@ both scopes still hold:
   can be called a graph, its nodes wrap services that already exist, and the
   fast path pays only a bounded ~200–400 ms routing decision (REQ: S3/R4).
 
-## 3. Document ingestion flow (REQ: S1/R1, R2, G3) — [TARGET · shipped so far: extraction schemas (A.1), OpenEMR dedupe-upload client + document scopes (0.2), fixture set incl. degraded scans (A.7)]
+## 3. Document ingestion flow (REQ: S1/R1, R2, G3) — [SHIPPED: upload route + attach_and_extract service, VLM extractor w/ feedback retry, geometric grounding on real fixtures, fact persistence w/ page_bbox citations, patient-mismatch block, dedupe idempotency, renal→HCQ re-tier · TARGET: chat tool wrapper (C), live EHR write + vitals row (deploy), evidence pinning (C.6), brief refresh]
 
 ```
 panel upload (front-desk role)                    chat/graph tool
@@ -173,7 +173,7 @@ child spans of the supervisor span; extraction/retrieval sub-calls are children
 of their worker spans. One correlation ID reconstructs the full multi-agent
 trace — the spec's test, verbatim.
 
-## 5. Hybrid RAG design (REQ: S2/R3, E5) — [TARGET · shipped so far: structure-aware chunker + chunk contract (B.2), Cohere/backend config (0.4), pgvector verify script (0.1)]
+## 5. Hybrid RAG design (REQ: S2/R3, E5) — [SHIPPED: hybrid BM25+dense → RRF → Cohere rerank behind injectable backends, PHI query scrubber + CI canary, disease-tag filters, /api/evidence/search, retrieval goldens · TARGET: pgvector/tsvector backends at deploy (0.1), answer-model wiring (Wave C)]
 
 **Corpus (locked decisions #3, #6).** 6–10 short authored **practice-protocol
 documents** — "agreed clinical practices the office follows" — each grounded

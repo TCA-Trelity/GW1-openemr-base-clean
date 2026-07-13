@@ -23,6 +23,7 @@ const SUITE_ORDER = [
     'multi-turn-conversation',
     'prescriptiveness',
     'imaging-cohesion',
+    'retrieval-grounded',
 ];
 
 export interface ReportSummary {

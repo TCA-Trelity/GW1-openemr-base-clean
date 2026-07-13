@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-13T17:38:35.323Z",
+  "generated_at": "2026-07-13T18:24:15.406Z",
   "commit": "local",
   "categories": {
     "citation_present": {
@@ -19,6 +19,18 @@
       "passed": 6,
       "rate": 1,
       "threshold": 1
+    },
+    "no_phi_in_logs": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1,
+      "threshold": 1
+    },
+    "retrieval_grounded": {
+      "total": 2,
+      "passed": 2,
+      "rate": 1,
+      "threshold": 0.9
     }
   }
 }

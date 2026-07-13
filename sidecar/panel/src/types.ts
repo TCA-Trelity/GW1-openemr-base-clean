@@ -76,6 +76,7 @@ export const FACT_TYPES = [
     'family_history',
     'patient_goal',
     'chief_complaint',
+    'lab_result',
 ] as const;
 export type FactType = (typeof FACT_TYPES)[number];
 
@@ -206,7 +207,20 @@ export type PatientFact = FactBase &
         | { fact_type: 'family_history'; content: FamilyHistoryContent }
         | { fact_type: 'patient_goal'; content: PatientGoalContent }
         | { fact_type: 'chief_complaint'; content: ChiefComplaintContent }
+        | { fact_type: 'lab_result'; content: LabResultContent }
     );
+
+// Week 2 (A.6): extracted lab value — mirrors schemas/facts.ts LabResultContentSchema.
+export interface LabResultContent {
+    test_name: string;
+    value: string;
+    value_numeric: number | null;
+    unit: string | null;
+    reference_range: string | null;
+    abnormal_flag: 'normal' | 'low' | 'high' | 'critical_low' | 'critical_high' | 'abnormal' | null;
+    collection_date: string | null;
+    performing_lab: string | null;
+}
 
 // ---- Contradictions (schemas/contradictions.ts, runtime projection) ----
 

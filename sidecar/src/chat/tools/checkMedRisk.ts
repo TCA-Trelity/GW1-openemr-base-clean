@@ -3,8 +3,8 @@
 // produced by computeMedicationRiskFlags (carrying its own guideline `source`), never
 // fabricated — so no source-text provenance. A name matching no medication -> { error }.
 import { z } from 'zod';
-import { computeMedicationRiskFlags, type MedicationInput } from '../../engines/index.js';
-import { MedicationContentSchema } from '../../schemas/index.js';
+import { calculateMedicationDurationYears, computeMedicationRiskFlags, type MedicationInput, type MedRiskClinicalContext } from '../../engines/index.js';
+import { LabResultContentSchema, MedicationContentSchema } from '../../schemas/index.js';
 import type { FactBundle } from '../../store/index.js';
 import { defineTool } from './types.js';
 
@@ -19,7 +19,7 @@ const RiskFlagSchema = z.object({
     recommendation: z.string(),
     source: z.string(),
     details: z
-        .object({ duration_years: z.number(), cumulative_dose_grams: z.number(), daily_dose_mg: z.number() })
+        .object({ duration_years: z.number(), cumulative_dose_grams: z.number(), daily_dose_mg: z.number(), egfr: z.number().optional() })
         .optional(),
     relevance_boost: z.number().optional(),
 });
@@ -48,8 +48,41 @@ function medicationInputsOf(bundle: FactBundle, nameFilter: string | undefined):
         if (filterLower !== undefined && !parsed.data.name.toLowerCase().includes(filterLower)) {
             return [];
         }
-        return [{ content: { name: parsed.data.name, dose: parsed.data.dose } }];
+        // Week 2 (A.6): bridge start_date -> the duration string the engine reads, so the
+        // cumulative-dose tiers actually fire from chart facts (they carry start_date).
+        const med: MedicationInput = { content: { name: parsed.data.name, dose: parsed.data.dose } };
+        if (parsed.data.start_date != null && parsed.data.start_date !== '') {
+            const years = calculateMedicationDurationYears({ start_date: parsed.data.start_date }, new Date());
+            if (years !== null && years > 0 && med.content !== undefined) {
+                med.content.duration = `${years} years`;
+            }
+        }
+        return [med];
     });
+}
+
+// Week 2 (A.6): most recent extracted eGFR feeds the engine's renal escalation — the
+// uploaded renal panel re-tiers HCQ risk through this exact path (the hero arc, UC-4).
+export function renalContextOf(bundle: FactBundle): MedRiskClinicalContext {
+    let best: { egfr: number; collected_date: string | null } | undefined;
+    for (const fact of bundle.facts) {
+        if (fact.fact_type !== 'lab_result') {
+            continue;
+        }
+        const parsed = LabResultContentSchema.safeParse(fact.content);
+        if (!parsed.success || !/egfr/i.test(parsed.data.test_name)) {
+            continue;
+        }
+        const value = parsed.data.value_numeric ?? Number.parseFloat(parsed.data.value);
+        if (!Number.isFinite(value)) {
+            continue;
+        }
+        const collected = parsed.data.collection_date;
+        if (best === undefined || (collected ?? '') > (best.collected_date ?? '')) {
+            best = { egfr: value, collected_date: collected };
+        }
+    }
+    return best === undefined ? {} : { renal: best };
 }
 
 export const checkMedRisk = defineTool<Input, Output>({
@@ -74,7 +107,7 @@ export const checkMedRisk = defineTool<Input, Output>({
         return {
             medication_filter: input.medication_name ?? null,
             medications_checked: medications.length,
-            flags: computeMedicationRiskFlags(medications),
+            flags: computeMedicationRiskFlags(medications, {}, renalContextOf(bundle)),
             derived: true,
         };
     },

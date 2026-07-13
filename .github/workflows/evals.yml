@@ -9,6 +9,14 @@ on:
     paths:
       - 'sidecar/**'
       - '.github/workflows/evals.yml'
+  # Week 2 (D.4, REQ S4/R6): the eval suite gates pull requests. Deterministic (stubbed
+  # fixtures, no live keys), so this check is fast, free, and never flaky — mark it as a
+  # REQUIRED status check on main (branch protection; see RELEASE.md promotion gate).
+  pull_request:
+    paths:
+      - 'sidecar/**'
+      - 'docs/execution/eval-results.md'
+      - '.github/workflows/evals.yml'
   workflow_dispatch:
 
 permissions:

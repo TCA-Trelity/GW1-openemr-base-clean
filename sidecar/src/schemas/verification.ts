@@ -21,6 +21,9 @@ export const PHYSICIAN_VERIFICATION_REQUIRED = [
     'clinical_finding',
     'imaging_finding',
     'procedure_history',
+    // Week 2 (A.6): extracted lab values are clinical data — physician-verified,
+    // same tier as the findings they inform (ARCHITECTURE.md §3 role model).
+    'lab_result',
 ] as const satisfies readonly FactType[];
 
 // The prototype's role keys (permissions.jsx ROLES table).

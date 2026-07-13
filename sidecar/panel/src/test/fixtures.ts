@@ -146,6 +146,7 @@ const emptyFacts: Record<FactType, PatientFact[]> = {
     family_history: [],
     patient_goal: [],
     chief_complaint: [],
+    lab_result: [],
 };
 
 const base = { patient_id: 'margaret-chen', is_current: true, created_date: '2024-12-26T09:53:00Z' };

@@ -67,6 +67,12 @@ const EnvSchema = z.object({
     // OAuth site under /oauth2/<site>/ (OpenEMR default is 'default'); shapes the SMART issuer,
     // JWKS, and introspection URLs the resource-server verifier uses.
     OPENEMR_OAUTH_SITE: z.string().min(1).default('default').catch(orWarn('default', 'OPENEMR_OAUTH_SITE')),
+    // Week 2 (Wave A.3): the standard-API password-grant user for document writes — the
+    // FHIR facade has no document/observation create, so uploads ride a user-role token
+    // (see openemr/auth.ts STANDARD_API_SEED_SCOPES). Both must be set to enable EHR
+    // document storage; absent -> ingestion stores sidecar-side only and says so.
+    OPENEMR_API_USERNAME: z.string().min(1).optional().catch(orWarn(undefined, 'OPENEMR_API_USERNAME')),
+    OPENEMR_API_PASSWORD: z.string().min(1).optional().catch(orWarn(undefined, 'OPENEMR_API_PASSWORD')),
     // ---- Week 2 (Wave 0.4) ----
     // Cohere powers the guideline-corpus dense embeddings + rerank (REQ S2/R3; the one
     // new vendor, the one the spec names). The corpus is public text and retrieval
