@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What's Changed This Week?</title>
+<style>
+  :root {
+    --bg: #faf9f6;
+    --ink: #23272f;
+    --muted: #5b6370;
+    --accent: #0b6e6e;
+    --accent-soft: #e3f0ee;
+    --card: #ffffff;
+    --line: #e4e1da;
+    --stop: #a52833;
+    --stop-bg: #faeceb;
+    --stop-line: #e8c8c8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15181d;
+      --ink: #e7e5e0;
+      --muted: #9aa2ad;
+      --accent: #57c4b8;
+      --accent-soft: #1c2b2a;
+      --card: #1c2026;
+      --line: #2b303a;
+      --stop: #f2a1a1;
+      --stop-bg: #2a1d1e;
+      --stop-line: #4a3234;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 3rem 1.25rem 2rem;
+  }
+  .kicker {
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin: 0 0 0.5rem;
+  }
+  h1 {
+    font-size: 2.1rem;
+    line-height: 1.2;
+    margin: 0 0 0.75rem;
+    letter-spacing: -0.01em;
+  }
+  .lede {
+    font-size: 1.1rem;
+    color: var(--muted);
+    margin: 0 0 2rem;
+  }
+  nav.toc {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 2.5rem;
+  }
+  nav.toc p {
+    margin: 0 0 0.4rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+  }
+  nav.toc ol {
+    margin: 0;
+    padding-left: 1.4rem;
+    columns: 2;
+    column-gap: 2rem;
+    font-size: 0.95rem;
+  }
+  @media (max-width: 560px) { nav.toc ol { columns: 1; } }
+  nav.toc li { margin: 0.2rem 0; break-inside: avoid; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  section { margin-bottom: 2.75rem; }
+  h2 {
+    font-size: 1.35rem;
+    line-height: 1.3;
+    margin: 0 0 0.75rem;
+    padding-top: 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  h2 .num {
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    margin-right: 0.4rem;
+  }
+  p { margin: 0 0 1rem; }
+  ul, ol.steps { margin: 0 0 1rem; padding-left: 1.4rem; }
+  li { margin-bottom: 0.5rem; }
+  strong { font-weight: 650; }
+  .callout {
+    background: var(--accent-soft);
+    border-left: 4px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    padding: 0.85rem 1.1rem;
+    margin: 1.25rem 0;
+    font-size: 1.02rem;
+  }
+  .callout p { margin: 0; }
+  dl { margin: 0 0 1rem; }
+  dt { font-weight: 650; margin-top: 0.9rem; }
+  dd { margin: 0.15rem 0 0 0; padding-left: 0; }
+
+  /* ---- Flow diagram ---- */
+  .flow {
+    margin: 1.5rem auto;
+    max-width: 540px;
+  }
+  .flow-title {
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 1rem;
+  }
+  .step {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+  }
+  .step .t {
+    font-weight: 650;
+    font-size: 0.98rem;
+  }
+  .step .t .n {
+    display: inline-block;
+    background: var(--accent);
+    color: var(--bg);
+    border-radius: 50%;
+    width: 1.4rem; height: 1.4rem;
+    line-height: 1.4rem;
+    text-align: center;
+    font-size: 0.78rem;
+    margin-right: 0.5rem;
+  }
+  .step .d {
+    font-size: 0.88rem;
+    color: var(--muted);
+    margin-top: 0.15rem;
+  }
+  .arrow {
+    text-align: center;
+    color: var(--accent);
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 0.35rem 0;
+  }
+  .guard {
+    background: var(--stop-bg);
+    border: 1px dashed var(--stop-line);
+    color: var(--stop);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    padding: 0.45rem 0.8rem;
+    margin: 0.45rem 0 0 2.4rem;
+  }
+  .guard::before { content: "⛔ "; }
+
+  footer {
+    border-top: 1px solid var(--line);
+    margin-top: 3rem;
+    padding-top: 1.25rem;
+    font-size: 0.88rem;
+    color: var(--muted);
+  }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.88em;
+    background: var(--accent-soft);
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+  }
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <p class="kicker">Clinical Co-Pilot · Week 2</p>
+  <h1>What's Changed This Week?</h1>
+  <p class="lede">A plain-language guide to the Week 2 work: teaching the
+  assistant to read paper, look things up in the practice's own protocols,
+  and prove — automatically — that it hasn't gotten worse.</p>
+</header>
+
+<nav class="toc">
+  <p>Contents</p>
+  <ol>
+    <li><a href="#goals">Our goals this week</a></li>
+    <li><a href="#approach">Our architectural approach</a></li>
+    <li><a href="#data">The data structures</a></li>
+    <li><a href="#upload">When a document is uploaded</a></li>
+    <li><a href="#library">Filling the "library"</a></li>
+    <li><a href="#query">How it's queried</a></li>
+    <li><a href="#answers">How answers come out</a></li>
+    <li><a href="#controls">The controls on the output</a></li>
+    <li><a href="#closing">Where it stands</a></li>
+  </ol>
+</nav>
+
+<section id="goals">
+  <h2><span class="num">1.</span>Our goals this week</h2>
+  <p>Week 1 gave Dan — the retina surgeon this project is built around — an
+  assistant that reads his medical-records system and answers questions about
+  a patient, with every claim linked back to the chart. That worked, but only
+  for information already typed into the system as structured data.</p>
+  <p>Real clinics don't run on tidy data. The scenario this week's assignment
+  starts from: the physician is prepping for a follow-up visit. The chart
+  looks unchanged — but the important news is buried in a scanned lab PDF and
+  a paper intake form the front desk uploaded. The physician's question is
+  simple: <em>what changed, what should I pay attention to, and what evidence
+  supports the recommendation?</em></p>
+  <p>Week 2 makes the assistant able to answer that, with two new abilities:</p>
+  <ul>
+    <li><strong>It can read paper.</strong> A scanned outside lab report or an
+    intake form can now be uploaded, read, and turned into usable, checkable
+    facts.</li>
+    <li><strong>It can consult the practice's own rulebook.</strong> Questions
+    like "what do <em>our</em> protocols say about this drug at this kidney
+    function?" are answered from the practice's written protocols — with the
+    exact passage quoted.</li>
+  </ul>
+  <p>And because an assistant that quietly gets worse is dangerous, the third
+  deliverable is proof: an automated test gate that blocks any code change
+  that would degrade quality or safety. The governing rule is unchanged from
+  Week 1: <em>the system may be unavailable; it may never be silently
+  wrong.</em></p>
+</section>
+
+<section id="approach">
+  <h2><span class="num">2.</span>Our architectural approach</h2>
+  <p>The medical-records system itself (OpenEMR — the practice's permanent
+  system of record) is untouched. Everything new lives in a small separate
+  service running beside it, called a <strong>sidecar</strong> — think of an
+  annex built next to the records room, connected by a door. If the annex has
+  a bad day, the records room is unaffected.</p>
+  <p>Inside the sidecar, this week's work is organized like a small team
+  rather than one giant brain:</p>
+  <ul>
+    <li>A <strong>supervisor</strong> looks at each request and makes one
+    routing decision: plain chart question, "check the protocols" question,
+    or "read this document" job.</li>
+    <li>Two <strong>specialist workers</strong> do the work: the
+    <em>intake-extractor</em> reads uploaded documents; the
+    <em>evidence-retriever</em> finds the relevant protocol passages.</li>
+    <li>A <strong>critic</strong> — an automated fact-checker — re-verifies
+    every citation before anything reaches the user.</li>
+  </ul>
+  <p>Every handoff between them is logged under a shared tracking number, so
+  a reviewer can reconstruct exactly who did what for any single answer.</p>
+  <p>Why this shape? In a clinical setting, small and inspectable beats big
+  and clever: one do-everything AI is impossible to audit, while three narrow
+  roles with logged handoffs can each be tested and watched. The assignment
+  itself says the best versions "feel narrower than the original spec and
+  stronger because of it."</p>
+</section>
+
+<section id="data">
+  <h2><span class="num">3.</span>The data structures</h2>
+  <p>Five kinds of information, each with a deliberate home:</p>
+  <dl>
+    <dt>The source document</dt>
+    <dd>The actual uploaded PDF or image, filed into the medical-records
+    system itself — the permanent, authoritative artifact, exactly as
+    received. The assistant keeps pointers to it, never a substitute for
+    it.</dd>
+    <dt>Extracted facts</dt>
+    <dd>What the AI read out of the document — each lab value, medication, or
+    allergy stored as a typed, structured value (a number is a number, a date
+    is a date), each carrying a citation back to the exact spot on the exact
+    page it came from.</dd>
+    <dt>The guideline corpus</dt>
+    <dd>Eight short authored documents in the project repository — seven
+    clinical practice protocols (screening schedules, dosing thresholds,
+    treatment rules, each citing the named real-world guideline it is grounded
+    in) plus the practice's intake-documentation standard. Ordinary text files
+    anyone can read, versioned like code.</dd>
+    <dt>The vector index</dt>
+    <dd>Each protocol passage gets an <strong>embedding</strong> — a numerical
+    fingerprint of what the passage <em>means</em>, so the system can find
+    passages by meaning rather than by matching words. New this week: these
+    fingerprints are stored permanently in the database, so a restart reuses
+    all 71 of them instead of recomputing anything.</dd>
+    <dt>The answer records</dt>
+    <dd>Every pre-visit brief and every chat answer is stored in full, with
+    its citations, so any answer can be audited later against its sources.</dd>
+  </dl>
+  <div class="callout"><p><strong>The key principle:</strong> nothing is ever
+  marked "true." Everything is marked "supported by <em>this document</em>, at
+  <em>this location</em>." The system stores evidence and pointers, not
+  beliefs.</p></div>
+</section>
+
+<section id="upload">
+  <h2><span class="num">4.</span>What happens when a document is uploaded</h2>
+  <p>When the front desk uploads, say, an outside kidney-function panel, it
+  moves through a fixed series of checkpoints:</p>
+
+  <div class="flow">
+    <p class="flow-title">The upload pipeline</p>
+    <div class="step"><div class="t"><span class="n">1</span>Received</div>
+      <div class="d">Uploading is a chart write, so it requires a signed-in,
+      accountable clinical role.</div></div>
+    <div class="arrow">▼</div>
+    <div class="step"><div class="t"><span class="n">2</span>Stored in the medical record</div>
+      <div class="d">The original file goes into OpenEMR first — before any AI
+      touches it.</div></div>
+    <div class="arrow">▼</div>
+    <div class="step"><div class="t"><span class="n">3</span>Read into a strict form</div>
+      <div class="d">A vision-capable AI reads the scan; its output must fit a
+      rigid, typed form.</div></div>
+    <div class="guard">Doesn't fit the form (after one corrected retry)?
+      The upload is marked failed and <strong>nothing is saved</strong>.</div>
+    <div class="arrow">▼</div>
+    <div class="step"><div class="t"><span class="n">4</span>Every value located on the page</div>
+      <div class="d">Non-AI code pins each value to its exact box, or its page
+      — or honestly flags it "unverified."</div></div>
+    <div class="guard">Unverified values stay visible but can
+      <strong>never be cited</strong> in an answer.</div>
+    <div class="arrow">▼</div>
+    <div class="step"><div class="t"><span class="n">5</span>Patient check</div>
+      <div class="d">The patient printed on the document is compared to the
+      chart it's being attached to.</div></div>
+    <div class="guard">Mismatch? <strong>Everything is blocked.</strong></div>
+    <div class="arrow">▼</div>
+    <div class="step"><div class="t"><span class="n">6</span>Facts saved</div>
+      <div class="d">Typed values persist, each with its citation and a
+      confidence score.</div></div>
+    <div class="arrow">▼</div>
+    <div class="step"><div class="t"><span class="n">7</span>Safety flags update</div>
+      <div class="d">The new kidney number automatically re-tiers the
+      medication-safety flag.</div></div>
+  </div>
+
+  <p>Step 7 is the payoff in our demo case: the extracted eGFR (a standard
+  measure of kidney function) automatically re-tiers the patient's safety flag
+  for hydroxychloroquine — a long-term medication whose risk of damaging the
+  retina rises as kidney function falls — through the same rule-based safety
+  engine built in Week 1. The paper changed the clinical answer, and the lab
+  value behind it is cited.</p>
+  <p>One boundary worth stating: information that already lives in the records
+  system as structured data skips all of this. It still takes the Week 1 path
+  — read directly, no document processing.</p>
+</section>
+
+<section id="library">
+  <h2><span class="num">5.</span>How information goes into the "library"</h2>
+  <p>The protocol side works like building a small reference library. (The
+  technique's jargon name is <strong>RAG</strong> — retrieval-augmented
+  generation — which just means "look it up before you answer.")</p>
+  <p>Each protocol document is split into passages, carefully, so every rule
+  stays attached to its conditions: a dose threshold is never separated from
+  the population it applies to, and each passage keeps its section heading.
+  Split a rulebook carelessly and "reduce the dose" drifts away from "…in
+  patients with kidney impairment" — exactly the error a clinic can't
+  afford.</p>
+  <p>Each passage then gets its meaning-fingerprint (embedding) computed once
+  and stored in the database. If a protocol is later edited, only the changed
+  passages are re-processed; everything else is reused, and the whole index
+  can be rebuilt from the repository's text files with one command.</p>
+  <p>One deliberate absence: <strong>patient documents never go into this
+  library.</strong> Meaning-similarity answers "which passage is
+  <em>about</em> this topic?" — a fine question for protocols, a dangerous one
+  for patient data, where the bar is the <em>exact</em> value from the
+  <em>right</em> lab report, with a citation. A "similar" lab row is a safety
+  bug, not a convenience. Patient facts stay in their own structured store and
+  are always retrieved exactly.</p>
+</section>
+
+<section id="query">
+  <h2><span class="num">6.</span>How it's queried</h2>
+  <p>When a chat question sounds like a protocol question ("what screening
+  interval do our protocols recommend…?"), the supervisor hands it to the
+  evidence-retriever, which does four things:</p>
+  <ol class="steps">
+    <li><strong>Scrubs the question.</strong> Anything identifying — names,
+    dates of birth, record numbers — is stripped by plain rule-following code
+    (not an AI) before the question leaves the system. Only de-identified clinical concepts
+    (drug, dose range, disease stage) go out.</li>
+    <li><strong>Searches two ways at once.</strong> An exact-keyword search
+    (strong on drug names and precise terms) runs alongside a
+    meaning-similarity search over the fingerprints (strong when the question
+    is phrased differently from the document). Clinical language needs both —
+    the same drug appears as "Plaquenil" and "hydroxychloroquine."</li>
+    <li><strong>Merges the two result lists</strong> with a standard
+    rank-combining formula.</li>
+    <li><strong>Re-ranks with a specialist.</strong> A dedicated re-ranking
+    service (from Cohere, an AI company whose model does exactly this one job)
+    reads the merged candidates against the question and puts the genuinely
+    relevant passages on top.</li>
+  </ol>
+  <p>Only the top few passages — five at most — reach the answering AI. And
+  the whole protocol-checking turn runs inside a strict time budget: if the
+  library is unreachable, the assistant says so and answers from the record
+  only, rather than stalling or pretending.</p>
+</section>
+
+<section id="answers">
+  <h2><span class="num">7.</span>How answers come out</h2>
+  <p>The answering AI works under open-book-exam rules: it may use
+  <em>only</em> the passages it was handed, and every claim must quote its
+  source word-for-word, with machine-readable pointers to the document,
+  section, and passage.</p>
+  <p>Before the user sees anything, the critic replays the exam. It compares
+  each quoted snippet — character by character — against the stored original.
+  A claim whose quote doesn't match, or that carries no citation at all, is
+  withheld on the server; it never renders.</p>
+  <p>And when the library simply has nothing on a topic, the honest answer
+  ships: <strong>"No practice protocol on file covers this question."</strong>
+  The assistant never falls back on its general training to invent a
+  plausible-sounding protocol — an invented protocol delivered confidently
+  would be the worst failure a tool like this can have.</p>
+</section>
+
+<section id="controls">
+  <h2><span class="num">8.</span>The controls on the output</h2>
+  <p>No single safeguard is trusted to be perfect, so they are layered:</p>
+  <ul>
+    <li><strong>Strict forms.</strong> Nothing malformed is ever saved —
+    extraction output fits the pre-defined form or is discarded entirely.</li>
+    <li><strong>Location grounding.</strong> Every extracted value is pinned
+    to its spot in the document or visibly marked unverified — and unverified
+    is unusable in answers.</li>
+    <li><strong>The patient-mismatch block.</strong> A document whose printed
+    patient doesn't match the chart goes nowhere.</li>
+    <li><strong>The critic's quote check.</strong> Every citation re-verified
+    word-for-word against the stored original before display.</li>
+    <li><strong>Honesty by default.</strong> "No protocol on file" when the
+    library is empty on a topic; a refusal — offering the protocol-grounded
+    alternative — when asked to skip the safety checks ("just tell me a dose
+    to prescribe").</li>
+    <li><strong>The automated test gate.</strong> 58 recorded test cases
+    across six pass/fail categories run automatically on every proposed code
+    change. Safety categories (refusing unsafe requests, citations present,
+    no patient data in logs) block a change on even one newly failing case;
+    quality categories block on any meaningful drop. We rehearsed the gate by
+    deliberately injecting three faults — a broken form field, a dropped
+    citation, a planted identifier in a log line. It caught all three.</li>
+    <li><strong>A spending cap.</strong> AI usage is metered against a hard
+    $5-per-day budget — the system stops spending rather than running up a
+    bill.</li>
+    <li><strong>Privacy rules with teeth.</strong> Logs and monitoring traces
+    carry IDs and counts — never patient names, never document text,
+    never clinical values. An automated check scans for leaks on every code
+    change.</li>
+  </ul>
+</section>
+
+<section id="closing">
+  <h2><span class="num">9.</span>Where it stands</h2>
+  <p>Everything described above is live on the deployed demo: upload a lab
+  PDF and watch the checkpoints advance, click a value to see it highlighted
+  on the scanned page, ask the protocol question, and read the cited answer.
+  Every patient, chart, and document in the system is synthetic — no real
+  patient information appears anywhere.</p>
+</section>
+
+<footer>
+  <p>Part of the Clinical Co-Pilot Week 2 submission — see
+  <code>W2_ARCHITECTURE.md</code> for the engineering-level version.
+  Synthetic data only.</p>
+</footer>
+
+</main>
+</body>
+</html>
