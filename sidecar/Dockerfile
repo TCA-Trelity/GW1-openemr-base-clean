@@ -21,9 +21,12 @@ ENV NODE_ENV=production
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY package.json ./
-# Runtime data resolved relative to dist/: SQL migrations, seed corpus, built panel.
+# Runtime data resolved relative to dist/: SQL migrations, seed data, the guideline
+# corpus (buildEvidenceDeps returns undefined without it — retriever_index reports
+# not_configured and evidence turns silently fall back to Week 1), and the built panel.
 COPY migrations ./migrations
 COPY seed ./seed
+COPY corpus ./corpus
 COPY --from=panel /panel/dist ./panel/dist
 EXPOSE 8080
 CMD ["node", "dist/server.js"]
