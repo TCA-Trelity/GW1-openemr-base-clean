@@ -388,7 +388,7 @@ const DATA = {
     { id: "A", title: "Wave A — Ingestion spine", band: "Band 1 · MVP · ∥ with B", tickets: [
         { id: "A.1", t: "LabPdfExtraction + IntakeFormExtraction Zod schemas + validation tests", reqs: ["R2","D3","G3"], deps: "—", s: "done" },
         { id: "A.2", t: "Citation contract v2 (guideline_evidence, page_bbox) + migration note", reqs: ["R5","G1"], deps: "—", s: "done" },
-        { id: "A.3", t: "Upload endpoint + OpenEMR document write + dedupe + attach_and_extract; token mint confirmed live — end-to-end upload round-trip = test plan A1/A2", reqs: ["S1/R1","G1"], deps: "0.2", s: "active" },
+        { id: "A.3", t: "Upload endpoint + OpenEMR document write + dedupe + attach_and_extract; FIXED 07-14: document routes take numeric pid — a uuid was silently filed to patient 0 (invisible in the chart despite POST 200); client now resolves uuid→pid via GET /api/patient/:puuid. End-to-end round-trip = test plan A1/A2", reqs: ["S1/R1","G1"], deps: "0.2", s: "active" },
         { id: "A.4", t: "Extraction job: Claude vision → Zod parse → retry → ingestion states", reqs: ["S1/R1","G3","G2"], deps: "A.1, A.3", s: "done" },
         { id: "A.5", t: "Geometric grounding: word-box bbox / page fallback / unverified (tested on real fixtures)", reqs: ["R5","P2"], deps: "A.2, A.4", s: "done" },
         { id: "A.6", t: "Persistence: facts + provenance + renal→HCQ re-tier shipped; OPEN: native vitals route (seam built, not wired — G1's open box)", reqs: ["S1/R1","G1"], deps: "A.4", s: "active" },

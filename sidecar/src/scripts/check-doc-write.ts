@@ -66,12 +66,35 @@ if (testPid === undefined) {
 }
 
 const headers = { authorization: `Bearer ${tokenBody['access_token']}` };
-const get = await fetch(`${base}/apis/default/api/patient/${testPid}/document?path=${encodeURIComponent('Lab Report')}`, { headers });
+
+// The document routes take the NUMERIC pid — a raw uuid is silently filed to patient 0
+// (Document.class.php:93-103 reassigns any non-numeric id to 0 and still returns 200),
+// which is exactly how an earlier probe.pdf vanished into no patient's chart. Resolve a
+// uuid to the numeric pid first, the same way the sidecar client now does internally.
+let pid = testPid;
+if (!/^[1-9]\d*$/.test(pid)) {
+    const patientResponse = await fetch(`${base}/apis/default/api/patient/${encodeURIComponent(pid)}`, { headers });
+    const patientBody = (await patientResponse.json().catch(() => ({}))) as Record<string, unknown>;
+    const dataRaw = patientBody['data'];
+    const record = typeof dataRaw === 'object' && dataRaw !== null ? (dataRaw as Record<string, unknown>) : undefined;
+    const resolved = String(record?.['pid'] ?? '');
+    if (!patientResponse.ok || !/^[1-9]\d*$/.test(resolved)) {
+        console.error(
+            `\ncould not resolve patient uuid → numeric pid (GET /api/patient/:puuid → ${patientResponse.status}). ` +
+                'Aborting the probes rather than writing a document that OpenEMR would file to patient 0.',
+        );
+        process.exit(1);
+    }
+    console.log(`\nresolved patient uuid → numeric pid ${resolved} (document routes take the numeric pid; a raw uuid files to patient 0)`);
+    pid = resolved;
+}
+
+const get = await fetch(`${base}/apis/default/api/patient/${pid}/document?path=${encodeURIComponent('Lab Report')}`, { headers });
 console.log(`\ndocument READ  (GET  …/document?path=Lab Report): ${get.status}${get.ok ? ' — ACL patients/docs read OK' : ` — ${JSON.stringify(await get.json().catch(() => ({})))}`}`);
 
 const form = new FormData();
 form.set('document', new Blob([new TextEncoder().encode('%PDF-1.4 probe')], { type: 'application/pdf' }), 'probe.pdf');
-const post = await fetch(`${base}/apis/default/api/patient/${testPid}/document?path=${encodeURIComponent('Lab Report')}`, {
+const post = await fetch(`${base}/apis/default/api/patient/${pid}/document?path=${encodeURIComponent('Lab Report')}`, {
     method: 'POST',
     headers,
     body: form,
