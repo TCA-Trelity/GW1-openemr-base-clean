@@ -108,7 +108,7 @@
   A <code>null</code> is <b>expected</b>, not a failed key drop: the variables sit staged on Railway and take
   effect on the post-merge redeploy. Verifies that DO work pre-merge: item 3's <code>langfuse</code> flip + prep
   trace, item 6's dev-login, item 2's laptop <code>verify:pgvector</code> run (your clone is on the W2 branch).
-  <br>Reported done so far: <b>0</b> + <b>7</b> (2026-07-13), <b>5</b> — all four sub-steps, and <b>1</b> — Cohere key staged, <code>null</code> verify accepted as the expected pre-merge result (2026-07-14).
+  <br>Reported done so far: <b>0</b> + <b>7</b> (2026-07-13); <b>5</b>, <b>1</b>, <b>3</b>, <b>6</b> (2026-07-14). Open: <b>2</b> (laptop run works today), <b>4</b> (skip while single-service), <b>8</b> (last). Then PR #9's merge flips every deferred verify live.
 </div>
 
 <main id="items"></main>
@@ -180,7 +180,7 @@ OPENEMR_BASE_URL='https://gw1-openemr-base-clean-production.up.railway.app' npx 
 <p>No jq? <code>curl -s …/ready | python3 -m json.tool | grep -A2 '"reranker"'</code>. Expect <code>not_configured → ok</code>. Deploy logs show <code>dense: 'hash-offline' → 'cohere'</code>. One live search returns the rerank flag:</p>
 <pre><button class="copy">copy</button><code>curl -s -X POST https://enchanting-mercy-production-5d32.up.railway.app/api/evidence/search -H 'content-type: application/json' -d '{"q":"hydroxychloroquine screening interval"}' | grep -o '"rerank_applied":[a-z]*'</code></pre></div>`},
 
-{ id:'a3', order:'do 5th', title:'3 · Langfuse — committed observability posture', sub:'R7, 0.3 — prep traces + the W2 graph spans', body:`
+{ id:'a3', order:'do 5th', title:'3 · Langfuse — committed observability posture', sub:'✅ done 2026-07-14 — Cloud keys live, verified on today’s deploy; graph spans join post-merge (R7, 0.3)', body:`
 <p><b>Get the keys:</b> <a href="https://cloud.langfuse.com" target="_blank" rel="noopener">cloud.langfuse.com</a> → sign up → create an <b>Organization</b>, then a <b>Project</b> → <b>Project Settings → API Keys → Create new API keys</b>. The dialog shows three values — copy all three <b>exactly as displayed, including the host</b> (region-dependent: <code>https://cloud.langfuse.com</code> EU, <code>https://us.cloud.langfuse.com</code> US).</p>
 <h4>Variables — SIDECAR service (all three or tracing stays off by design)</h4>
 <table><tr><th>Variable</th><th>Value</th></tr>
@@ -189,7 +189,7 @@ OPENEMR_BASE_URL='https://gw1-openemr-base-clean-production.up.railway.app' npx 
 <tr><td><code>LANGFUSE_SECRET_KEY</code></td><td><code>sk-lf-…</code></td></tr></table>
 <div class="verify"><b>Verify:</b> <code>/ready → .dependencies.langfuse</code> flips to <code>ok</code>. Trigger one prep (panel: Margaret Chen → AI Insights → prepare) → a <code>prep</code> trace whose id equals the response's <code>x-correlation-id</code>; one evidence chat turn adds a <code>graph</code> trace with <code>supervisor→…</code> spans. Walkthrough: <a href="../RUNBOOK.md">RUNBOOK</a> §C.</div>`},
 
-{ id:'a6', order:'do 6th', title:'6 · Dev-login secret — write-path demo auth', sub:'E.3/E.8 — uploads require a minted bearer in every mode', body:`
+{ id:'a6', order:'do 6th', title:'6 · Dev-login secret — write-path demo auth', sub:'✅ done 2026-07-14 — verified on today’s deploy (E.3/E.8)', body:`
 <pre><button class="copy">copy</button><code>openssl rand -hex 24</code></pre>
 <p>Set the output as <code>DEV_LOGIN_SECRET</code> on the <b>sidecar</b> service (any ≥16 random chars).</p>
 <div class="verify"><b>Verify:</b>

@@ -328,18 +328,22 @@ proves the gate catches injected regressions (`docs/w2/gate-rehearsal.md`);
 
 **Status:** ⚠️ partial. Correlation IDs end-to-end; pino structured logs;
 Postgres `llm_calls` ledger (per-call tokens + est. cost) + `SpendGuard`
-$5/day budget + `GET /api/usage`; `prep_runs` stage tracking. Langfuse client
-exists, wired into prep only, **not deployed** ("pending G2" in
-`docs/execution/observability.md`); no OTEL/LangSmith.
+$5/day budget + `GET /api/usage`; `prep_runs` stage tracking. Langfuse
+**activated** (Cloud, user key-drop 2026-07-14): prep traces flow on the
+deployed service; the W2 graph-span adapter (E.4) is shipped code that joins
+when PR #9's build deploys. LangSmith fenced to the demo env (E.5); no OTEL.
 
 **Acceptance criteria:**
 - [ ] Per encounter, reconstructable from one correlation ID: tool/worker
   sequence, latency by step, token usage, cost estimate, retrieval hits
   (query-hash, chunk_ids, scores — never patient text), extraction confidence
   (per document and per field), eval outcome where applicable.
-- [ ] Langfuse activated (locked: Cloud for the synthetic-data demo,
+- [x] Langfuse activated (locked: Cloud for the synthetic-data demo,
   self-hosted documented as pilot posture); spans extended beyond prep to
   supervisor → workers → retrieval/extraction sub-calls (G13 hierarchy).
+  *(Activated 2026-07-14: Cloud keys live on the sidecar service, prep
+  trace verified. The supervisor→worker span hierarchy is shipped code
+  (E.4) — its visual check completes when PR #9's build deploys.)*
 - [x] LangSmith enabled **only** in the demo environment (locked), documented
   as a demo-env overlay with synthetic data — never the committed production
   posture (P5 guard).

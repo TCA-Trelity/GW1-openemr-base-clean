@@ -23,7 +23,9 @@ land — nothing below blocks a merge. Each item: exact names → where to click
 | 7 | Branch protection | ✅ done (2026-07-13) — `Run eval suite` REQUIRED on `main` |
 | 5 | OpenEMR document-write | ✅ all four sub-steps done (2026-07-14) — deployed verify pending PR #9 merge (see below) |
 | 1 | Cohere | ✅ key staged on the sidecar service (2026-07-14) — `reranker` verify returned `null` as expected pre-merge; re-verify post-merge |
-| 3 · 6 · 2 · 4 · 8 | — | open |
+| 3 | Langfuse | ✅ done (2026-07-14) — Cloud keys live, verified against today's deploy; graph spans join post-merge |
+| 6 | Dev-login secret | ✅ done (2026-07-14) — verified against today's deploy |
+| 2 · 4 · 8 | — | open |
 
 > ⚠️ **Deploy sequencing — read before running any `/ready` verify.** Railway
 > deploys `main`, and until **PR #9 merges** (then Railway auto-redeploys) the
@@ -133,7 +135,7 @@ your laptop clone, which is on the W2 branch). The `/ready` half is post-merge:
 deployed. Record the script's outcome in `W2_ARCHITECTURE.md` §15 (the 0.1
 acceptance).
 
-## 3. Langfuse (committed observability posture — R7, 0.3)
+## 3. Langfuse (committed observability posture — R7, 0.3) — ✅ DONE (user, 2026-07-14)
 
 **Get the keys:** cloud.langfuse.com → sign up / sign in → create an
 **Organization**, then a **Project** (any name; synthetic-data demo posture) →
@@ -231,7 +233,7 @@ Then upload once via the panel Sources tab (or Bruno `06-documents`) and
 confirm the document appears in the OpenEMR chart (Patient → Documents); the
 ingestion record shows `openemr_document_id` set.
 
-## 6. Dev-login secret (write-path demo auth — E.3/E.8, RUNBOOK §D)
+## 6. Dev-login secret (write-path demo auth — E.3/E.8, RUNBOOK §D) — ✅ DONE (user, 2026-07-14)
 
 Generate locally, then set on the **sidecar** service:
 ```bash
