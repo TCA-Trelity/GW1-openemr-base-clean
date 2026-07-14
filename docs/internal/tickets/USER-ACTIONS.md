@@ -22,7 +22,8 @@ land — nothing below blocks a merge. Each item: exact names → where to click
 | 0 | Laptop setup | ✅ done (2026-07-13) |
 | 7 | Branch protection | ✅ done (2026-07-13) — `Run eval suite` REQUIRED on `main` |
 | 5 | OpenEMR document-write | ✅ all four sub-steps done (2026-07-14) — deployed verify pending PR #9 merge (see below) |
-| 1 · 3 · 6 · 2 · 4 · 8 | — | open |
+| 1 | Cohere | ✅ key staged on the sidecar service (2026-07-14) — `reranker` verify returned `null` as expected pre-merge; re-verify post-merge |
+| 3 · 6 · 2 · 4 · 8 | — | open |
 
 > ⚠️ **Deploy sequencing — read before running any `/ready` verify.** Railway
 > deploys `main`, and until **PR #9 merges** (then Railway auto-redeploys) the
@@ -72,7 +73,7 @@ value → repeat as needed → Railway stages the changes and shows an
 **Apply/Deploy** banner — click it and watch the Deployments tab go green
 (variable changes only take effect after that redeploy).
 
-## 1. Cohere (live dense embeddings + rerank — S2/R3)
+## 1. Cohere (live dense embeddings + rerank — S2/R3) — ✅ DONE (user, 2026-07-14; key staged, verify post-merge)
 
 **Get the key:** dashboard.cohere.com → sign in → **API Keys** (left nav). A
 free **Trial key** exists by default — copy it (trial is rate-limited but fine
