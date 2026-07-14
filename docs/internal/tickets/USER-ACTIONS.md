@@ -15,6 +15,26 @@ land — nothing below blocks a merge. Each item: exact names → where to click
 
 **Order that unblocks the most, first: 0 → 7 → 5 → 1 → 3 → 6 → 2 → 4 → 8.**
 
+**Progress (recorded as you report it):**
+
+| # | Item | State |
+|---|---|---|
+| 0 | Laptop setup | ✅ done (2026-07-13) |
+| 7 | Branch protection | ✅ done (2026-07-13) — `Run eval suite` REQUIRED on `main` |
+| 5 | OpenEMR document-write | ✅ all four sub-steps done (2026-07-14) — deployed verify pending PR #9 merge (see below) |
+| 1 · 3 · 6 · 2 · 4 · 8 | — | open |
+
+> ⚠️ **Deploy sequencing — read before running any `/ready` verify.** Railway
+> deploys `main`, and until **PR #9 merges** (then Railway auto-redeploys) the
+> deployed sidecar is **Week 1 code**: the W2 probes (`document_storage`,
+> `retriever_index`, `reranker`) are absent from `/ready` — `jq` prints
+> `null` — and the W2 routes (`/api/documents` upload, `/api/evidence/search`)
+> 404. **A `null` there is expected and does NOT mean your key drop failed**;
+> the variables sit staged on Railway and take effect on the post-merge
+> redeploy. Verifies that DO work pre-merge: item 3's `langfuse` flip +
+> prep trace, item 6's dev-login, and item 2's laptop `verify:pgvector` run
+> (it runs from your clone, which is checked out on the W2 branch).
+
 ---
 
 ## 0. One-time laptop setup (prerequisite for items 2 and 5)
@@ -67,7 +87,8 @@ for demo volume). While you're there, note the pricing/tier numbers for
 | `COHERE_EMBED_MODEL` | do not set (defaults to `embed-english-v3.0`) |
 | `COHERE_RERANK_MODEL` | do not set (defaults to `rerank-english-v3.0`) |
 
-**Verify (after the redeploy goes green):**
+**Verify (post-merge only — the `reranker` probe and the evidence-search
+route ship with PR #9; on the deployed `main` build they return `null`/404):**
 ```bash
 curl -s https://enchanting-mercy-production-5d32.up.railway.app/ready | jq '.dependencies.reranker'
 # no jq? use:  curl -s .../ready | python3 -m json.tool | grep -A2 '"reranker"'
@@ -105,8 +126,11 @@ The script prints exactly one outcome:
 | `NOT AVAILABLE` (exit 1) | set `RETRIEVER_DENSE_BACKEND=memory` on the **sidecar** service (in-process cosine, fully supported at this corpus size) |
 | `NO DATABASE` (exit 2) | the URL was wrong (likely the internal one) — recopy the public URL and rerun |
 
-**Verify:** `/ready` → `.dependencies.retriever_index.status` is `ok` after the
-redeploy; record the outcome in `W2_ARCHITECTURE.md` §15 (the 0.1 acceptance).
+**Verify:** the `verify:pgvector` run itself works **today** (it runs from
+your laptop clone, which is on the W2 branch). The `/ready` half is post-merge:
+`.dependencies.retriever_index.status` is `ok` only once PR #9's build is
+deployed. Record the script's outcome in `W2_ARCHITECTURE.md` §15 (the 0.1
+acceptance).
 
 ## 3. Langfuse (committed observability posture — R7, 0.3)
 
@@ -156,7 +180,7 @@ environment posture (synthetic data only)`; one evidence turn → a LangGraph
 run tree under that project at smith.langchain.com. Confirm the production
 service's log still says `LangSmith tracing off — production posture`.
 
-## 5. OpenEMR document-write enablement (S1/R1) — four sub-steps, in order
+## 5. OpenEMR document-write enablement (S1/R1) — four sub-steps, in order — ✅ DONE (user, 2026-07-14)
 
 The sidecar stores uploaded PDFs in OpenEMR via a **password-grant user
 token**. OAuth grants are **intersected with the client's registered scopes**,
@@ -195,11 +219,13 @@ old one):
 | `OPENEMR_API_USERNAME` | an OpenEMR **user** with patients/docs access — `admin` works for the demo |
 | `OPENEMR_API_PASSWORD` | that user's password (`pass` on the demo EHR) |
 
-**Verify:**
+**Verify (post-merge only — see the sequencing box up top):**
 ```bash
 curl -s https://enchanting-mercy-production-5d32.up.railway.app/ready | jq '.dependencies.document_storage'
 # not_configured → ok   (proves a live token mint against the new client)
 ```
+`null` today is expected: the `document_storage` probe ships with PR #9, so
+the deployed `main` build has no such key. Re-run after merge + redeploy.
 Then upload once via the panel Sources tab (or Bruno `06-documents`) and
 confirm the document appears in the OpenEMR chart (Patient → Documents); the
 ingestion record shows `openemr_document_id` set.

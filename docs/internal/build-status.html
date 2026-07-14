@@ -191,7 +191,7 @@
 // Update in the SAME PR as the code it describes (anti-drift rule #3).
 // ============================================================================
 const DATA = {
-  stamp: "updated 2026-07-13 · session 4 (user actions 0+7 done: eval gate is a REQUIRED check on main — S4/R6 closed)",
+  stamp: "updated 2026-07-14 · session 4 (user action 5 done: OpenEMR doc-write creds live on Railway; deployed /ready verifies await PR #9 merge)",
   budget: { capPerDay: "$5.00", spentToday: "—", note: "SpendGuard unchanged (locked #16); Cohere rides a ledger line at B.4" },
   w1Floor: "24/24 W1 evals passing · read-path p95 46 ms @10 / 193 ms @50 (regression floor)",
 
@@ -206,7 +206,7 @@ const DATA = {
       ]},
     { id: "0", title: "Wave 0 — Preflight", band: "Band 1 · MVP", tickets: [
         { id: "0.1", t: "Verify pgvector on Railway Postgres — script + fallback flag shipped; live run needs DATABASE_URL", reqs: ["S2/R3"], deps: "deploy env", s: "active" },
-        { id: "0.2", t: "document.write scope + dedupe upload client shipped (mocked tests); live re-register + POST pending", reqs: ["S1/R1","G7"], deps: "deploy env", s: "active" },
+        { id: "0.2", t: "document.write scope + upload client shipped; OAuth re-registered + 4 creds on Railway (user, 2026-07-14); live POST awaits PR #9 merge→redeploy", reqs: ["S1/R1","G7"], deps: "PR #9 merge", s: "active" },
         { id: "0.3", t: "Activate Langfuse (Cloud, synthetic demo posture)", reqs: ["R7"], deps: "—", s: "pending" },
         { id: "0.4", t: "Cohere/LangSmith keys in boot-crash-proof config", reqs: ["S2/R3","R7","G2"], deps: "—", s: "done" },
         { id: "0.5", t: "Branch protection FLIPPED: Run eval suite is a required check on main (user, 2026-07-13)", reqs: ["S4/R6","D5"], deps: "—", s: "done" },
