@@ -44,10 +44,13 @@ import { VlmExtractor } from './ingest/extractor.js';
 import { CohereEmbeddings, HashEmbeddings } from './retrieval/embeddings.js';
 import { CohereReranker, PassthroughReranker } from './retrieval/rerank.js';
 import { HybridRetriever, loadCorpusChunks, type RetrievalLogger } from './retrieval/retriever.js';
+import { PgVectorDenseIndex, type DenseIndex, type PgQueryable } from './retrieval/denseIndex.js';
 import { OpenEmrPasswordAuthClient } from './openemr/auth.js';
 import { StandardApiClient } from './openemr/standardApi.js';
 
 export interface AppDeps {
+    /** The fact store's pg pool — shared by the pgvector dense index (B.3-live). */
+    pool: PgQueryable;
     /** Real readiness probe for /ready (SELECT 1 through the pool). */
     checkPostgres: () => Promise<void>;
     /** E.6: proves the OpenEMR write client can mint a token (document storage). */
@@ -221,6 +224,7 @@ export function buildDeps(config: Config): AppDeps | undefined {
                   },
               }
             : {}),
+        pool,
         runMigrations: () => migrate(pool),
         prep: {
             store,
@@ -368,34 +372,113 @@ export function buildServer(config: Config, deps?: AppDeps): FastifyInstance {
 
 /** Week 2 (B.3/B.4): build the guideline retriever. Cohere when keyed; deterministic
  *  offline backends otherwise — retrieval never hard-depends on a vendor being up. */
-export async function buildEvidenceDeps(config: Config, logger?: RetrievalLogger): Promise<EvidenceRouteDeps | undefined> {
+export interface EvidenceBuildOptions {
+    /** Fact-store pool: enables the persisted pgvector dense index (migration 005). */
+    pool?: PgQueryable;
+    /** Idempotent migration runner — invoked before the index sync so first boot works. */
+    runMigrations?: () => Promise<string[]>;
+    /** Ledger sink (R7): Cohere embed/rerank calls recorded as unit-counted llm_calls rows. */
+    onCohereUsage?: (usage: { purpose: 'cohere_embed' | 'cohere_rerank'; model: string; units: number; correlationId: string }) => void;
+}
+
+export async function buildEvidenceDeps(
+    config: Config,
+    logger?: RetrievalLogger,
+    options?: EvidenceBuildOptions,
+): Promise<EvidenceRouteDeps | undefined> {
     const corpusDir = fileURLToPath(new URL('../corpus/', import.meta.url));
     if (!existsSync(corpusDir)) {
         return undefined;
     }
     const chunks = loadCorpusChunks(corpusDir);
+    const onUsage = options?.onCohereUsage;
     const embeddings =
         config.COHERE_API_KEY !== undefined
-            ? new CohereEmbeddings({ apiKey: config.COHERE_API_KEY, model: config.COHERE_EMBED_MODEL })
+            ? new CohereEmbeddings({
+                  apiKey: config.COHERE_API_KEY,
+                  model: config.COHERE_EMBED_MODEL,
+                  ...(onUsage === undefined
+                      ? {}
+                      : {
+                            onUsage: (units: number, correlationId: string) =>
+                                onUsage({ purpose: 'cohere_embed', model: config.COHERE_EMBED_MODEL, units, correlationId }),
+                        }),
+              })
             : new HashEmbeddings();
     const reranker =
         config.COHERE_API_KEY !== undefined
-            ? new CohereReranker({ apiKey: config.COHERE_API_KEY, model: config.COHERE_RERANK_MODEL })
+            ? new CohereReranker({
+                  apiKey: config.COHERE_API_KEY,
+                  model: config.COHERE_RERANK_MODEL,
+                  ...(onUsage === undefined
+                      ? {}
+                      : {
+                            onUsage: (units: number, correlationId: string) =>
+                                onUsage({ purpose: 'cohere_rerank', model: config.COHERE_RERANK_MODEL, units, correlationId }),
+                        }),
+              })
             : new PassthroughReranker();
-    return { retriever: await HybridRetriever.build(chunks, { embeddings, reranker, ...(logger === undefined ? {} : { logger }) }) };
+
+    // B.3-live: RETRIEVER_DENSE_BACKEND finally branches. pgvector engages when a database
+    // is wired AND Cohere is keyed (the table is vector(1024) = embed-english-v3.0 dims);
+    // any failure falls back to the in-memory dense path — loudly, never fatally.
+    let denseIndex: DenseIndex | undefined;
+    if (config.RETRIEVER_DENSE_BACKEND === 'pgvector' && options?.pool !== undefined && config.COHERE_API_KEY !== undefined) {
+        try {
+            await options.runMigrations?.();
+            denseIndex = await PgVectorDenseIndex.sync(options.pool, chunks, embeddings, 'corpus-index-boot', logger);
+        } catch (error) {
+            logger?.info(
+                { backend: 'pgvector', error: error instanceof Error ? error.message : String(error) },
+                'pgvector dense index unavailable — in-memory dense path serves',
+            );
+        }
+    }
+    return {
+        retriever: await HybridRetriever.build(chunks, {
+            embeddings,
+            reranker,
+            ...(logger === undefined ? {} : { logger }),
+            ...(denseIndex === undefined ? {} : { denseIndex }),
+        }),
+    };
 }
 
 // Boot only when executed directly (tests import buildServer instead).
 if (process.argv[1]?.endsWith('server.js') || process.argv[1]?.endsWith('server.ts')) {
     const config = loadConfig();
     const deps = buildDeps(config);
-    // Evidence retriever builds before the server so its routes register at startup;
-    // corpus embedding is a one-time boot cost (seconds, offline-free with HashEmbeddings).
+    // Evidence retriever builds before the server so its routes register at startup.
+    // With pgvector (B.3-live) the boot sync embeds only changed chunks — an unchanged
+    // corpus costs zero Cohere calls; keyless/db-less runs use the in-memory path.
     // Same structured-JSON shape as the app logger so retrieval_hit/miss events (G5)
     // stay one grep away from the pino stream.
-    const evidence = await buildEvidenceDeps(loadConfig(), {
+    const retrievalBootLogger = {
         info: (obj: Record<string, unknown>, msg: string) => console.log(JSON.stringify({ level: 'info', msg, ...obj })),
-    });
+    };
+    const evidence = await buildEvidenceDeps(
+        loadConfig(),
+        retrievalBootLogger,
+        deps === undefined
+            ? undefined
+            : {
+                  pool: deps.pool,
+                  runMigrations: deps.runMigrations,
+                  // R7: Cohere calls ride the same llm_calls ledger as Anthropic calls —
+                  // unit-counted (texts embedded / candidates reranked). est_cost_usd is 0,
+                  // not priced through the Anthropic rate card: per-unit Cohere pricing
+                  // stays a COSTS.md §6.2 verify-at-key-drop cell, never memory-quoted.
+                  onCohereUsage: (usage) => {
+                      void deps.pool
+                          .query(
+                              `INSERT INTO llm_calls (correlation_id, purpose, model, input_tokens, output_tokens, est_cost_usd)
+                               VALUES ($1, $2, $3, $4, 0, 0)`,
+                              [usage.correlationId, usage.purpose, usage.model, usage.units],
+                          )
+                          .catch(() => undefined); // the ledger must never fail retrieval
+                  },
+              },
+    );
     if (deps !== undefined && evidence !== undefined) {
         deps.evidence = evidence;
         // E.9: assemble the chat evidence lane — router tie-break + LLM composer over
@@ -466,7 +549,11 @@ if (process.argv[1]?.endsWith('server.js') || process.argv[1]?.endsWith('server.
             : 'LangSmith tracing off — production posture (Langfuse is the committed backend)',
     );
     app.log.info(
-        { corpusRetriever: evidence !== undefined, dense: config.COHERE_API_KEY !== undefined ? 'cohere' : 'hash-offline' },
+        {
+            corpusRetriever: evidence !== undefined,
+            denseBackend: evidence?.retriever.denseBackend ?? 'off',
+            embeddings: config.COHERE_API_KEY !== undefined ? 'cohere' : 'hash-offline',
+        },
         evidence !== undefined ? 'guideline retriever ready' : 'guideline corpus absent — evidence routes off',
     );
     // Startup signal for EHR sync wiring: the panel's "not configured" state is exactly

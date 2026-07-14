@@ -11,6 +11,7 @@
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { InMemoryDenseIndex, type DenseIndex } from './denseIndex.js';
 import { Bm25Index, tokenize } from './bm25.js';
 import { chunkCorpusDocument, type CorpusChunk } from './chunker.js';
 import type { EmbeddingsProvider } from './embeddings.js';
@@ -64,13 +65,7 @@ export function reciprocalRankFusion(lists: readonly (readonly string[])[], k = 
     return fused;
 }
 
-function cosine(a: readonly number[], b: readonly number[]): number {
-    let dot = 0;
-    for (let i = 0; i < a.length && i < b.length; i += 1) {
-        dot += a[i]! * b[i]!;
-    }
-    return dot; // vectors are normalized at embed time
-}
+// (JS cosine moved to denseIndex.ts with the in-memory backend.)
 
 // Minimum BM25 score for the keyword list AND floor for "did we find anything at all":
 // out-of-domain queries (no term overlap with any protocol) must yield an EMPTY result.
@@ -94,7 +89,7 @@ const COVERAGE_STOPWORDS = new Set([
 export class HybridRetriever {
     private readonly bm25: Bm25Index;
     private readonly byId: Map<string, CorpusChunk>;
-    private dense: { provider: EmbeddingsProvider; vectors: Map<string, number[]> } | undefined;
+    private dense: { provider: EmbeddingsProvider; index: DenseIndex } | undefined;
 
     private constructor(
         private readonly chunks: readonly CorpusChunk[],
@@ -105,13 +100,23 @@ export class HybridRetriever {
         this.byId = new Map(chunks.map((chunk) => [chunk.chunk_id, chunk]));
     }
 
-    /** Build over pre-chunked content; embeds the corpus once when a provider is given. */
+    /** Build over pre-chunked content. With `denseIndex` (pgvector, already synced) the
+     *  boot embed is skipped — the persisted index serves. With only `embeddings`, the
+     *  corpus is embedded once into the in-memory backend (B.3 behavior, CI/keyless path). */
     static async build(
         chunks: readonly CorpusChunk[],
-        options: { embeddings?: EmbeddingsProvider; reranker: Reranker; correlationId?: string; logger?: RetrievalLogger },
+        options: {
+            embeddings?: EmbeddingsProvider;
+            reranker: Reranker;
+            correlationId?: string;
+            logger?: RetrievalLogger;
+            denseIndex?: DenseIndex;
+        },
     ): Promise<HybridRetriever> {
         const retriever = new HybridRetriever(chunks, options.reranker, options.logger);
-        if (options.embeddings !== undefined) {
+        if (options.embeddings !== undefined && options.denseIndex !== undefined) {
+            retriever.dense = { provider: options.embeddings, index: options.denseIndex };
+        } else if (options.embeddings !== undefined) {
             const vectors = await options.embeddings.embed(
                 chunks.map((chunk) => chunk.text),
                 'search_document',
@@ -119,7 +124,7 @@ export class HybridRetriever {
             );
             retriever.dense = {
                 provider: options.embeddings,
-                vectors: new Map(chunks.map((chunk, index) => [chunk.chunk_id, vectors[index] ?? []])),
+                index: new InMemoryDenseIndex(new Map(chunks.map((chunk, index) => [chunk.chunk_id, vectors[index] ?? []]))),
             };
         }
         return retriever;
@@ -127,6 +132,11 @@ export class HybridRetriever {
 
     get size(): number {
         return this.chunks.length;
+    }
+
+    /** Live dense backend ('pgvector' | 'memory') or undefined when dense is off. */
+    get denseBackend(): string | undefined {
+        return this.dense?.index.backend;
     }
 
     async search(rawQuery: string, options: SearchOptions = {}): Promise<RetrievalResult> {
@@ -138,15 +148,15 @@ export class HybridRetriever {
         const keywordHits = this.bm25.search(query, CANDIDATE_POOL).filter((hit) => hit.score >= KEYWORD_FLOOR);
         const lists: string[][] = [keywordHits.map((hit) => hit.id)];
 
-        // Dense leg — only when a provider was configured at build time.
+        // Dense leg — only when a provider was configured at build time. The backend
+        // (pgvector SQL scan vs in-memory cosine) is the index's concern, not ours.
         if (this.dense !== undefined) {
             const [queryVector] = await this.dense.provider.embed([query], 'search_query', correlationId);
             if (queryVector !== undefined) {
-                const scored = [...this.dense.vectors.entries()]
-                    .map(([id, vector]) => ({ id, score: cosine(queryVector, vector) }))
-                    .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
-                    .slice(0, CANDIDATE_POOL);
-                lists.push(scored.map((hit) => hit.id));
+                const scored = await this.dense.index.search(queryVector, CANDIDATE_POOL, correlationId);
+                if (scored.length > 0) {
+                    lists.push(scored.map((hit) => hit.id));
+                }
             }
         }
 

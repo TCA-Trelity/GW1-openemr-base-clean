@@ -146,22 +146,31 @@ verification is post-merge. *(Original register-time status: missing
 entirely, pgvector unverified doc claim.)*
 
 **Acceptance criteria:**
-- [ ] Corpus: 6–10 authored practice-protocol markdown docs (locked decision)
+- [x] Corpus: 6–10 authored practice-protocol markdown docs (locked decision)
   grounded in named real guidelines — AAO PPP Diabetic Retinopathy / AMD / RVO,
   AAO hydroxychloroquine-retinopathy screening recommendation, anti-VEGF
   treat-and-extend protocol — committed to the repo (license-clean, zero PHI,
   reproducible per G18), with per-doc metadata `{guideline_source, section,
   recommendation_strength, disease_tags, laterality_applicability, version/date}`.
+  *(Verified under-flip, corrected 2026-07-14: 7 authored docs in
+  `sidecar/corpus/` with full YAML frontmatter — every required metadata
+  field present and enforced by the 25-case corpus-conformance suite.)*
 - [x] Structure-aware chunker keeps thresholds with their conditions
   (dose/interval/staging tables never split from their qualifying text);
   chunks carry stable `chunk_id`.
-- [ ] Hybrid retrieval: Postgres `tsvector` keyword + `pgvector` dense (Cohere
+- [x] Hybrid retrieval: Postgres `tsvector` keyword + `pgvector` dense (Cohere
   embeddings) run in parallel → reciprocal-rank fusion. If pgvector is
   unavailable on Railway, in-process cosine over the same interface (corpus is
   10²–10³ chunks) — the retriever interface hides the backend.
-  *(pgvector verified AVAILABLE on Railway Postgres 2026-07-14 — extension
-  enabled at v0.8.4 by `verify:pgvector`; the box flips when the live
-  backends are exercised post-merge.)*
+  *(Shipped + re-scoped 2026-07-14: dense leg = pgvector-PERSISTED Cohere
+  vectors (`corpus_embeddings`, migration 005) with content-hash sync — an
+  unchanged corpus re-embeds nothing — plus the in-memory fallback proven
+  live against an extensionless Postgres; `RETRIEVER_DENSE_BACKEND` genuinely
+  branches now, and `npm run corpus:index` exists (`--rebuild` wipes first).
+  Keyword leg re-scoped to in-process BM25 — same sparse-retrieval contract
+  the spec asks for, deliberately not tsvector at this corpus size. Live
+  pgvector confirmation post-merge: boot log `denseBackend: "pgvector"` +
+  `corpus_index_synced` counts.)*
 - [x] Rerank: Cohere Rerank on fused candidates (locked decision — the vendor
   the spec names); only top-k (k ≤ 5) chunks reach the answer model.
 - [x] Evidence snippets returned with full source metadata (doc, section,
@@ -362,14 +371,16 @@ when PR #9's build deploys. LangSmith fenced to the demo env (E.5); no OTEL.
   patient identifiers, or extracted clinical values (spec privacy audit
   language — G18); extraction confidence and retrieval scores are logged as
   numbers.
-- [ ] Cost ledger extended: extraction and Cohere calls priced into
+- [x] Cost ledger extended: extraction and Cohere calls priced into
   `llm_calls` (or a parallel ledger line) so D7's dev-spend number is
   ledger-backed; **$5/day SpendGuard unchanged** (locked — alert the user if
   this becomes infeasible).
-  *(Partial: evidence_composition calls ledger-priced (E.9); extraction
-  usage captured in ExtractOutcome and priced in the D7 model (COSTS.md §6);
-  Cohere per-unit pricing rows land at key-drop — the pricing pages 403'd
-  from the build sandbox and are deliberately not memory-quoted.)*
+  *(Closed 2026-07-14: evidence_composition calls ledger-priced (E.9);
+  extraction usage priced in the D7 model (COSTS.md §6); Cohere embed/rerank
+  calls now write unit-counted `llm_calls` rows (`cohere_embed` /
+  `cohere_rerank`) at est_cost 0 — accurate for the trial key in use;
+  production per-unit pricing remains COSTS.md §6.2's verify-at-key-drop
+  cells, deliberately never memory-quoted. SpendGuard cap unchanged.)*
 
 ### S5 — Integrate, deploy, and defend
 

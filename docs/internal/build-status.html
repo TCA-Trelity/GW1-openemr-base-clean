@@ -365,7 +365,7 @@
 // Update in the SAME PR as the code it describes (anti-drift rule #3).
 // ============================================================================
 const DATA = {
-  stamp: "updated 2026-07-14 · session 4 — DEPLOY FULLY GREEN: ready:true, all W2 probes ok (PRs #9/#10/#11 merged; corpus COPY fix; OPENEMR_CLIENT_ID re-sync). Manual test plan in progress; merges to main held until testing done",
+  stamp: "updated 2026-07-14 · session 4 — EXECUTION SWEEP: pgvector dense index now PERSISTED (migration 005 + hash-sync + corpus:index CLI, fallback proven on extensionless pg); Cohere in the ledger; storage/lifecycle matrix in W2_ARCHITECTURE §10; S2/R3 9/9. On branch/PR #12 — merge after manual testing",
   budget: { capPerDay: "$5.00", spentToday: "—", note: "SpendGuard unchanged (locked #16); Cohere rides a ledger line at B.4" },
   w1Floor: "24/24 W1 evals passing · read-path p95 46 ms @10 / 193 ms @50 (regression floor)",
 
@@ -462,11 +462,11 @@ const DATA = {
     { name: "Core (MVP stages + agent requirements)", rows: [
       { id: "S1/R1", t: "Document ingestion & extraction (attach_and_extract, OpenEMR round-trip, no dupes)", plan: "A.3–A.7, E.1", done: 5, total: 7, s: "active" },
       { id: "R2", t: "Strict Zod schemas (lab_pdf 7 fields · intake 6+goals)", plan: "A.1", done: 4, total: 5, s: "active" },
-      { id: "S2/R3", t: "Hybrid RAG + rerank (corpus, pgvector+tsvector, RRF, Cohere, PHI-free queries)", plan: "0.1, 0.4, B.1–B.6", done: 7, total: 9, s: "active" },
+      { id: "S2/R3", t: "Hybrid RAG + rerank — COMPLETE incl. pgvector-PERSISTED dense index (migration 005, content-hash sync, corpus:index CLI, fallback proven); keyword re-scoped to in-process BM25", plan: "0.1, 0.4, B.1–B.6, B.3-live", done: 9, total: 9, s: "done" },
       { id: "S3/R4", t: "Supervisor + intake-extractor + evidence-retriever (LangGraph, logged handoffs)", plan: "C.1–C.6", done: 4, total: 7, s: "active" },
       { id: "R5", t: "Citation contract v2 + required PDF bbox overlay", plan: "A.2, A.5, E.2", done: 4, total: 5, s: "active" },
       { id: "S4/R6", t: "Eval gate COMPLETE: 58 cases, 6 categories baselined, rehearsal proven, required check live", plan: "0.5, D.1–D.7", done: 7, total: 7, s: "done" },
-      { id: "R7", t: "Observability + cost per encounter (PHI-free)", plan: "0.3, E.4, E.5", done: 2, total: 5, s: "active" },
+      { id: "R7", t: "Observability + cost per encounter (PHI-free) — Cohere embed/rerank now unit-counted in llm_calls", plan: "0.3, E.4, E.5", done: 3, total: 5, s: "active" },
       { id: "S5", t: "Integrate, deploy, defend (upload UI, demo auth, traces, UC mapping) — merged to main; deployed-flow + trace boxes close on post-deploy verify", plan: "E.1, E.3, E.9, F.5, F.8", done: 3, total: 5, s: "active" },
     ]},
     { name: "Extensions", rows: [

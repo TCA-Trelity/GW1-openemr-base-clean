@@ -105,11 +105,14 @@ Field notes:
 
 ## The index is derived (rebuildable by script)
 
-These markdown files are the **single source of truth**. The chunk table,
-keyword `tsvector` rows, and `pgvector` (Cohere) embeddings are a **derived
-index**, rebuilt from this directory by the ingest script (ticket B.3,
-`npm run corpus:index`) — wipe-and-rebuild, never hand-edited. If the index is
-lost, re-running the build against this directory reconstructs it exactly. To
+These markdown files are the **single source of truth**. The persisted
+`pgvector` (Cohere) embeddings in `corpus_embeddings` are a **derived index**,
+synced from this directory at boot (content-hashed per chunk — unchanged
+chunks are never re-embedded) and rebuildable on demand with
+`npm run corpus:index` (`--rebuild` wipes first) — never hand-edited. The
+keyword leg is an in-process BM25 index built from the same files at boot. If
+the index is lost, re-running the build against this directory reconstructs
+it exactly. To
 change practice content, edit the markdown here and re-run the build; bump
 `version` / `effective_date` in the frontmatter when a protocol's clinical
 content changes.
