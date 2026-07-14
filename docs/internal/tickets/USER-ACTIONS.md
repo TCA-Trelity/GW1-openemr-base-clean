@@ -27,7 +27,7 @@ land — nothing below blocks a merge. Each item: exact names → where to click
 | 6 | Dev-login secret | ✅ done (2026-07-14) — verified against today's deploy |
 | 2 | pgvector | ✅ done (2026-07-14) — `AVAILABLE (installed now, version 0.8.4)`; `RETRIEVER_DENSE_BACKEND` stays default `pgvector`; recorded in `W2_ARCHITECTURE.md` §5/§15 + board 0.1 |
 | 4 | LangSmith | ⏸ ON HOLD (user, 2026-07-14) — single-service posture; revisit only if a separate demo service appears |
-| 8 | Eval dispatch | open — save for last |
+| 8 | Eval dispatch | ✅ done (user, 2026-07-14) — verified via the Actions API: `workflow_dispatch` on `main` at 11:39 UTC, success, `eval-results` artifact present |
 
 > ⚠️ **Deploy sequencing — read before running any `/ready` verify.** Railway
 > deploys `main`, and until **PR #9 merges** (then Railway auto-redeploys) the
@@ -314,7 +314,7 @@ UI). Field by field:
 **Verify:** open PR #9 → the merge box lists *Run eval suite — Required*. Note
 the flip in `RELEASE.md`'s promotion gate (the 0.5 acceptance).
 
-## 8. Live eval dispatch (pre-milestone sanity — F.6 prerequisite)
+## 8. Live eval dispatch (pre-milestone sanity — F.6 prerequisite) — ✅ DONE (user, 2026-07-14; verified via Actions API)
 
 Once items 1/3/5 are in: GitHub → **Actions** (top tab) → **Sidecar Evals**
 (left sidebar) → **Run workflow** (grey dropdown, right side) → pick branch

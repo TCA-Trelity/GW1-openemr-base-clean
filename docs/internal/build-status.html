@@ -191,7 +191,7 @@
 // Update in the SAME PR as the code it describes (anti-drift rule #3).
 // ============================================================================
 const DATA = {
-  stamp: "updated 2026-07-14 · session 4 (user actions 5+1+3+6+2 done — pgvector AVAILABLE v0.8.4; 4 on hold; only 8 open; W2 /ready verifies await PR #9 merge)",
+  stamp: "updated 2026-07-14 · session 4 (ALL user actions done or on-hold; 8 verified via Actions API; semgrep green'd: XSS rule excluded as Fastify false-positive + TLS line suppressed w/ justification; PR #9 merge = last lever)",
   budget: { capPerDay: "$5.00", spentToday: "—", note: "SpendGuard unchanged (locked #16); Cohere rides a ledger line at B.4" },
   w1Floor: "24/24 W1 evals passing · read-path p95 46 ms @10 / 193 ms @50 (regression floor)",
 
@@ -313,14 +313,14 @@ const DATA = {
       { id: "D8", t: "Deployed app, W2 flow public", plan: "F.8", done: 0, total: 1, s: "pending" },
     ]},
     { name: "Engineering (graded, non-optional)", rows: [
-      { id: "G1", t: "Typed contracts everywhere · migration notes · explicit data authority", plan: "A.2, F.7 (+table shipped in W2_ARCHITECTURE §10)", done: 3, total: 3, s: "done" },
+      { id: "G1", t: "Typed contracts everywhere · migration notes · explicit data authority (open: Zod on the vitals-write payload — route pending)", plan: "A.2, F.7 (+table shipped in W2_ARCHITECTURE §10)", done: 2, total: 3, s: "active" },
       { id: "G2", t: "SLOs · timeouts + retries on all egress · circuit behavior", plan: "A.4, B.4, E.9", done: 1, total: 3, s: "active" },
       { id: "G3", t: "Raw VLM output never bypasses validation", plan: "A.4", done: 0, total: 1, s: "pending" },
       { id: "G4", t: "Correlation ID through every W2 boundary; trace from ID alone", plan: "C.5", done: 1, total: 2, s: "active" },
       { id: "G5", t: "Structured logs: new W2 event types, searchable, PHI-free", plan: "C.5, E.4", done: 0, total: 2, s: "pending" },
       { id: "G6", t: "Dashboard tiles for W2 metrics", plan: "E.4", done: 1, total: 1, s: "active" },
-      { id: "G7", t: "CI: audit + security scan on main PRs · contract tests · Dependabot sidecar", plan: "0.2, C.1, D.4, D.6", done: 3, total: 4, s: "active" },
-      { id: "G8", t: "Testing strategy documented (per-test failure modes)", plan: "P.2 → W2_ARCHITECTURE §11", done: 1, total: 1, s: "done" },
+      { id: "G7", t: "CI: audit + security scan on main PRs (semgrep green'd 2026-07-14) · contract tests · extraction goldens in required gate · Dependabot sidecar", plan: "0.2, C.1, D.4, D.6", done: 4, total: 4, s: "done" },
+      { id: "G8", t: "Testing strategy documented — §11 layer table verified; open on the per-test failure-mode-naming clause", plan: "P.2 → W2_ARCHITECTURE §11", done: 0, total: 1, s: "active" },
       { id: "G9", t: "Failure-mode runbook (identify in logs + recovery)", plan: "P.2 → W2_ARCHITECTURE §12", done: 1, total: 1, s: "done" },
       { id: "G10", t: "Bruno collection covers all W2 workflows", plan: "E.8", done: 1, total: 1, s: "done" },
       { id: "G11", t: "W2 baselines vs W1 (shared-path regression check)", plan: "F.1", done: 1, total: 1, s: "done" },

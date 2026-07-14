@@ -367,16 +367,16 @@ deterministic IDs + wipe-and-rewrite on re-processing (the shipped
 hash dedupe. Schema changes from Week 1 carry migration notes — the first is
 citation v2 (§6).
 
-## 11. Testing strategy (REQ: G8) — [TARGET]
+## 11. Testing strategy (REQ: G8) — [SHIPPED: layer table verified vs the shipped suites 2026-07-14 · TARGET: per-test failure-mode naming (G8's strict clause)]
 
 | Layer | What | Failure mode it guards |
 |---|---|---|
 | Unit | Zod schema validators (R2); grounding matcher (value→word-box); RRF fusion math; gate-math comparator (tiered rules); query scrubber | Malformed VLM output persisted; citation pointing at absent text; regression math drift; PHI in queries |
 | Contract | Supervisor↔worker state schema; OpenAPI-vs-implementation (G16); citation v2 backward compatibility | Graph state drift; spec/implementation divergence; breaking Week 1 clients |
 | Integration (stubbed — G17) | Full upload→extract→ground→persist→pin→answer path on fixture documents with stubbed VLM/LLM/embed/rerank; vitals write against a mocked OpenEMR | End-to-end wiring breaks that unit tests can't see; CI must pass with no live APIs |
-| Golden set (evals) | 50 boolean cases across six categories (§7) | Behavior regressions — the graders' injected regression class |
+| Golden set (evals) | 58 committed boolean cases across six categories (§7) | Behavior regressions — the graders' injected regression class |
 | Live (opt-in, pre-milestone) | `LIVE_EVALS=1` behavioral suite + live smoke on Railway | Model-behavior drift the stubbed gate cannot see |
-| Load/baseline | `npm run load-test` extended to ingestion/retrieval endpoints (G11) | Latency regressions vs Week 1's measured floor |
+| Load/baseline | `npm run baseline:w2` in-process W2 flow baselines + the W1 floor re-measured live (`npm run load-test`, G11) | Latency regressions vs Week 1's measured floor |
 
 **Not tested, and why:** pixel-accuracy of bbox *rendering* (visual QA in the
 demo checklist — automating screenshot diffs is not worth the flake this
@@ -385,15 +385,15 @@ model, covered by `retrieval_grounded` outcomes, not re-benchmarked);
 OpenEMR's own document storage internals (upstream-tested; we test our client
 contract against it).
 
-## 12. Failure modes & incident response (REQ: G9) — [TARGET]
+## 12. Failure modes & incident response (REQ: G9) — [SHIPPED: identification signals verified against emitted events 2026-07-14]
 
 | Failure | How you see it (logs/traces) | Recovery action |
 |---|---|---|
-| Document ingestion fails (upload/OpenEMR write) | `ingestion_failed` event + correlation ID; `/ready` doc-storage probe degraded if systemic | Panel shows failed state with reason; retry is safe (hash dedupe); if OpenEMR write path is down, uploads queue as failed-visible — never half-ingested |
-| Extraction schema violation | `extraction_field_outcome` failures; ingestion ends `ingestion_failed` after one validation-feedback retry | Nothing persisted; fixture-replay the document locally; fix schema/prompt; re-upload is idempotent |
-| Extraction grounding misses (bad scan) | Facts flagged `unverified` with per-field confidence in trace | No action required for safety (unverified = uncitable); improve fixture/OCR handling; the degraded-scan eval case pins expected behavior |
-| RAG returns no results | `retrieval_miss` event with query-hash | Answer states "no protocol on file for this question" (never silently answers from parametric knowledge); check corpus coverage; add protocol doc if genuinely missing |
-| Reranker/embedding API down | Retrieval span error; circuit opens; `/ready` reranker degraded | Tier-1 turns degrade to "record-only, guidelines unreachable"; keyword-only fallback path may serve pinned evidence; recovers automatically on probe success |
+| Document ingestion fails (upload/OpenEMR write) | `ingestion_failed_storage` stage log (every stage change logs `ingestion_<stage>` with correlation_id + ingestion_id); route-level `ingestion_unhandled_failure`; `/ready` doc-storage probe degraded if systemic | Panel shows failed state with reason; retry is safe (hash dedupe); if OpenEMR write path is down, uploads land failed-visible — never half-ingested |
+| Extraction schema violation | `ingestion_failed_validation` stage log after the single validation-feedback retry (`ingestion_failed_extraction` for upstream VLM failure) | Nothing persisted; fixture-replay the document locally; fix schema/prompt; re-upload is idempotent |
+| Extraction grounding misses (bad scan) | Facts flagged `unverified` with per-field confidence in the ingestion record (`grounding` stage detail) | No action required for safety (unverified = uncitable); improve fixture/OCR handling; the degraded-scan eval case pins expected behavior |
+| RAG returns no results | `evidence_degraded` graph event; retriever result carries `empty: true` (queries logged as scrubbed text/hash, never patient values) | Answer states "no protocol on file for this question" (never silently answers from parametric knowledge); check corpus coverage; add protocol doc if genuinely missing |
+| Reranker/embedding API down | Retrieval leg error in the trace; per-call fallback engages (PassthroughReranker keeps fusion order, `rerank_applied: false`); `/ready` reranker `not_configured` when keyless | Tier-1 turns degrade honestly; keyword+fusion path still serves; recovers automatically on the next successful call |
 | Supervisor routing error (wrong worker / loop) | `worker_handoff` trail under one correlation ID makes the misroute visible; round caps bound loops | Graph state is per-ask and disposable — no persistence to clean; fix routing rule/prompt; add the transcript as an eval case |
 | Eval gate false-positive blocking a PR | Category comparison in the gate report artifact | Baselines are committed — a deliberate re-baseline is a reviewed diff, never an env flag that skips the gate |
 | pgvector unavailable at deploy | Day-one probe fails; `/ready` vector-index degraded | Flip retriever backend to in-process scan (same interface); file infra follow-up; corpus size makes this a non-event |

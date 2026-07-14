@@ -383,9 +383,13 @@ when PR #9's build deploys. LangSmith fenced to the demo env (E.5); no OTEL.
 **Acceptance criteria:**
 - [ ] Deployed Railway app serves the full W2 flow: panel upload → extraction
   status → brief/chat with document + guideline citations → bbox overlay.
-- [ ] Upload UI: panel drag-drop with front-desk persona via existing role
+- [x] Upload UI: panel drag-drop with front-desk persona via existing role
   switcher (locked decision); extraction status + document preview in the
   Sources tab.
+  *(Shipped E.1/E.3: drag-drop upload with live staged progress, loud
+  terminal states, and document preview in the Sources tab. Uploader persona
+  = physician/nurse via the existing role switcher — no separate front-desk
+  label was added; resident demonstrates the 403.)*
 - [x] Demo auth (locked): write paths (upload, vitals write, verify) require a
   dev-login bearer with role gate; read/chat surfaces stay open for graders.
   *(Shipped: upload requires an attributable principal with the new
@@ -494,29 +498,47 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
   Langfuse key-drop; the graph span adapter is live code behind the keys.)*
 
 ### G7 — CI pipeline
-- [ ] On every PR to `main`: build, lint/typecheck, tests, coverage, **npm
+- [x] On every PR to `main`: build, lint/typecheck, tests, coverage, **npm
   audit (dependency audit)**, **semgrep (security scan)** — note today
   `semgrep.yml`/`api-docs.yml`/`pre-commit.yml` are branch-filtered to
   `master`/`rel-*` and never fire on `main` PRs; W2 adds sidecar-scoped
   equivalents that do.
+  *(Shipped: `sidecar-ci.yml` (test/typecheck/build ×2 legs + export parity)
+  + `sidecar-security.yml` (npm audit high+, semgrep). Semgrep green'd
+  2026-07-14: the Express direct-response-write XSS rule excluded as a
+  Fastify-JSON false positive; one deliberate Railway TLS line suppressed
+  with inline justification.)*
 - [x] Contract tests for the supervisor–worker interface (G1) run in CI.
   *(`test/graph.test.ts` boundary-contract cases run in `sidecar-ci.yml` on
   every push + PR.)*
-- [ ] Extraction regression tests are part of the PR-blocking suite (S4/R6).
-- [ ] Dependabot (or equivalent) covers `sidecar/` + `sidecar/panel/` (today it
+- [x] Extraction regression tests are part of the PR-blocking suite (S4/R6).
+  *(13 extraction goldens run inside `Run eval suite` — a REQUIRED check on
+  `main` since 2026-07-13.)*
+- [x] Dependabot (or equivalent) covers `sidecar/` + `sidecar/panel/` (today it
   covers only `/` and `/ccdaservice`).
+  *(Shipped: `.github/dependabot.yml` carries `/sidecar` and `/sidecar/panel`
+  npm ecosystems.)*
 
 ### G8 — Testing strategy documented
 - [ ] W2_ARCHITECTURE.md section: what is unit-tested (schema validators, tool
   functions, gate math), integration-tested (ingestion flow, RAG pipeline,
   graph), evaluated via golden set (agent behavior), and **not tested and
   why**; every test names the failure mode it guards against.
+  *(§11 layer table verified 2026-07-14 — unit/contract/stubbed-integration/
+  58-case golden/live-opt-in/baseline layers plus not-tested-and-why. Open
+  strictly on the last clause: per-test failure-mode naming is not enforced
+  test-by-test.)*
 
 ### G9 — Failure modes & incident response
-- [ ] W2_ARCHITECTURE.md section covering at minimum: document ingestion
+- [x] W2_ARCHITECTURE.md section covering at minimum: document ingestion
   failures, extraction schema violations, RAG retrieval returning no results,
   supervisor routing errors — each with: how to identify in logs (event +
   correlation ID) and the recovery action.
+  *(§12 verified 2026-07-14 — identification column corrected to the real
+  emitted signals: `ingestion_<stage>` stage logs incl. the three
+  `failed_*` stages, `evidence_degraded`, `worker_handoff` trail; each row
+  carries its recovery action. Alerts A4–A6 with response actions live in
+  docs/execution/observability.md.)*
 
 ### G10 — Runnable API collection
 - [x] Bruno collection (`sidecar/api-collection/`) adds: document upload,
@@ -590,16 +612,24 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
   control (who reads/writes), validation rules.
   *(§10 verified against code 2026-07-13; the native-vitals row carries an
   honest TARGET annotation — seam shipped, server wiring pending.)*
-- [ ] Privacy audit: traces, logs, eval datasets, and cost reports contain
+- [x] Privacy audit: traces, logs, eval datasets, and cost reports contain
   **no patient identifiers, no raw document text, no extracted clinical
   values**; scrubbing approach documented; **verified in CI with a
   PHI-detection check** (canary-based, see S4/R6).
-- [ ] Backup & recovery: automatic + manual procedures documented for
+  *(Shipped: `no_phi_in_logs` canary sweep — planted name/DOB/family/allergy
+  canaries over real pipeline runs — rides the REQUIRED gate (D.5); PHI-free
+  retrieval-query scrubber + CI canary (B.5); eval corpora and COSTS
+  artifacts are synthetic/identifier-free by construction.)*
+- [x] Backup & recovery: automatic + manual procedures documented for
   extracted documents (OpenEMR-side + fact store), derived records, and the
   eval golden set; RPO/RTO estimates stated; fact store's derived-view
   wipe-and-rebuild property documented as the recovery primitive; **golden
-  set reproducible from the repo alone** (no DB-only state). Today this
-  runbook does not exist — real gap.
+  set reproducible from the repo alone** (no DB-only state).
+  *(Shipped: RUNBOOK §E with an EXECUTED dump→drop→restore rehearsal
+  (2026-07-13 — row counts verified, live reads post-restore), RPO/RTO
+  stated, wipe-and-rebuild documented as the recovery primitive; the golden
+  set and corpus are repo-committed. The register-time "runbook does not
+  exist" gap is closed.)*
 
 ---
 

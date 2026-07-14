@@ -108,7 +108,7 @@
   A <code>null</code> is <b>expected</b>, not a failed key drop: the variables sit staged on Railway and take
   effect on the post-merge redeploy. Verifies that DO work pre-merge: item 3's <code>langfuse</code> flip + prep
   trace, item 6's dev-login, item 2's laptop <code>verify:pgvector</code> run (your clone is on the W2 branch).
-  <br>Reported done so far: <b>0</b> + <b>7</b> (2026-07-13); <b>5</b>, <b>1</b>, <b>3</b>, <b>6</b>, <b>2</b> — pgvector AVAILABLE v0.8.4 (2026-07-14). <b>4</b> is ON HOLD (user, 2026-07-14). Only <b>8</b> remains open. Then PR #9's merge flips every deferred verify live.
+  <br><b>All actionable items are done</b> — 0 + 7 (2026-07-13); 5, 1, 3, 6, 2, 8 (2026-07-14). <b>4</b> is ON HOLD (user call, single-service posture). The one remaining lever: <b>merge PR #9</b> — it flips every deferred verify live on the next Railway deploy.
 </div>
 
 <main id="items"></main>
@@ -234,7 +234,7 @@ cd sidecar</code></pre>
 <tr><td><code>LANGSMITH_PROJECT</code></td><td><code>clinical-copilot-w2-demo</code></td></tr></table>
 <div class="verify"><b>Verify:</b> demo deploy log prints <code>LangSmith tracing ON — demo environment posture</code>; one evidence turn → a LangGraph run tree under that project. The production log must still say <code>tracing off</code>.</div>`},
 
-{ id:'a8', order:'do last', title:'8 · Live eval dispatch — pre-milestone sanity', sub:'F.6 prerequisite — after items 1/3/5 land', body:`
+{ id:'a8', order:'do last', title:'8 · Live eval dispatch — pre-milestone sanity', sub:'✅ done 2026-07-14 — dispatch on main succeeded 11:39 UTC; eval-results artifact verified via Actions API (F.6 prerequisite)', body:`
 <p><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions" target="_blank" rel="noopener">Actions</a> (top tab) → <b>Sidecar Evals</b> (left sidebar) → <b>Run workflow</b> (grey dropdown, right side) → branch <code>claude/openemr-rag-requirements-x25vzm</code> or <code>main</code> → green <b>Run workflow</b>. CLI alternative (needs <code>gh auth login</code>):</p>
 <pre><button class="copy">copy</button><code>gh workflow run "Sidecar Evals" --ref main</code></pre>
 <div class="verify"><b>Verify:</b> the run goes green; open it → the <b>Artifacts</b> section at the bottom has <code>eval-results</code>. The scheduled live-model suite (<code>LIVE_EVALS=1</code>) rides ticket F.6 — this dispatch proves the pipe.</div>`},
