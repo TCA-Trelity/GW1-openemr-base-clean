@@ -20,6 +20,12 @@ served the 2026-07-09/10 deploy-blocker firefight. Wave M (PR #4, merged
 
 ## Promotion gate
 
+> **2026-07-13 — the gate is now ENFORCED by branch protection:** `main`
+> requires the **`Run eval suite`** status check (plus the Sidecar CI jobs)
+> to pass before any merge — the Week 2 eval gate (58 cases, tiered category
+> math, rehearsed in `docs/w2/gate-rehearsal.md`) cannot be bypassed by an
+> ordinary merge. (0.5 acceptance.)
+
 A PR may merge to `main` only when ALL of these are green on its head:
 
 1. `cd sidecar && npm test` **and** `cd sidecar/panel && npm test`

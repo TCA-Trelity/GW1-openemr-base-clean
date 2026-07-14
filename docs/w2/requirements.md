@@ -269,11 +269,11 @@ page/bbox variant, no PDF preview overlay.
 > gate fails. If the eval gate does not block the regression, the Week 2 build
 > does not pass."*
 
-**Status:** ⚠️ near-complete. **58/58 deterministic cases across 14 suites, all
-six categories measured and baselined** (`eval/baseline.json`); rehearsal
-proves the gate catches injected regressions (`docs/w2/gate-rehearsal.md`).
-Remaining: branch-protection required-check flip (user action 0.5), scheduled
-live-model suite.
+**Status:** ✅ complete (PR leg). **58/58 deterministic cases across 14 suites,
+all six categories measured and baselined** (`eval/baseline.json`); rehearsal
+proves the gate catches injected regressions (`docs/w2/gate-rehearsal.md`);
+**`Run eval suite` is a required check on `main`** (branch protection flipped
+2026-07-13). Remaining: the scheduled live-model suite (F.6, post key-drop).
 
 **Acceptance criteria:**
 - [x] 50 committed golden cases, extraction-weighted (locked): ~20 extraction
@@ -296,11 +296,12 @@ live-model suite.
   `retrieval_grounded`) fail on **>5% drop vs committed per-category baseline
   OR below absolute pass threshold**. Baseline file committed and updated
   deliberately.
-- [ ] PR-blocking: eval workflow triggers on `pull_request`, is a required
+- [x] PR-blocking: eval workflow triggers on `pull_request`, is a required
   status check on `main`, **and** a pre-push git hook runs the same suite
-  locally (spec says "Git Hook" — we deliver both). *(Shipped: `evals.yml` on
-  pull_request + installable `.githooks/pre-push`. Remaining: the
-  branch-protection required-check flip — user action 0.5.)*
+  locally (spec says "Git Hook" — we deliver both). *(Complete 2026-07-13:
+  the user flipped branch protection — `Run eval suite` is a required check
+  on `main` (+ the Sidecar CI jobs). The pull_request trigger's path filter
+  was removed so a required check can never wedge a docs-only PR.)*
 - [x] PR suite is fully deterministic on stubbed VLM/LLM fixtures — no live
   keys in CI (G17); live-model suite runs on dispatch/schedule and before
   milestones (locked decision). *(All 58 PR-leg cases run keyless — scripted

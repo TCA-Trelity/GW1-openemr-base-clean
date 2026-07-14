@@ -10,13 +10,12 @@ on:
       - 'sidecar/**'
       - '.github/workflows/evals.yml'
   # Week 2 (D.4, REQ S4/R6): the eval suite gates pull requests. Deterministic (stubbed
-  # fixtures, no live keys), so this check is fast, free, and never flaky — mark it as a
-  # REQUIRED status check on main (branch protection; see RELEASE.md promotion gate).
+  # fixtures, no live keys), so this check is fast, free, and never flaky — it IS a
+  # REQUIRED status check on main (branch protection, flipped 2026-07-13; RELEASE.md).
+  # No path filter here ON PURPOSE: a required check that is skipped by path filtering
+  # never reports, which blocks docs-only PRs forever ("Expected — waiting for status").
+  # The suite is ~seconds and keyless, so running it on every PR is the cheap fix.
   pull_request:
-    paths:
-      - 'sidecar/**'
-      - 'docs/execution/eval-results.md'
-      - '.github/workflows/evals.yml'
   workflow_dispatch:
 
 permissions:

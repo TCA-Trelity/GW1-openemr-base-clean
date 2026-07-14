@@ -84,7 +84,7 @@ at whichever boundary it first crosses:
 1. **Pre-push git hook** (`.githooks/pre-push`, installed via `npm run hooks:install`)
    — blocks the push when the outgoing range touches `sidecar/**`.
 2. **CI on pull_request** (`.github/workflows/evals.yml`) — the PR-blocking leg
-   (user action 0.5: mark it required in branch protection).
+   (0.5 DONE 2026-07-13: `Run eval suite` is a required check on `main`).
 3. **Locally on demand** — `npm run eval`; `npm run gate-rehearsal` re-runs this
    entire rehearsal.
 

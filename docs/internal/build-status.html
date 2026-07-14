@@ -191,7 +191,7 @@
 // Update in the SAME PR as the code it describes (anti-drift rule #3).
 // ============================================================================
 const DATA = {
-  stamp: "updated 2026-07-13 · session 3 (F WAVE COMPLETE — remaining: key-drops, video recording, live re-measures: all user actions)",
+  stamp: "updated 2026-07-13 · session 4 (user actions 0+7 done: eval gate is a REQUIRED check on main — S4/R6 closed)",
   budget: { capPerDay: "$5.00", spentToday: "—", note: "SpendGuard unchanged (locked #16); Cohere rides a ledger line at B.4" },
   w1Floor: "24/24 W1 evals passing · read-path p95 46 ms @10 / 193 ms @50 (regression floor)",
 
@@ -209,7 +209,7 @@ const DATA = {
         { id: "0.2", t: "document.write scope + dedupe upload client shipped (mocked tests); live re-register + POST pending", reqs: ["S1/R1","G7"], deps: "deploy env", s: "active" },
         { id: "0.3", t: "Activate Langfuse (Cloud, synthetic demo posture)", reqs: ["R7"], deps: "—", s: "pending" },
         { id: "0.4", t: "Cohere/LangSmith keys in boot-crash-proof config", reqs: ["S2/R3","R7","G2"], deps: "—", s: "done" },
-        { id: "0.5", t: "Branch protection: eval workflow as required check", reqs: ["S4/R6","D5"], deps: "—", s: "pending" },
+        { id: "0.5", t: "Branch protection FLIPPED: Run eval suite is a required check on main (user, 2026-07-13)", reqs: ["S4/R6","D5"], deps: "—", s: "done" },
       ]},
     { id: "A", title: "Wave A — Ingestion spine", band: "Band 1 · MVP · ∥ with B", tickets: [
         { id: "A.1", t: "LabPdfExtraction + IntakeFormExtraction Zod schemas + validation tests", reqs: ["R2","D3","G3"], deps: "—", s: "done" },
@@ -240,7 +240,7 @@ const DATA = {
         { id: "D.1", t: "Category framework + committed baseline + tiered comparator", reqs: ["S4/R6"], deps: "—", s: "done" },
         { id: "D.2", t: "58 cases committed — all 6 categories measured + baselined; all 5 corpora wired", reqs: ["S4/R6","D4"], deps: "A.7, B.6, D.1", s: "done" },
         { id: "D.3", t: "Full-path goldens: fixture PDF → stub VLM → grounding → retrieval → critic → cited answer, keyless", reqs: ["G17"], deps: "A.4, B.4 stubs", s: "done" },
-        { id: "D.4", t: "PR-blocking: pull_request trigger + pre-push hook shipped; required-check flag = user admin (0.5)", reqs: ["S4/R6","D5"], deps: "D.1, 0.5", s: "active" },
+        { id: "D.4", t: "PR-blocking complete: pull_request trigger (unfiltered) + pre-push hook + REQUIRED check on main", reqs: ["S4/R6","D5"], deps: "D.1, 0.5", s: "done" },
         { id: "D.5", t: "PHI sweep: log-capture over real ingestion+graph runs + retrieval query scrub — 0 canaries", reqs: ["G18"], deps: "D.3", s: "done" },
         { id: "D.6", t: "npm audit + semgrep workflow on main PRs + Dependabot sidecar coverage", reqs: ["G7"], deps: "—", s: "done" },
         { id: "D.7", t: "Hard-gate rehearsal DONE: 3 injected regressions caught (npm run gate-rehearsal + doc)", reqs: ["D5","S4/R6"], deps: "D.2–D.5", s: "done" },
@@ -291,7 +291,7 @@ const DATA = {
       { id: "S2/R3", t: "Hybrid RAG + rerank (corpus, pgvector+tsvector, RRF, Cohere, PHI-free queries)", plan: "0.1, 0.4, B.1–B.6", done: 7, total: 9, s: "active" },
       { id: "S3/R4", t: "Supervisor + intake-extractor + evidence-retriever (LangGraph, logged handoffs)", plan: "C.1–C.6", done: 4, total: 7, s: "active" },
       { id: "R5", t: "Citation contract v2 + required PDF bbox overlay", plan: "A.2, A.5, E.2", done: 4, total: 5, s: "active" },
-      { id: "S4/R6", t: "Eval gate: 58 cases, 6 categories baselined, rehearsal proven; required-check flip = user 0.5", plan: "0.5, D.1–D.7", done: 6, total: 7, s: "active" },
+      { id: "S4/R6", t: "Eval gate COMPLETE: 58 cases, 6 categories baselined, rehearsal proven, required check live", plan: "0.5, D.1–D.7", done: 7, total: 7, s: "done" },
       { id: "R7", t: "Observability + cost per encounter (PHI-free)", plan: "0.3, E.4, E.5", done: 0, total: 5, s: "pending" },
       { id: "S5", t: "Integrate, deploy, defend (upload UI, demo auth, traces, UC mapping)", plan: "E.1, E.3, E.9, F.5, F.8", done: 2, total: 5, s: "active" },
     ]},
