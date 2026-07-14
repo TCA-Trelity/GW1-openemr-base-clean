@@ -47,5 +47,14 @@ jobs:
       image: semgrep/semgrep
     steps:
       - uses: actions/checkout@v7
+      # direct-response-write is an Express rule: it assumes res.send(userInput) can emit
+      # HTML. Fastify's reply.send serializes objects to JSON (content-type
+      # application/json) and the sidecar renders no HTML anywhere, so the rule
+      # false-positives on every JSON route. Excluded wholesale rather than suppressed
+      # line-by-line so the next JSON route doesn't re-trip it.
       - name: Scan sidecar with JS/TS + security-audit rulesets
-        run: semgrep scan --error --config p/javascript --config p/nodejs --config p/security-audit sidecar/src sidecar/eval
+        run: >-
+          semgrep scan --error
+          --config p/javascript --config p/nodejs --config p/security-audit
+          --exclude-rule javascript.express.security.audit.xss.direct-response-write.direct-response-write
+          sidecar/src sidecar/eval
