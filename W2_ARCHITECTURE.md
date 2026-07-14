@@ -173,7 +173,7 @@ child spans of the supervisor span; extraction/retrieval sub-calls are children
 of their worker spans. One correlation ID reconstructs the full multi-agent
 trace — the spec's test, verbatim.
 
-## 5. Hybrid RAG design (REQ: S2/R3, E5) — [SHIPPED: hybrid BM25+dense → RRF → Cohere rerank behind injectable backends, PHI query scrubber + CI canary, disease-tag filters, coverage floor w/ stopword-hardening, /api/evidence/search, retrieval goldens · pgvector-PERSISTED dense index SHIPPED (migration 005 + content-hash sync + corpus:index CLI + in-memory fallback proven on an extensionless Postgres) · TARGET: post-merge live confirmation (boot log denseBackend:pgvector + corpus_index_synced counts)] — answer leg SHIPPED (E.9)
+## 5. Hybrid RAG design (REQ: S2/R3, E5) — [SHIPPED: hybrid BM25+dense → RRF → Cohere rerank behind injectable backends, PHI query scrubber + CI canary, disease-tag filters, coverage floor w/ stopword-hardening, /api/evidence/search, retrieval goldens · pgvector-PERSISTED dense index SHIPPED + CONFIRMED LIVE 2026-07-14 (production boot log: corpus_index_synced backend:pgvector total:71 embedded:0 reused:71 — restart reused every persisted vector)] — answer leg SHIPPED (E.9)
 
 **Corpus (locked decisions #3, #6).** 6–10 short authored **practice-protocol
 documents** — "agreed clinical practices the office follows" — each grounded
