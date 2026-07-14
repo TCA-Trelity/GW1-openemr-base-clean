@@ -1,5 +1,10 @@
 # USER-ACTIONS — the key-drop & click checklist (human-only steps)
 
+> **STATUS: ARCHIVE (2026-07-14).** Every item below is complete and verified
+> live (item 4 on hold by user decision). Nothing here requires action —
+> kept as reference for credential re-dos and troubleshooting. Remaining W2
+> work lives on the build board (manual test plan + open matrix rows).
+
 > **Human surface: [`../user-actions.html`](../user-actions.html)** — the same
 > checklist as an interactive form (checkboxes persist in-browser, copy
 > buttons, navigation links). This markdown stays the canonical source agents
