@@ -8,6 +8,7 @@
 // B.3-live); offline/CI = HashEmbeddings + PassthroughReranker over the in-memory index.
 // A retrieval that finds nothing above the confidence floor returns empty WITH the floor
 // stated — "no protocol on file" is an answer, never a silent parametric fallback (P2/G9).
+import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Bm25Index, tokenize } from './bm25.js';
@@ -45,6 +46,11 @@ export interface SearchOptions {
     context?: QueryContext;
     identifiers?: PatientIdentifiers;
     correlationId?: string;
+}
+
+/** Structural logger (pino-compatible) so this module never imports a logging library. */
+export interface RetrievalLogger {
+    info(obj: Record<string, unknown>, msg: string): void;
 }
 
 /** Reciprocal-rank fusion (k=60): rank-based, so BM25 and cosine scores need no calibration. */
@@ -93,6 +99,7 @@ export class HybridRetriever {
     private constructor(
         private readonly chunks: readonly CorpusChunk[],
         private readonly reranker: Reranker,
+        private readonly logger?: RetrievalLogger,
     ) {
         this.bm25 = new Bm25Index(chunks.map((chunk) => ({ id: chunk.chunk_id, text: chunk.text })));
         this.byId = new Map(chunks.map((chunk) => [chunk.chunk_id, chunk]));
@@ -101,9 +108,9 @@ export class HybridRetriever {
     /** Build over pre-chunked content; embeds the corpus once when a provider is given. */
     static async build(
         chunks: readonly CorpusChunk[],
-        options: { embeddings?: EmbeddingsProvider; reranker: Reranker; correlationId?: string },
+        options: { embeddings?: EmbeddingsProvider; reranker: Reranker; correlationId?: string; logger?: RetrievalLogger },
     ): Promise<HybridRetriever> {
-        const retriever = new HybridRetriever(chunks, options.reranker);
+        const retriever = new HybridRetriever(chunks, options.reranker, options.logger);
         if (options.embeddings !== undefined) {
             const vectors = await options.embeddings.embed(
                 chunks.map((chunk) => chunk.text),
@@ -171,7 +178,9 @@ export class HybridRetriever {
         };
         const supported = candidates.filter((chunk) => keywordIds.has(chunk.chunk_id));
         if (supported.length === 0 || Math.max(...supported.map(coverage)) < 0.5) {
-            return { snippets: [], searched_query: query, rerank_applied: false, empty: true };
+            const result: RetrievalResult = { snippets: [], searched_query: query, rerank_applied: false, empty: true };
+            this.logSearch(result, correlationId);
+            return result;
         }
 
         const outcome = await this.reranker.rerank(
@@ -200,7 +209,26 @@ export class HybridRetriever {
                       },
                   ];
         });
-        return { snippets, searched_query: query, rerank_applied: outcome.rerankApplied, empty: snippets.length === 0 };
+        const result: RetrievalResult = { snippets, searched_query: query, rerank_applied: outcome.rerankApplied, empty: snippets.length === 0 };
+        this.logSearch(result, correlationId);
+        return result;
+    }
+
+    // G5 `retrieval_hit`/`retrieval_miss`: one structured event per search, from every
+    // caller (evidence route and graph worker alike). The searched query is the
+    // PHI-scrubbed rewrite (log-safe by construction); hits are chunk ids, never text.
+    private logSearch(result: RetrievalResult, correlationId: string): void {
+        this.logger?.info(
+            {
+                correlation_id: correlationId,
+                query_hash: createHash('sha256').update(result.searched_query).digest('hex').slice(0, 16),
+                searched_query: result.searched_query,
+                hits: result.snippets.length,
+                chunk_ids: result.snippets.map((snippet) => snippet.chunk_id),
+                rerank_applied: result.rerank_applied,
+            },
+            result.empty ? 'retrieval_miss' : 'retrieval_hit',
+        );
     }
 }
 

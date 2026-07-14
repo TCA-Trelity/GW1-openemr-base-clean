@@ -167,6 +167,38 @@ describe('IngestionService end-to-end (A.3/A.6, stubbed VLM over the real fixtur
         expect(doc.content.text_content).toContain('eGFR');
     });
 
+    it('emits one extraction_field_outcome event per field — positional labels, no extracted values (G5)', async () => {
+        const events: Array<{ obj: Record<string, unknown>; msg: string }> = [];
+        const service = new IngestionService({
+            extractor: new VlmExtractor(vlmReturning(RENAL_JSON)),
+            records: new MemoryIngestionRecordStore(),
+            factSink: makeSink(),
+            logger: {
+                info: (obj, msg) => events.push({ obj: obj as Record<string, unknown>, msg }),
+                warn: (obj, msg) => events.push({ obj: obj as Record<string, unknown>, msg }),
+            },
+        });
+        const record = await service.attachAndExtract({
+            patientId: 'margaret-chen',
+            docType: 'lab_pdf',
+            filename: 'renal-panel-clean.pdf',
+            mimeType: 'application/pdf',
+            bytes: cleanRenal,
+            correlationId: 'corr-g5-fields',
+            expectedPatient: { name: 'Margaret L. Chen' },
+        });
+        expect(record.status).toBe('complete');
+        const fieldEvents = events.filter((event) => event.msg === 'extraction_field_outcome');
+        expect(fieldEvents.length).toBe(record.grounding?.total);
+        for (const event of fieldEvents) {
+            expect(event.obj['correlation_id']).toBe('corr-g5-fields');
+            expect(['word_box', 'page', 'unverified']).toContain(event.obj['outcome']);
+            // Positional labels only — the event payload never carries extracted values.
+            expect(event.obj['field']).toMatch(/^[a-z_]+(\[\d+\])?$/);
+            expect(JSON.stringify(event.obj)).not.toMatch(/eGFR|creatinine/i);
+        }
+    });
+
     it('byte-identical re-upload returns the SAME record — no duplicate rows or facts', async () => {
         const sink = makeSink();
         const records = new MemoryIngestionRecordStore();

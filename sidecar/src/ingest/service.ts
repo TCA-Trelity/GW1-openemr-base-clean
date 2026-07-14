@@ -239,6 +239,20 @@ export class IngestionService {
             'grounded',
             `${grounded.summary.word_box} word_box / ${grounded.summary.page} page / ${grounded.summary.unverified} unverified`,
         );
+        // G5 `extraction_field_outcome`: one structured event per field. Positional labels
+        // only — no extracted values ever enter the log stream (PHI-free by construction).
+        for (const field of grounded.fields) {
+            this.deps.logger?.info(
+                {
+                    correlation_id: correlationId,
+                    ingestion_id: record.id,
+                    doc_type: input.docType,
+                    field: field.field,
+                    outcome: field.outcome,
+                },
+                'extraction_field_outcome',
+            );
+        }
 
         // 4. Printed-patient identity check — mismatch blocks before any fact persists.
         const mismatch = patientMismatch(grounded.extraction, input.expectedPatient);

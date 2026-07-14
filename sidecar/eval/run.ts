@@ -41,6 +41,23 @@ if (baseline === undefined) {
     const gate = applyGate(readLedgerRecords(), baseline);
     console.log(formatGateReport(gate, baseline));
     gateFailed = !gate.pass;
+    // G5 `eval_run_outcome`: one structured event per eval run, same JSON shape as the
+    // service log stream, so run outcomes are greppable alongside runtime events.
+    console.log(
+        JSON.stringify({
+            level: 'info',
+            msg: 'eval_run_outcome',
+            total,
+            passed: total - failed,
+            gate: gate.pass ? 'pass' : 'fail',
+            categories: Object.fromEntries(
+                gate.verdicts.map((verdict) => [
+                    verdict.category,
+                    verdict.status === 'not-measured' ? 'not-measured' : `${verdict.stats.passed}/${verdict.stats.total}`,
+                ]),
+            ),
+        }),
+    );
 }
 
 if (total === 0) {
