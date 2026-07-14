@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>User Actions — key drops &amp; clicks (W2)</title>
+<style>
+  :root {
+    --bg:#f6f7f9; --panel:#ffffff; --ink:#1e2530; --muted:#5c6675; --line:#e3e7ee;
+    --accent:#4453c4; --accent-soft:#eef0fb; --ok:#177245; --ok-soft:#e9f5ee;
+    --warn:#8a5a00; --warn-soft:#fdf3e0; --code-bg:#f0f2f6; --shadow:0 1px 3px rgba(20,25,40,.07);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#12151c; --panel:#1a1f29; --ink:#e6e9ef; --muted:#98a2b3; --line:#2a3140;
+      --accent:#8b97ff; --accent-soft:#232948; --ok:#4cc38a; --ok-soft:#15281f;
+      --warn:#e2b93d; --warn-soft:#2d2513; --code-bg:#232936; --shadow:0 1px 3px rgba(0,0,0,.4); }
+  }
+  :root[data-theme="light"] {
+    --bg:#f6f7f9; --panel:#ffffff; --ink:#1e2530; --muted:#5c6675; --line:#e3e7ee;
+    --accent:#4453c4; --accent-soft:#eef0fb; --ok:#177245; --ok-soft:#e9f5ee;
+    --warn:#8a5a00; --warn-soft:#fdf3e0; --code-bg:#f0f2f6; --shadow:0 1px 3px rgba(20,25,40,.07);
+  }
+  :root[data-theme="dark"] {
+    --bg:#12151c; --panel:#1a1f29; --ink:#e6e9ef; --muted:#98a2b3; --line:#2a3140;
+    --accent:#8b97ff; --accent-soft:#232948; --ok:#4cc38a; --ok-soft:#15281f;
+    --warn:#e2b93d; --warn-soft:#2d2513; --code-bg:#232936; --shadow:0 1px 3px rgba(0,0,0,.4);
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font:14px/1.55 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; padding:24px 16px 80px; }
+  .wrap { max-width: 880px; margin:0 auto; }
+  header h1 { font-size:20px; margin:0 0 4px; }
+  header p { color:var(--muted); margin:0 0 6px; }
+  .navrow { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 22px; }
+  .navrow a { font-size:12px; text-decoration:none; color:var(--accent); background:var(--accent-soft);
+    border:1px solid var(--line); padding:4px 10px; border-radius:999px; }
+  .progress { display:flex; align-items:center; gap:10px; margin:0 0 18px; }
+  .bar { flex:1; height:8px; background:var(--line); border-radius:999px; overflow:hidden; }
+  .bar > div { height:100%; width:0%; background:var(--ok); transition:width .25s; }
+  .progress .n { font-size:12px; color:var(--muted); white-space:nowrap; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    box-shadow:var(--shadow); margin-bottom:14px; overflow:hidden; }
+  .card.done { opacity:.72; }
+  .card > .head { display:flex; align-items:flex-start; gap:12px; padding:14px 16px; cursor:pointer; }
+  .card input[type=checkbox] { width:18px; height:18px; margin-top:2px; accent-color:var(--ok); cursor:pointer; }
+  .head .t { flex:1; }
+  .head .t b { font-size:15px; }
+  .head .t .sub { color:var(--muted); font-size:12.5px; margin-top:2px; }
+  .head .order { font-size:11px; color:var(--muted); border:1px solid var(--line); border-radius:6px;
+    padding:1px 7px; white-space:nowrap; margin-top:2px; }
+  .body { border-top:1px dashed var(--line); padding:12px 16px 16px 46px; display:none; }
+  .card.open .body { display:block; }
+  .body h4 { margin:12px 0 6px; font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+  table { border-collapse:collapse; width:100%; margin:6px 0; font-size:13px; }
+  td, th { border:1px solid var(--line); padding:6px 9px; text-align:left; vertical-align:top; }
+  th { background:var(--code-bg); font-weight:600; }
+  code, pre { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12.5px; }
+  code { background:var(--code-bg); padding:1px 5px; border-radius:5px; }
+  pre { background:var(--code-bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px;
+    overflow-x:auto; position:relative; margin:8px 0; }
+  .copy { position:absolute; top:6px; right:6px; font-size:11px; border:1px solid var(--line);
+    background:var(--panel); color:var(--muted); border-radius:6px; padding:2px 8px; cursor:pointer; }
+  .copy:hover { color:var(--accent); border-color:var(--accent); }
+  .verify { background:var(--ok-soft); border:1px solid var(--line); border-radius:8px; padding:8px 12px; margin-top:8px; }
+  .verify b { color:var(--ok); }
+  .warnbox { background:var(--warn-soft); border:1px solid var(--line); border-radius:8px; padding:8px 12px; margin-top:8px; }
+  .warnbox b { color:var(--warn); }
+  .links a { color:var(--accent); }
+  a { color:var(--accent); }
+  footer { color:var(--muted); font-size:12px; margin-top:26px; }
+  .resetbtn { border:1px solid var(--line); background:var(--panel); color:var(--muted);
+    border-radius:8px; padding:4px 10px; font-size:12px; cursor:pointer; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>User actions — key drops &amp; clicks</h1>
+  <p>The steps only the account owner can do. Everything in the sidecar no-ops cleanly until these
+     land — nothing here blocks a merge. Checkbox state saves in <em>this browser</em> (localStorage).
+     <b>Never paste secret values into this page</b> — it stores only your check-off state.</p>
+  <p><b>Order that unblocks the most, first: 0 → 7 → 5 → 1 → 3 → 6 → 2 → 4 → 8.</b></p>
+</header>
+
+<div class="navrow">
+  <a href="https://railway.app/dashboard" target="_blank" rel="noopener">Railway dashboard</a>
+  <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/settings/branches" target="_blank" rel="noopener">GitHub branch protection</a>
+  <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions" target="_blank" rel="noopener">GitHub Actions</a>
+  <a href="https://dashboard.cohere.com/api-keys" target="_blank" rel="noopener">Cohere API keys</a>
+  <a href="https://cloud.langfuse.com" target="_blank" rel="noopener">Langfuse Cloud</a>
+  <a href="https://smith.langchain.com" target="_blank" rel="noopener">LangSmith</a>
+  <a href="https://gw1-openemr-base-clean-production.up.railway.app" target="_blank" rel="noopener">Deployed OpenEMR</a>
+  <a href="https://enchanting-mercy-production-5d32.up.railway.app/ready" target="_blank" rel="noopener">Sidecar /ready</a>
+  <a href="build-status.html">Build board</a>
+  <a href="tickets/USER-ACTIONS.md">Markdown source</a>
+  <a href="../RUNBOOK.md">RUNBOOK</a>
+</div>
+
+<div class="progress"><div class="bar"><div id="fill"></div></div><span class="n" id="count"></span>
+  <button class="resetbtn" id="reset" title="Clear all checkboxes">reset</button></div>
+
+<div class="warnbox" style="margin:0 0 14px">
+  <b>Deploy sequencing — read before running any <code>/ready</code> verify.</b>
+  Railway deploys <code>main</code>; until <b>PR&nbsp;#9 merges</b> (Railway then auto-redeploys) the deployed
+  sidecar is <b>Week&nbsp;1 code</b>: the W2 probes (<code>document_storage</code>, <code>retriever_index</code>,
+  <code>reranker</code>) are absent — <code>jq</code> prints <code>null</code> — and the W2 routes
+  (<code>/api/documents</code> upload, <code>/api/evidence/search</code>) 404.
+  A <code>null</code> is <b>expected</b>, not a failed key drop: the variables sit staged on Railway and take
+  effect on the post-merge redeploy. Verifies that DO work pre-merge: item 3's <code>langfuse</code> flip + prep
+  trace, item 6's dev-login, item 2's laptop <code>verify:pgvector</code> run (your clone is on the W2 branch).
+  <br><b>All actionable items are done</b> — 0 + 7 (2026-07-13); 5, 1, 3, 6, 2, 8 (2026-07-14). <b>4</b> is ON HOLD (user call, single-service posture). The one remaining lever: <b>merge PR #9</b> — it flips every deferred verify live on the next Railway deploy.
+</div>
+
+<main id="items"></main>
+
+<footer>
+  Railway click path + service identification live in card 0. Canonical source: <a href="tickets/USER-ACTIONS.md">tickets/USER-ACTIONS.md</a> —
+  agents read that file; this form mirrors it for humans.
+</footer>
+</div>
+
+<script>
+const ITEMS = [
+{ id:'a0', order:'do 1st', title:'0 · One-time laptop setup', sub:'✅ done 2026-07-13 — prerequisite for items 2 and 5', body:`
+<p>Commands in this checklist run <b>from inside a local clone</b> — a bare <code>cd sidecar</code> from your home directory fails because the folder only exists inside the clone.</p>
+<pre><button class="copy">copy</button><code>git clone https://github.com/TCA-Trelity/GW1-openemr-base-clean.git ~/GW1-openemr-base-clean
+cd ~/GW1-openemr-base-clean
+git checkout claude/openemr-rag-requirements-x25vzm
+cd sidecar && npm ci</code></pre>
+<p>Needs <b>Node 22</b> (<code>node --version</code>; install via nvm if older). <code>npm ci</code> takes a couple of minutes. Later commands are written from <code>~/GW1-openemr-base-clean</code> — adjust if you cloned elsewhere.</p>
+<h4>Finding the right Railway service (items 1, 3, 4, 5, 6)</h4>
+<p>railway.app → project canvas → click a service card → <b>Settings → Networking</b> shows its domain:
+<code>enchanting-mercy-…</code> = <b>sidecar</b> (most variables go here); <code>gw1-openemr-…</code> = <b>the EHR</b>.
+To set a variable: card → <b>Variables</b> tab → <b>New Variable</b> → name + value → click the <b>Apply/Deploy</b> banner → watch Deployments go green (variables only take effect after that redeploy).</p>
+<div class="verify"><b>Verify:</b> <code>cd ~/GW1-openemr-base-clean/sidecar && npm test</code> runs green (keyless by design).</div>`},
+
+{ id:'a7', order:'do 2nd', title:'7 · Branch protection: make the eval gate a REQUIRED check', sub:'✅ done 2026-07-13 — “Run eval suite” is REQUIRED on main (0.5, D5)', body:`
+<p><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/settings/branches" target="_blank" rel="noopener">Settings → Branches</a> → <b>Add branch protection rule</b>:</p>
+<ol>
+<li><b>Branch name pattern</b> = <code>main</code> — this field names <b>which branch is protected</b>. ⚠️ The check name does NOT go here.</li>
+<li>Check <b>Require status checks to pass before merging</b>.</li>
+<li>Leave "Require branches to be up to date" unchecked (forces reruns on every main move — skippable here).</li>
+<li>Click into the box <i>"Search for status checks in the last week for this repository"</i> and type:
+<pre><button class="copy">copy</button><code>Run eval suite</code></pre>
+then click the suggestion. That string is the <b>job name</b> in <code>.github/workflows/evals.yml</code> — the workflow <i>title</i> is “Sidecar Evals”; branch protection matches JOB names.</li>
+</ol>
+<div class="warnbox"><b>Nothing suggested?</b> GitHub only offers checks that ran in the last 7 days. Fix: <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions" target="_blank" rel="noopener">Actions</a> → Sidecar Evals → Run workflow (branch <code>claude/openemr-rag-requirements-x25vzm</code>) → wait for green → reload the protection page → search again.</div>
+<p>Recommended, same box: add <code>sidecar (test + typecheck + build)</code> and <code>export parity (deploy archive == committed tree)</code>. Optional hardening: check <b>"Do not allow bypassing the above settings"</b> so even admins can't merge past a red gate (leave off if you want an escape hatch). Everything else unchecked → <b>Create</b>.</p>
+<div class="verify"><b>Verify:</b> open PR #9 → the merge box lists <i>Run eval suite — Required</i>. Note the flip in RELEASE.md's promotion gate.</div>`},
+
+{ id:'a5', order:'do 3rd', title:'5 · OpenEMR document-write enablement — FOUR sub-steps, in order', sub:'✅ all four sub-steps done 2026-07-14 — deployed verify pending PR #9 merge (S1/R1)', body:`
+<p>Uploads store PDFs in OpenEMR via a <b>password-grant user token</b>. Grants are <b>intersected with the client's registered scopes</b> — a client registered before the document scopes existed can never receive them, so the client must be <b>re-registered</b>.</p>
+<h4>5a — enable the API connectors (one-time; registration fails without it)</h4>
+<p>Log into the <a href="https://gw1-openemr-base-clean-production.up.railway.app" target="_blank" rel="noopener">deployed EHR</a> (<code>admin</code>/<code>pass</code>) → <b>Administration → Globals → Connectors</b> → enable <b>"OpenEMR Standard REST API"</b> and <b>OAuth2 password grant</b> → Save.</p>
+<h4>5b — re-register the client (from the laptop clone, item 0)</h4>
+<pre><button class="copy">copy</button><code>cd ~/GW1-openemr-base-clean/sidecar
+OPENEMR_BASE_URL='https://gw1-openemr-base-clean-production.up.railway.app' npx tsx src/scripts/register-oauth.ts</code></pre>
+<p>The script generates a fresh RSA keypair and <b>prints TWO variables to copy</b>: the new <code>OPENEMR_CLIENT_ID=…</code> and a one-lined <code>OPENEMR_CLIENT_KEY=…</code> (paste as-is — the <code>\\n</code> escapes are expected).</p>
+<h4>5c — enable the new client (fresh clients start DISABLED)</h4>
+<p>OpenEMR → <b>Administration → System → API Clients</b> → newest "Clinical Co-Pilot Sidecar" → <b>Enable Client</b>.</p>
+<h4>5d — variables, SIDECAR service (all four; the new keypair replaces the old)</h4>
+<table><tr><th>Variable</th><th>Value</th></tr>
+<tr><td><code>OPENEMR_CLIENT_ID</code></td><td>printed by 5b (the NEW id)</td></tr>
+<tr><td><code>OPENEMR_CLIENT_KEY</code></td><td>printed by 5b (one-lined PEM, exact paste)</td></tr>
+<tr><td><code>OPENEMR_API_USERNAME</code></td><td>an OpenEMR <b>user</b> with patients/docs access (<code>admin</code> for the demo)</td></tr>
+<tr><td><code>OPENEMR_API_PASSWORD</code></td><td>that user's password (<code>pass</code> on the demo EHR)</td></tr></table>
+<div class="verify"><b>Verify (post-merge only — see the sequencing box up top):</b>
+<pre><button class="copy">copy</button><code>curl -s https://enchanting-mercy-production-5d32.up.railway.app/ready | jq '.dependencies.document_storage'</code></pre>
+<code>not_configured → ok</code> (a live token mint). <b><code>null</code> today is expected</b> — the <code>document_storage</code> probe ships with PR #9; re-run after merge + redeploy. Then upload once via the panel Sources tab (or Bruno <code>06-documents</code>) and confirm the document appears in OpenEMR (Patient → Documents); the ingestion record shows <code>openemr_document_id</code> set.</div>`},
+
+{ id:'a1', order:'do 4th', title:'1 · Cohere — live dense embeddings + rerank', sub:'✅ key staged 2026-07-14 — deployed verify pending PR #9 merge (S2/R3)', body:`
+<p><b>Get the key:</b> <a href="https://dashboard.cohere.com/api-keys" target="_blank" rel="noopener">dashboard.cohere.com → API Keys</a> (left nav). A free <b>Trial key</b> exists by default — copy it (rate-limited but fine for demo volume). While there, note the pricing numbers for COSTS.md §6.2's "verify at key-drop" cells.</p>
+<h4>Variables — SIDECAR service</h4>
+<table><tr><th>Variable</th><th>Value</th></tr>
+<tr><td><code>COHERE_API_KEY</code></td><td>the key you copied</td></tr>
+<tr><td><code>COHERE_EMBED_MODEL</code></td><td>do not set (default <code>embed-english-v3.0</code>)</td></tr>
+<tr><td><code>COHERE_RERANK_MODEL</code></td><td>do not set (default <code>rerank-english-v3.0</code>)</td></tr></table>
+<div class="verify"><b>Verify (post-merge only — the <code>reranker</code> probe and the evidence-search route ship with PR #9; the deployed <code>main</code> build returns <code>null</code>/404):</b>
+<pre><button class="copy">copy</button><code>curl -s https://enchanting-mercy-production-5d32.up.railway.app/ready | jq '.dependencies.reranker'</code></pre>
+<p>No jq? <code>curl -s …/ready | python3 -m json.tool | grep -A2 '"reranker"'</code>. Expect <code>not_configured → ok</code>. Deploy logs show <code>dense: 'hash-offline' → 'cohere'</code>. One live search returns the rerank flag:</p>
+<pre><button class="copy">copy</button><code>curl -s -X POST https://enchanting-mercy-production-5d32.up.railway.app/api/evidence/search -H 'content-type: application/json' -d '{"q":"hydroxychloroquine screening interval"}' | grep -o '"rerank_applied":[a-z]*'</code></pre></div>`},
+
+{ id:'a3', order:'do 5th', title:'3 · Langfuse — committed observability posture', sub:'✅ done 2026-07-14 — Cloud keys live, verified on today’s deploy; graph spans join post-merge (R7, 0.3)', body:`
+<p><b>Get the keys:</b> <a href="https://cloud.langfuse.com" target="_blank" rel="noopener">cloud.langfuse.com</a> → sign up → create an <b>Organization</b>, then a <b>Project</b> → <b>Project Settings → API Keys → Create new API keys</b>. The dialog shows three values — copy all three <b>exactly as displayed, including the host</b> (region-dependent: <code>https://cloud.langfuse.com</code> EU, <code>https://us.cloud.langfuse.com</code> US).</p>
+<h4>Variables — SIDECAR service (all three or tracing stays off by design)</h4>
+<table><tr><th>Variable</th><th>Value</th></tr>
+<tr><td><code>LANGFUSE_HOST</code></td><td>the host from the key dialog</td></tr>
+<tr><td><code>LANGFUSE_PUBLIC_KEY</code></td><td><code>pk-lf-…</code></td></tr>
+<tr><td><code>LANGFUSE_SECRET_KEY</code></td><td><code>sk-lf-…</code></td></tr></table>
+<div class="verify"><b>Verify:</b> <code>/ready → .dependencies.langfuse</code> flips to <code>ok</code>. Trigger one prep (panel: Margaret Chen → AI Insights → prepare) → a <code>prep</code> trace whose id equals the response's <code>x-correlation-id</code>; one evidence chat turn adds a <code>graph</code> trace with <code>supervisor→…</code> spans. Walkthrough: <a href="../RUNBOOK.md">RUNBOOK</a> §C.</div>`},
+
+{ id:'a6', order:'do 6th', title:'6 · Dev-login secret — write-path demo auth', sub:'✅ done 2026-07-14 — verified on today’s deploy (E.3/E.8)', body:`
+<pre><button class="copy">copy</button><code>openssl rand -hex 24</code></pre>
+<p>Set the output as <code>DEV_LOGIN_SECRET</code> on the <b>sidecar</b> service (any ≥16 random chars).</p>
+<div class="verify"><b>Verify:</b>
+<pre><button class="copy">copy</button><code>curl -s -X POST https://enchanting-mercy-production-5d32.up.railway.app/api/dev-login -H 'content-type: application/json' -d '{"role":"physician","patient":"margaret-chen"}'</code></pre>
+returns <code>{"access_token":"…"}</code>; a 404 means the secret is absent or too short.</div>`},
+
+{ id:'a2', order:'do 7th', title:'2 · pgvector decision — dense index backend, step by step', sub:'✅ done 2026-07-14 — AVAILABLE (installed now, v0.8.4); RETRIEVER_DENSE_BACKEND stays default pgvector', body:`
+<p>One command from the laptop clone that asks the Railway Postgres whether the <code>pgvector</code> extension exists. Whichever answer it prints, one step later you're done — <b>both outcomes are fully supported</b>.</p>
+<h4>Step 1 — freshen the clone (the branch moves daily)</h4>
+<pre><button class="copy">copy</button><code>cd ~/GW1-openemr-base-clean
+git pull
+cd sidecar</code></pre>
+<h4>Step 2 — find the sidecar's Postgres card</h4>
+<p><a href="https://railway.app/dashboard" target="_blank" rel="noopener">Railway</a> project canvas → the <b>PostgreSQL</b> card (usually just named "Postgres"). More than one database card? Open the <b>sidecar</b> card → Variables → its <code>DATABASE_URL</code> row shows a reference like <code>\${{Postgres.DATABASE_URL}}</code> — the name inside <code>\${{…}}</code> is the database card you want.</p>
+<h4>Step 3 — copy the PUBLIC connection URL</h4>
+<p>On that Postgres card → <b>Variables</b> tab → the row named <code>DATABASE_PUBLIC_URL</code> (⚠️ not <code>DATABASE_URL</code>). Values are masked — click the <b>copy icon</b> at the right end of that row (safer than revealing + hand-selecting). Sanity-check the paste: it must contain <code>proxy.rlwy.net:</code> followed by a port number; if it contains <code>railway.internal</code> you copied the wrong row — that host only resolves inside Railway and hangs from a laptop.</p>
+<h4>Step 4 — run the check (still inside <code>sidecar/</code>)</h4>
+<pre><button class="copy">copy</button><code>DATABASE_URL='PASTE-THE-URL-HERE' npm run verify:pgvector</code></pre>
+<p>Replace <code>PASTE-THE-URL-HERE</code> with the step-3 URL — <b>keep the single quotes</b>, everything on <b>one line</b>, one space before <code>npm</code>. The left-hand name stays <code>DATABASE_URL</code> even though the value came from the <code>DATABASE_PUBLIC_URL</code> row — the script reads the variable <i>named</i> <code>DATABASE_URL</code>; you're handing it the public value.</p>
+<div class="warnbox"><b>DO NOT RUN the example below — illustration only.</b> The host and credentials are fake (running it prints a <code>query failed:</code> error). It exists to show what the finished command <i>looks like</i>:</div>
+<pre><code>DATABASE_URL='postgresql://postgres:AbC123xYz456@maglev.proxy.rlwy.net:43210/railway' npm run verify:pgvector</code></pre>
+<h4>Step 5 — read the result (exact lines the script prints)</h4>
+<table><tr><th>The output says</th><th>Meaning</th><th>What you do</th></tr>
+<tr><td><code>pgvector AVAILABLE (already installed, version …)</code> or <code>pgvector AVAILABLE (installed now, version …)</code></td><td>best outcome — "installed now" = the script enabled it; that's its job, not an error</td><td><b>nothing</b> — leave <code>RETRIEVER_DENSE_BACKEND</code> unset. Item 2 done.</td></tr>
+<tr><td><code>pgvector NOT AVAILABLE on this Postgres image.</code></td><td>Railway's Postgres image ships without the extension</td><td>add ONE variable on the <b>sidecar</b> card (card-0 click path): name <code>RETRIEVER_DENSE_BACKEND</code>, value <code>memory</code> → Apply/Deploy. Fully supported fallback at this corpus size. Item 2 done.</td></tr>
+<tr><td><code>verify:pgvector — query failed: getaddrinfo ENOTFOUND …railway.internal</code> (or it hangs ~30 s, then times out)</td><td>you pasted the internal URL</td><td>redo step 3 — copy the <code>DATABASE_PUBLIC_URL</code> row</td></tr>
+<tr><td><code>verify:pgvector — query failed: password authentication failed …</code></td><td>the URL got truncated or edited in the paste</td><td>redo step 3 with the row's copy icon; re-paste the whole thing between the quotes</td></tr>
+<tr><td><code>verify:pgvector — DATABASE_URL is not set; nothing to verify (exit 2)</code></td><td>the inline variable never reached the command (name typo'd, or command split across lines)</td><td>retype step 4 as ONE line starting exactly <code>DATABASE_URL='</code></td></tr>
+<tr><td><code>Cannot find module …</code> / <code>tsx: command not found</code></td><td>dependencies missing in this clone</td><td><code>npm ci</code> inside <code>sidecar/</code>, then rerun step 4</td></tr>
+<tr><td>any other <code>query failed: …</code></td><td>—</td><td>paste the full line in chat; the agent diagnoses it</td></tr></table>
+<h4>Step 6 — report the outcome in chat</h4>
+<p>Say <code>AVAILABLE</code> or <code>NOT AVAILABLE</code> — the agent records the decision in <code>W2_ARCHITECTURE.md</code> §15 / board ticket 0.1.</p>
+<div class="verify"><b>Verify:</b> step 5's first two rows ARE today's verification (the run works now — your clone is on the W2 branch). The <code>/ready</code> echo is post-merge: <code>.dependencies.retriever_index.status</code> reads <code>ok</code> once PR #9's build is deployed.</div>`},
+
+{ id:'a4', order:'on hold', title:'4 · LangSmith — DEMO service only', sub:'⏸ ON HOLD (user, 2026-07-14) — single-service posture; revisit only if a separate demo service appears', body:`
+<div class="warnbox"><b>Fence:</b> demo Railway service only. If you run a single sidecar service today, <b>skip this</b> until a separate demo service exists — never put it on the main service.</div>
+<p><b>Get the key:</b> <a href="https://smith.langchain.com" target="_blank" rel="noopener">smith.langchain.com</a> → <b>Settings</b> (gear, bottom-left) → <b>API Keys</b> → <b>Create API Key</b> (looks like <code>lsv2_pt_…</code>). The project auto-creates on the first trace — no pre-creation needed.</p>
+<h4>Variables — DEMO service only</h4>
+<table><tr><th>Variable</th><th>Value</th></tr>
+<tr><td><code>LANGSMITH_TRACING</code></td><td><code>true</code></td></tr>
+<tr><td><code>LANGSMITH_API_KEY</code></td><td><code>lsv2_…</code></td></tr>
+<tr><td><code>LANGSMITH_PROJECT</code></td><td><code>clinical-copilot-w2-demo</code></td></tr></table>
+<div class="verify"><b>Verify:</b> demo deploy log prints <code>LangSmith tracing ON — demo environment posture</code>; one evidence turn → a LangGraph run tree under that project. The production log must still say <code>tracing off</code>.</div>`},
+
+{ id:'a8', order:'do last', title:'8 · Live eval dispatch — pre-milestone sanity', sub:'✅ done 2026-07-14 — dispatch on main succeeded 11:39 UTC; eval-results artifact verified via Actions API (F.6 prerequisite)', body:`
+<p><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions" target="_blank" rel="noopener">Actions</a> (top tab) → <b>Sidecar Evals</b> (left sidebar) → <b>Run workflow</b> (grey dropdown, right side) → branch <code>claude/openemr-rag-requirements-x25vzm</code> or <code>main</code> → green <b>Run workflow</b>. CLI alternative (needs <code>gh auth login</code>):</p>
+<pre><button class="copy">copy</button><code>gh workflow run "Sidecar Evals" --ref main</code></pre>
+<div class="verify"><b>Verify:</b> the run goes green; open it → the <b>Artifacts</b> section at the bottom has <code>eval-results</code>. The scheduled live-model suite (<code>LIVE_EVALS=1</code>) rides ticket F.6 — this dispatch proves the pipe.</div>`},
+];
+
+const KEY = 'w2-user-actions-v1';
+const state = JSON.parse(localStorage.getItem(KEY) || '{}');
+const main = document.getElementById('items');
+
+for (const item of ITEMS) {
+  const card = document.createElement('section');
+  card.className = 'card' + (state[item.id] ? ' done' : '');
+  card.innerHTML = `
+    <div class="head">
+      <input type="checkbox" id="cb-${item.id}" ${state[item.id] ? 'checked' : ''} aria-label="done">
+      <div class="t"><b>${item.title}</b><div class="sub">${item.sub}</div></div>
+      <span class="order">${item.order}</span>
+    </div>
+    <div class="body links">${item.body}</div>`;
+  main.appendChild(card);
+  const cb = card.querySelector('input');
+  card.querySelector('.head').addEventListener('click', (e) => {
+    if (e.target === cb) return;
+    card.classList.toggle('open');
+  });
+  cb.addEventListener('change', () => {
+    state[item.id] = cb.checked;
+    localStorage.setItem(KEY, JSON.stringify(state));
+    card.classList.toggle('done', cb.checked);
+    paint();
+  });
+}
+function paint() {
+  const done = ITEMS.filter(i => state[i.id]).length;
+  document.getElementById('fill').style.width = (100 * done / ITEMS.length) + '%';
+  document.getElementById('count').textContent = `${done}/${ITEMS.length} done`;
+}
+paint();
+document.getElementById('reset').addEventListener('click', () => {
+  if (!confirm('Clear all checkboxes?')) return;
+  localStorage.removeItem(KEY);
+  location.reload();
+});
+document.addEventListener('click', (e) => {
+  if (!e.target.classList || !e.target.classList.contains('copy')) return;
+  const code = e.target.parentElement.querySelector('code');
+  navigator.clipboard.writeText(code.textContent).then(() => {
+    e.target.textContent = 'copied';
+    setTimeout(() => { e.target.textContent = 'copy'; }, 1200);
+  });
+});
+</script>
+</body>
+</html>

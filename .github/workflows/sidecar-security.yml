@@ -1,0 +1,60 @@
+# Week 2 (D.6, REQ G7): dependency audit + security scan on every PR into main that
+# touches the sidecar. The pre-existing semgrep.yml is branch-filtered to master/rel-*
+# (upstream OpenEMR's branches) and never fires on this fork's main — this workflow is
+# the sidecar-scoped equivalent that actually gates our PRs.
+name: Sidecar Security
+
+on:
+  pull_request:
+    paths:
+      - 'sidecar/**'
+      - '.github/workflows/sidecar-security.yml'
+  push:
+    paths:
+      - 'sidecar/**'
+      - '.github/workflows/sidecar-security.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-24.04
+    name: npm audit (sidecar + panel)
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      # High+ severity fails the job; moderate and below reports without blocking —
+      # the gate must be strict enough to matter and calm enough to never get disabled.
+      - name: Audit sidecar (production deps)
+        working-directory: sidecar
+        run: npm audit --omit=dev --audit-level=high
+      - name: Audit panel (production deps)
+        working-directory: sidecar/panel
+        run: npm audit --omit=dev --audit-level=high
+
+  semgrep:
+    runs-on: ubuntu-24.04
+    name: semgrep (sidecar JS/TS)
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v7
+      # direct-response-write is an Express rule: it assumes res.send(userInput) can emit
+      # HTML. Fastify's reply.send serializes objects to JSON (content-type
+      # application/json) and the sidecar renders no HTML anywhere, so the rule
+      # false-positives on every JSON route. Excluded wholesale rather than suppressed
+      # line-by-line so the next JSON route doesn't re-trip it.
+      - name: Scan sidecar with JS/TS + security-audit rulesets
+        run: >-
+          semgrep scan --error
+          --config p/javascript --config p/nodejs --config p/security-audit
+          --exclude-rule javascript.express.security.audit.xss.direct-response-write.direct-response-write
+          sidecar/src sidecar/eval

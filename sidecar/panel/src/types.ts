@@ -15,6 +15,7 @@ export const SOURCE_TYPES = [
     'clinical_observation',
     'external_ehr_import',
     'scribe_transcript',
+    'guideline_evidence',
 ] as const;
 export type SourceType = (typeof SOURCE_TYPES)[number];
 
@@ -35,13 +36,16 @@ export interface Attribution {
     confidence?: number;
 }
 
-export interface ExcerptLocation {
-    type: 'character_range';
-    start_char: number;
-    end_char: number;
-    context_before: string | null;
-    context_after: string | null;
-}
+export type ExcerptLocation =
+    | {
+          type: 'character_range';
+          start_char: number;
+          end_char: number;
+          context_before: string | null;
+          context_after: string | null;
+      }
+    | { type: 'page_bbox'; page: number; x: number; y: number; w: number; h: number }
+    | { type: 'page'; page: number };
 
 export interface CitationRef {
     id: string;
@@ -54,6 +58,8 @@ export interface CitationRef {
     source_document_id: string | null;
     document_date: string | null;
     deep_link_url?: string | null;
+    page_or_section?: string | null;
+    field_or_chunk_id?: string | null;
 }
 
 // ---- Facts (schemas/facts.ts) ----
@@ -70,6 +76,7 @@ export const FACT_TYPES = [
     'family_history',
     'patient_goal',
     'chief_complaint',
+    'lab_result',
 ] as const;
 export type FactType = (typeof FACT_TYPES)[number];
 
@@ -200,7 +207,20 @@ export type PatientFact = FactBase &
         | { fact_type: 'family_history'; content: FamilyHistoryContent }
         | { fact_type: 'patient_goal'; content: PatientGoalContent }
         | { fact_type: 'chief_complaint'; content: ChiefComplaintContent }
+        | { fact_type: 'lab_result'; content: LabResultContent }
     );
+
+// Week 2 (A.6): extracted lab value — mirrors schemas/facts.ts LabResultContentSchema.
+export interface LabResultContent {
+    test_name: string;
+    value: string;
+    value_numeric: number | null;
+    unit: string | null;
+    reference_range: string | null;
+    abnormal_flag: 'normal' | 'low' | 'high' | 'critical_low' | 'critical_high' | 'abnormal' | null;
+    collection_date: string | null;
+    performing_lab: string | null;
+}
 
 // ---- Contradictions (schemas/contradictions.ts, runtime projection) ----
 

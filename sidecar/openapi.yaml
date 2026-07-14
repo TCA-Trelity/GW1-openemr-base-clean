@@ -1,0 +1,274 @@
+# Sidecar HTTP contract (Week 2 E.7, REQ G16). Drift-gated by test/openapi.test.ts:
+# every path+method here must be registered by buildServer, and every registered
+# route must appear here — both directions fail CI. Shapes are summarized at the
+# field level the panel/Bruno rely on; Zod schemas in src/schemas/ remain the
+# canonical validators (G1: one schema serves API and UI).
+openapi: 3.0.3
+info:
+  title: Clinical Co-Pilot Sidecar API
+  description: >
+    Preparation pipeline, fact store, deterministic citation gate, document
+    ingestion (attach_and_extract), hybrid guideline retrieval, and streaming
+    chat beside an untouched OpenEMR. Every response carries x-correlation-id;
+    a full trace reconstructs from that ID alone (G4).
+  version: "2.0.0"
+  license:
+    name: GPL-3.0
+servers:
+  - url: http://localhost:8080
+    description: local dev
+  - url: https://{railway-app}.up.railway.app
+    description: Railway deploy (public demo)
+tags:
+  - { name: health }
+  - { name: auth }
+  - { name: record, description: deterministic reads over the seeded fact store }
+  - { name: prep }
+  - { name: chat }
+  - { name: ingestion, description: "Week 2: attach_and_extract document flow" }
+  - { name: evidence, description: "Week 2: hybrid guideline retrieval" }
+  - { name: ops }
+
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Liveness — never depends on downstream services.
+      responses:
+        "200": { description: "{ status: ok }" }
+  /ready:
+    get:
+      tags: [health]
+      summary: Readiness — real dependency probes with degraded statuses (G14).
+      description: >
+        Dependencies include openemr, anthropic, langfuse, postgres, redis, and
+        the Week 2 trio document_storage / retriever_index / reranker. Absent
+        probes report not_configured and never fail readiness; a configured
+        probe that throws fails readiness (503).
+      responses:
+        "200": { description: "{ ready: true, dependencies: {name: {status}} }" }
+        "503": { description: "a configured dependency failed, or production is missing required deps" }
+  /api/dev-login:
+    post:
+      tags: [auth]
+      summary: Mint a demo dev token bound to (role, patient) — AZ4.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username: { type: string, default: dr-demo }
+                role: { type: string, enum: [physician, nurse, resident] }
+                patient: { type: string, nullable: true }
+      responses:
+        "200": { description: "{ access_token, token_type: Bearer, expires_in, role, patient }" }
+        "404": { description: dev-login disabled (DEV_LOGIN_SECRET unset) or unknown patient }
+  /api/me:
+    get:
+      tags: [auth]
+      summary: The verified principal + role capabilities, or authenticated:false.
+      responses:
+        "200": { description: "{ authenticated, user?, patient?, role?, token_type?, capabilities? }" }
+  /api/patients:
+    get:
+      tags: [record]
+      summary: Day schedule (names + appointment times) — the panel's bootstrap read.
+      responses:
+        "200": { description: "{ patients: PatientRecord[] }" }
+        "503": { description: store_not_configured }
+  /api/overview/{patientId}:
+    get:
+      tags: [record]
+      summary: Deterministic landing payload (facts by type, risk flags, care plan) — no LLM.
+      parameters: [{ name: patientId, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: OverviewPayload }
+        "404": { description: patient_not_found }
+        "503": { description: store_not_configured }
+  /api/facts/{patientId}:
+    get:
+      tags: [record]
+      summary: Full fact bundle (facts, images, treatments, source documents).
+      parameters: [{ name: patientId, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: FactBundle }
+        "404": { description: patient_not_found }
+        "503": { description: store_not_configured }
+  /api/facts/{patientId}/{factId}/verify:
+    post:
+      tags: [record]
+      summary: Record a clinician's verification of a fact (role-gated, attributable — S3.3).
+      description: Requires an authenticated principal REGARDLESS of AUTH_MODE.
+      parameters:
+        - { name: patientId, in: path, required: true, schema: { type: string } }
+        - { name: factId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: "{ ok, verification, needs_attending_sign_off }" }
+        "401": { description: verification_requires_auth }
+        "403": { description: role_cannot_verify (nurse) }
+        "404": { description: fact_not_found }
+        "503": { description: store_not_configured }
+  /api/brief/{patientId}:
+    get:
+      tags: [prep]
+      summary: Latest completed pre-visit brief.
+      parameters: [{ name: patientId, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: StoredBrief }
+        "404": { description: no completed brief }
+        "503": { description: store_not_configured }
+  /api/prep/{patientId}:
+    post:
+      tags: [prep]
+      summary: Trigger a preparation run (role-gated in enforced mode; budget-gated).
+      parameters: [{ name: patientId, in: path, required: true, schema: { type: string } }]
+      responses:
+        "202": { description: "{ prep_run_id } — stages stream into prep_runs" }
+        "404": { description: patient_not_found }
+        "409": { description: a run is already in flight }
+        "429": { description: llm_budget_exceeded ($5/day SpendGuard) }
+        "503": { description: store_not_configured }
+  /api/prep-runs/{patientId}:
+    get:
+      tags: [prep]
+      summary: Newest-first prep-run history with live stage progress.
+      parameters: [{ name: patientId, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: "{ runs: PrepRunRecord[] }" }
+        "503": { description: store_not_configured }
+  /api/chat/{patientId}:
+    post:
+      tags: [chat]
+      summary: One chat turn, streamed as SSE.
+      description: >
+        Guards answer as plain JSON before the stream opens (400 invalid message,
+        404 patient, 429 budget). After the stream opens, events are
+        seed | status | delta | citation | tool_use | tool_result | done | error.
+        Week 2 (E.9): guideline-shaped questions take the evidence lane — a
+        `status` event ("checking practice protocols…") then a critic-verified
+        answer whose citations are guideline_evidence; graph failures fall back
+        to the Week 1 loop. done carries { conversation_id, citations,
+        unverified_count, tools_used, prescriptive_flag_count }.
+      parameters: [{ name: patientId, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message: { type: string, maxLength: 2000 }
+                conversation_id: { type: string }
+                viewing_image_id: { type: string }
+      responses:
+        "200": { description: "text/event-stream of chat events" }
+        "400": { description: invalid_message }
+        "404": { description: patient_not_found }
+        "429": { description: llm_budget_exceeded }
+        "503": { description: store_not_configured }
+    get:
+      tags: [chat]
+      summary: Replay a conversation transcript (persistence across reloads).
+      parameters:
+        - { name: patientId, in: path, required: true, schema: { type: string } }
+        - { name: conversation_id, in: query, required: false, schema: { type: string } }
+      responses:
+        "200": { description: "{ messages: StoredChatMessage[] }" }
+        "503": { description: store_not_configured }
+  /api/ehr-sync/{patientId}:
+    post:
+      tags: [record]
+      summary: Live FHIR R4 pull that rewrites the EHR snapshot (wipe-and-rewrite).
+      parameters: [{ name: patientId, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: "{ fact_count, resource_counts, synced_at }" }
+        "409": { description: not_linked_to_openemr | patient_not_found }
+        "503": { description: ehr_sync_not_configured }
+  /api/patients/{patientId}/documents:
+    post:
+      tags: [ingestion]
+      summary: attach_and_extract — multipart document upload (Week 2 S1/R1).
+      description: >
+        Requires an attributable principal with documentsWrite (physician/nurse)
+        REGARDLESS of AUTH_MODE (E.3). Accepts PDF/PNG/JPEG with
+        doc_type ∈ {lab_pdf, intake_form}. Extraction runs prep-time; the 202
+        carries a deterministic ingestion id derived from the content bytes.
+      parameters: [{ name: patientId, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [doc_type, file]
+              properties:
+                doc_type: { type: string, enum: [lab_pdf, intake_form] }
+                file: { type: string, format: binary }
+      responses:
+        "202": { description: "{ ingestion_id, correlation_id, status_url }" }
+        "400": { description: missing file or invalid doc_type }
+        "401": { description: document_upload_requires_auth }
+        "403": { description: role_cannot_upload_documents }
+        "413": { description: file exceeds the size limit }
+        "415": { description: unsupported media type }
+        "503": { description: ingestion not configured }
+  /api/ingestions/{id}:
+    get:
+      tags: [ingestion]
+      summary: Full staged ingestion record (correlation-traceable, G4).
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: IngestionRecord (status, stages, grounding summary, facts_persisted) }
+        "404": { description: unknown ingestion id }
+  /api/ingestions/{id}/file:
+    get:
+      tags: [ingestion]
+      summary: The uploaded original, for the panel's bbox overlay (E.2 preview cache).
+      description: Capped FIFO cache — evicted/restarted entries 404 with a pointer to OpenEMR Documents (the system of record).
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: the original bytes with its upload content-type }
+        "404": { description: not in the preview cache }
+  /api/patients/{patientId}/ingestions:
+    get:
+      tags: [ingestion]
+      summary: The patient's ingestion history.
+      parameters: [{ name: patientId, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: "{ ingestions: IngestionRecord[] }" }
+  /api/evidence/search:
+    post:
+      tags: [evidence]
+      summary: Hybrid guideline retrieval (BM25 + dense → RRF → rerank) — Week 2 S2/R3.
+      description: >
+        Queries are PHI-scrubbed before search (searched_query in the response is
+        the log-safe form). Out-of-domain queries return empty with empty=true —
+        never a forced match.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [q]
+              properties:
+                q: { type: string, minLength: 3, maxLength: 500 }
+                disease_tags: { type: array, maxItems: 6, items: { type: string } }
+                top_k: { type: integer, minimum: 1, maximum: 8 }
+      responses:
+        "200": { description: "{ snippets: EvidenceSnippet[], searched_query, rerank_applied, empty }" }
+        "400": { description: invalid query shape }
+  /api/usage:
+    get:
+      tags: [ops]
+      summary: LLM spend ledger summary (llm_calls) + daily budget state.
+      responses:
+        "200": { description: "{ spent_usd_24h, budget_usd, calls }" }
+        "503": { description: store_not_configured }
+  /api/images/{filename}:
+    get:
+      tags: [record]
+      summary: Scan pixels (static route; flat filenames only, IC4 loader shares the directory).
+      parameters: [{ name: filename, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: image bytes }
+        "404": { description: unknown filename }

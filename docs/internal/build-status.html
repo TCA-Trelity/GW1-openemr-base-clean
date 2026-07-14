@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W2 Build Status — Clinical Co-Pilot</title>
+<style>
+  :root {
+    --page: #f9f9f7; --surface: #fcfcfb;
+    --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+    --grid: #e1e0d9; --border: rgba(11,11,11,0.10);
+    --accent: #2a78d6; --accent-track: #cde2fb;
+    --good: #0ca30c; --good-text: #006300;
+    --warn: #fab219; --serious: #ec835a; --crit: #d03b3b;
+  }
+  :root[data-theme="dark"] {
+    --page: #0d0d0d; --surface: #1a1a19;
+    --ink: #ffffff; --ink2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --border: rgba(255,255,255,0.10);
+    --accent: #3987e5; --accent-track: #0d366b;
+    --good: #0ca30c; --good-text: #0ca30c;
+    --warn: #fab219; --serious: #ec835a; --crit: #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page: #0d0d0d; --surface: #1a1a19;
+      --ink: #ffffff; --ink2: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --border: rgba(255,255,255,0.10);
+      --accent: #3987e5; --accent-track: #0d366b;
+      --good: #0ca30c; --good-text: #0ca30c;
+      --warn: #fab219; --serious: #ec835a; --crit: #d03b3b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 20px 20px 60px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  header.top { display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+  h1 { font-size: 20px; margin: 0; }
+  .stamp { color: var(--ink2); font-size: 13px; }
+  .toplinks { font-size: 13px; color: var(--ink2); }
+  .toplinks a { margin-left: 10px; }
+  #themeToggle {
+    background: var(--surface); color: var(--ink2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 3px 10px; font: inherit; font-size: 12px; cursor: pointer;
+  }
+
+  h2 { font-size: 15px; margin: 30px 0 10px; }
+  h2 .sub { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 8px; }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-top: 14px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .tile .label { color: var(--ink2); font-size: 12px; }
+  .tile .value { font-weight: 600; font-size: 26px; margin-top: 2px; }
+  .tile.hero .value { font-size: 48px; line-height: 1.05; }
+  .tile .note { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+  .meter { height: 12px; border-radius: 6px; background: var(--accent-track); overflow: hidden; position: relative; }
+  .meter > i { display: block; height: 100%; background: var(--accent); border-radius: 6px 0 0 6px; }
+  .seg { display: flex; gap: 2px; height: 12px; border-radius: 6px; overflow: hidden; background: var(--surface); }
+  .seg i { display: block; height: 100%; }
+  .seg .s-done { background: var(--good); }
+  .seg .s-active { background: var(--accent); }
+  .seg .s-pending { background: var(--grid); }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; color: var(--ink2); font-size: 12px; margin-top: 6px; }
+  .legend .k { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 1px 9px; font-size: 12px; color: var(--ink); white-space: nowrap;
+  }
+  .chip .ico { font-size: 11px; }
+  .chip.done    { background: color-mix(in srgb, var(--good) 12%, var(--surface)); }
+  .chip.done .ico { color: var(--good-text); }
+  .chip.active  { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+  .chip.active .ico { color: var(--accent); }
+  .chip.pending { background: transparent; color: var(--ink2); }
+  .chip.pending .ico { color: var(--muted); }
+  .chip.blocked { background: color-mix(in srgb, var(--crit) 12%, var(--surface)); }
+  .chip.blocked .ico { color: var(--crit); }
+  .chip.seam    { background: transparent; color: var(--muted); }
+  .req {
+    display: inline-block; border-radius: 5px; padding: 0 6px; margin: 0 2px 2px 0;
+    background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+    border: 1px solid var(--border); font-size: 11px; color: var(--ink2); white-space: nowrap;
+  }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
+  .card .head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .card .head .t { font-weight: 600; }
+  .card .head .band { color: var(--muted); font-size: 12px; }
+  .wavebar { display: flex; align-items: center; gap: 10px; min-width: 220px; flex: 1; max-width: 340px; }
+  .wavebar .meter { flex: 1; }
+  .wavebar .n { color: var(--ink2); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+  .tblwrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; font-size: 12px; padding: 5px 10px 5px 0; border-bottom: 1px solid var(--grid); }
+  td { padding: 6px 10px 6px 0; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td.id { color: var(--ink2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.deps { color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+  .path { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .pnode { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; }
+  .pnode .pid { font-weight: 600; }
+  .pnode .pt { display: block; color: var(--ink2); font-size: 12px; }
+  .parr { color: var(--muted); font-size: 16px; }
+  .pathnote { color: var(--ink2); font-size: 13px; margin-top: 8px; }
+
+  .foot { color: var(--muted); font-size: 12px; border-top: 1px solid var(--grid); margin-top: 34px; padding-top: 12px; }
+  .foot code { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+  .mcell { min-width: 130px; }
+  .mcell .meter { margin-top: 4px; }
+  .mcell .mn { color: var(--ink2); font-size: 12px; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Week 2 Build Status — Clinical Co-Pilot <span class="stamp" id="stamp"></span></h1>
+      <p class="stamp" style="margin:4px 0 0">internal working docs:
+        <a href="user-actions.html">user-actions form</a> ·
+        <a href="tickets/README.md">ticket specs</a> ·
+        <a href="README.md">about this directory</a></p>
+      <div class="toplinks">
+        Sources of truth:
+        <a href="requirements.md">requirements.md</a>
+        <a href="execution-plan.md">execution-plan.md</a>
+        <a href="../../W2_ARCHITECTURE.md">W2_ARCHITECTURE.md</a>
+        <a href="defense-outline.md">defense-outline.md</a>
+        <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/pull/9">PR #9</a>
+      </div>
+    </div>
+    <button id="themeToggle" type="button">theme: auto</button>
+  </header>
+
+  <section class="tiles" id="tiles"></section>
+
+  <h2>Expectation bands <span class="sub">spec checkpoints, sequenced as waves — no day framing</span></h2>
+  <div id="bands"></div>
+
+  <h2>Critical path <span class="sub">longest dependency chain — start Wave 0 first, everything else fans out</span></h2>
+  <div class="card">
+    <div class="path" id="critpath"></div>
+    <div class="pathnote" id="pathnote"></div>
+  </div>
+
+  <h2>Ticket board <span class="sub">48 build tickets across 7 waves (+ planning wave, complete) — statuses flip in the same PR as the code</span></h2>
+  <div id="waves"></div>
+
+  <h2>Requirements coverage <span class="sub">acceptance checkboxes live in requirements.md — this matrix mirrors them</span></h2>
+  <div id="reqs"></div>
+
+  <h2>Runtime analytics <span class="sub">targets now; measured values land with D.1 (gate), E.4 (dashboards), F.1 (baselines)</span></h2>
+  <div class="card">
+    <div class="head"><span class="t">Eval gate — category status</span><span class="band">harness: sidecar/eval · gate math: tiered (locked #11)</span></div>
+    <div class="tblwrap"><table id="evals"></table></div>
+  </div>
+  <div class="card">
+    <div class="head"><span class="t">SLO targets vs measured</span><span class="band">measured column fills at F.1 (baselines)</span></div>
+    <div class="tblwrap"><table id="slos"></table></div>
+  </div>
+  <div class="card">
+    <div class="head"><span class="t">Cost &amp; alerts</span><span class="band">ledger-backed: <code>GET /api/usage</code> · report lands at F.2</span></div>
+    <div class="tblwrap"><table id="ops"></table></div>
+  </div>
+
+  <div class="foot">
+    <b>How this page updates (anti-drift protocol):</b> this file is the visual mirror of
+    <code>docs/w2/requirements.md</code> (acceptance) and <code>docs/w2/execution-plan.md</code> (tickets).
+    Every implementation PR edits the <code>DATA</code> block below in the same commit that lands the code —
+    ticket status, acceptance counts, measured numbers. W1 precedent: <code>docs/execution/build-status.html</code>,
+    <code>docs/execution/ops-status.html</code>. Session ritual: this page + the ops page are opened at the start
+    of every working session (see CLAUDE.md “Week 2 session-start ritual”).
+  </div>
+</div>
+
+<script>
+// ============================================================================
+// DATA — the single editable block. Statuses: done | active | pending | blocked.
+// Update in the SAME PR as the code it describes (anti-drift rule #3).
+// ============================================================================
+const DATA = {
+  stamp: "updated 2026-07-14 · session 4 (ALL user actions done or on-hold; 8 verified via Actions API; semgrep green'd: XSS rule excluded as Fastify false-positive + TLS line suppressed w/ justification; PR #9 merge = last lever)",
+  budget: { capPerDay: "$5.00", spentToday: "—", note: "SpendGuard unchanged (locked #16); Cohere rides a ledger line at B.4" },
+  w1Floor: "24/24 W1 evals passing · read-path p95 46 ms @10 / 193 ms @50 (regression floor)",
+
+  waves: [
+    { id: "P", title: "Wave P — Planning (this session)", band: "done",
+      tickets: [
+        { id: "P.1", t: "Requirements register (docs/w2/requirements.md)", reqs: ["all"], deps: "—", s: "done" },
+        { id: "P.2", t: "W2_ARCHITECTURE.md full draft (root)", reqs: ["D2","G8","G9"], deps: "—", s: "done" },
+        { id: "P.3", t: "Execution plan — waves + tickets", reqs: ["plan"], deps: "—", s: "done" },
+        { id: "P.4", t: "Defense outline — 6 slides (~5 min)", reqs: ["defense"], deps: "—", s: "done" },
+        { id: "P.5", t: "Draft PR #9 opened (docs package)", reqs: ["D1 partial"], deps: "—", s: "done" },
+      ]},
+    { id: "0", title: "Wave 0 — Preflight", band: "Band 1 · MVP", tickets: [
+        { id: "0.1", t: "pgvector VERIFIED on Railway Postgres (user, 2026-07-14): AVAILABLE, extension enabled v0.8.4 — RETRIEVER_DENSE_BACKEND stays default pgvector", reqs: ["S2/R3"], deps: "—", s: "done" },
+        { id: "0.2", t: "document.write scope + upload client shipped; OAuth re-registered + 4 creds on Railway (user, 2026-07-14); live POST awaits PR #9 merge→redeploy", reqs: ["S1/R1","G7"], deps: "PR #9 merge", s: "active" },
+        { id: "0.3", t: "Langfuse activated: Cloud keys live + prep trace verified (user, 2026-07-14); graph spans join post-merge", reqs: ["R7"], deps: "—", s: "done" },
+        { id: "0.4", t: "Cohere/LangSmith keys in boot-crash-proof config", reqs: ["S2/R3","R7","G2"], deps: "—", s: "done" },
+        { id: "0.5", t: "Branch protection FLIPPED: Run eval suite is a required check on main (user, 2026-07-13)", reqs: ["S4/R6","D5"], deps: "—", s: "done" },
+      ]},
+    { id: "A", title: "Wave A — Ingestion spine", band: "Band 1 · MVP · ∥ with B", tickets: [
+        { id: "A.1", t: "LabPdfExtraction + IntakeFormExtraction Zod schemas + validation tests", reqs: ["R2","D3","G3"], deps: "—", s: "done" },
+        { id: "A.2", t: "Citation contract v2 (guideline_evidence, page_bbox) + migration note", reqs: ["R5","G1"], deps: "—", s: "done" },
+        { id: "A.3", t: "Upload endpoint + OpenEMR document write + dedupe + attach_and_extract (live EHR POST pending deploy)", reqs: ["S1/R1","G1"], deps: "0.2", s: "active" },
+        { id: "A.4", t: "Extraction job: Claude vision → Zod parse → retry → ingestion states", reqs: ["S1/R1","G3","G2"], deps: "A.1, A.3", s: "done" },
+        { id: "A.5", t: "Geometric grounding: word-box bbox / page fallback / unverified (tested on real fixtures)", reqs: ["R5","P2"], deps: "A.2, A.4", s: "done" },
+        { id: "A.6", t: "Persistence: facts + provenance + renal→HCQ re-tier; vitals mapping (live vitals row pending deploy)", reqs: ["S1/R1","G1"], deps: "A.4", s: "active" },
+        { id: "A.7", t: "Fixtures: renal panel (eGFR↓) + updated intake + degradation ladder + HbA1c (6 PDFs, regenerable)", reqs: ["S1","D4"], deps: "—", s: "done" },
+      ]},
+    { id: "B", title: "Wave B — Corpus + retrieval", band: "Band 1 · MVP · ∥ with A", tickets: [
+        { id: "B.1", t: "8 authored practice protocols committed (AAO-grounded, metadata, zero PHI) + README", reqs: ["S2/R3","G18"], deps: "—", s: "done" },
+        { id: "B.2", t: "Structure-aware chunker (thresholds stay with conditions)", reqs: ["S2/R3"], deps: "B.1", s: "done" },
+        { id: "B.3", t: "Index: in-memory dense+BM25 shipped behind the interface; pgvector/tsvector at deploy", reqs: ["S2/R3","G18"], deps: "0.1, 0.4, B.2", s: "active" },
+        { id: "B.4", t: "Hybrid retrieve: keyword+dense → RRF → Cohere Rerank → top-k; degraded path", reqs: ["S2/R3","G2"], deps: "B.3", s: "done" },
+        { id: "B.5", t: "PHI-free query scrubber + query rewriting + disease/laterality filters", reqs: ["E5","G18","P5"], deps: "B.4", s: "done" },
+        { id: "B.6", t: "Retrieval goldens: 10 canonical + 2 refusal + PHI canary (retrieval_grounded live)", reqs: ["S4/R6","D4"], deps: "B.4, D.1", s: "done" },
+      ]},
+    { id: "C", title: "Wave C — The graph", band: "Band 1 · MVP · starts vs stubs", tickets: [
+        { id: "C.1", t: "LangGraph StateGraph skeleton + typed state + contract tests", reqs: ["S3/R4","G1","G7"], deps: "A.4/B.4 ifaces", s: "done" },
+        { id: "C.2", t: "Supervisor-as-entry router (short-circuits + Haiku tie-break; latency baseline pending)", reqs: ["S3/R4"], deps: "C.1", s: "done" },
+        { id: "C.3", t: "Worker nodes wrap A/B; ≤5 s evidence budget w/ degraded handoff (streaming UX = E.9)", reqs: ["S3/R4","G2"], deps: "C.1, A.4, B.4", s: "done" },
+        { id: "C.4", t: "Critic node: citation gate + lint promotion", reqs: ["E1"], deps: "C.1", s: "done" },
+        { id: "C.5", t: "Handoff logging + trace worked-example (span binding rides E.4)", reqs: ["G4","G13","P3"], deps: "C.3, 0.3", s: "done" },
+        { id: "C.6", t: "Ingestion-time evidence pinning + per-patient pin store (chat Tier-0 read = chat wiring)", reqs: ["S3/R4"], deps: "C.3", s: "done" },
+      ]},
+    { id: "D", title: "Wave D — Eval gate + CI", band: "Band 1 · MVP · D.1/D.3 start now", tickets: [
+        { id: "D.1", t: "Category framework + committed baseline + tiered comparator", reqs: ["S4/R6"], deps: "—", s: "done" },
+        { id: "D.2", t: "58 cases committed — all 6 categories measured + baselined; all 5 corpora wired", reqs: ["S4/R6","D4"], deps: "A.7, B.6, D.1", s: "done" },
+        { id: "D.3", t: "Full-path goldens: fixture PDF → stub VLM → grounding → retrieval → critic → cited answer, keyless", reqs: ["G17"], deps: "A.4, B.4 stubs", s: "done" },
+        { id: "D.4", t: "PR-blocking complete: pull_request trigger (unfiltered) + pre-push hook + REQUIRED check on main", reqs: ["S4/R6","D5"], deps: "D.1, 0.5", s: "done" },
+        { id: "D.5", t: "PHI sweep: log-capture over real ingestion+graph runs + retrieval query scrub — 0 canaries", reqs: ["G18"], deps: "D.3", s: "done" },
+        { id: "D.6", t: "npm audit + semgrep workflow on main PRs + Dependabot sidecar coverage", reqs: ["G7"], deps: "—", s: "done" },
+        { id: "D.7", t: "Hard-gate rehearsal DONE: 3 injected regressions caught (npm run gate-rehearsal + doc)", reqs: ["D5","S4/R6"], deps: "D.2–D.5", s: "done" },
+      ]},
+    { id: "E", title: "Wave E — Integration, UI, observability", band: "Band 2 · Early Submission", tickets: [
+        { id: "E.1", t: "Panel upload: drag-drop + doc-type + live staged progress (front-desk role gate rides E.3)", reqs: ["S5"], deps: "A.3, A.4", s: "done" },
+        { id: "E.2", t: "PDF preview + bbox overlay: three distinct grounding outcomes; file preview route", reqs: ["R5","E2"], deps: "A.5", s: "done" },
+        { id: "E.3", t: "Write-path auth: documentsWrite capability, 401/403 on upload regardless of AUTH_MODE", reqs: ["#14"], deps: "A.3", s: "done" },
+        { id: "E.4", t: "Graph→Langfuse span adapter (guarded, keyed-off) + ops tiles + alerts A4–A6", reqs: ["R7","G6","G15"], deps: "C.5, 0.3", s: "done" },
+        { id: "E.5", t: "LangSmith demo-env fencing: native env vars, boot posture log, RUNBOOK §C2", reqs: ["R7","P5"], deps: "C.3", s: "done" },
+        { id: "E.6", t: "/ready probes: doc storage (token mint), retriever index, reranker — degraded semantics", reqs: ["G14"], deps: "A.3, B.3", s: "done" },
+        { id: "E.7", t: "OpenAPI 3.0 spec (21 endpoints) + two-direction drift contract test", reqs: ["G16"], deps: "A.3 stable routes", s: "done" },
+        { id: "E.8", t: "Bruno 06-documents: dev-login → upload → status → file → evidence search + full-flow docs", reqs: ["G10"], deps: "E.3, E.6", s: "done" },
+        { id: "E.9", t: "Evidence turn LIVE: LLM composer + graph in chat SSE (status event, honest fallback)", reqs: ["G2"], deps: "C.3", s: "done" },
+      ]},
+    { id: "F", title: "Wave F — Hardening + deliverables", band: "Band 3 · Final", tickets: [
+        { id: "F.1", t: "W2 baselines measured (stub backends, honesty-labeled) + W1 floor git-evidenced", reqs: ["G11"], deps: "E wave", s: "done" },
+        { id: "F.2", t: "D7 cost & latency report: COSTS.md §6 — unit costs, Dan-volume projections, bottlenecks, $0 W2 spend", reqs: ["D7","R7"], deps: "F.1", s: "done" },
+        { id: "F.3", t: "README restructure: W1-vs-W2 split, no-guessing quickstart, 34-key env table, D1–D8 map", reqs: ["D1"], deps: "E wave", s: "done" },
+        { id: "F.4", t: "Backup & recovery RUNBOOK §E + EXECUTED restore rehearsal + §10 authority verify", reqs: ["G18","G1"], deps: "—", s: "done" },
+        { id: "F.5", t: "Demo script committed (7 shots, REQ/UC captions, keyless fallbacks) — recording = user action", reqs: ["D6","S5"], deps: "E.9, D.7", s: "active" },
+        { id: "F.6", t: "Pre-milestone live eval run + live smoke", reqs: ["S5"], deps: "D.2", s: "pending" },
+        { id: "F.7", t: "Anti-drift sweep: every checkbox verified or re-scoped", reqs: ["G1"], deps: "all", s: "pending" },
+        { id: "F.8", t: "Stable tag + deploy verification", reqs: ["D8"], deps: "F.3, F.6", s: "pending" },
+      ]},
+  ],
+
+  bands: [
+    { name: "Band 1 — MVP expectation", waves: ["0","A","B","C","D"], note: "two doc types + hybrid RAG + supervisor/2 workers + 50-case PR-blocking gate, demoable" },
+    { name: "Band 2 — Early Submission expectation", waves: ["E"], note: "full UI + observability + engineering spine" },
+    { name: "Band 3 — Final expectation", waves: ["F"], note: "reports, video, hardening, rehearsal evidence, tag" },
+  ],
+
+  criticalPath: [
+    { id: "0.2", t: "doc.write scope" },
+    { id: "A.3", t: "upload + EHR store" },
+    { id: "A.4", t: "VLM extraction" },
+    { id: "A.5", t: "geometric grounding" },
+    { id: "E.2", t: "bbox overlay (R5 core)" },
+  ],
+  pathNote: "Parallel tracks: Wave A ∥ Wave B end-to-end (meet at C.3/C.6) · D.1/D.3 are pure harness work — start immediately · C.1/C.2 build against stubbed interfaces · E.7 skeleton can start with route stubs.",
+
+  // Requirements matrix — acceptance counts mirror docs/w2/requirements.md checkboxes.
+  reqGroups: [
+    { name: "Core (MVP stages + agent requirements)", rows: [
+      { id: "S1/R1", t: "Document ingestion & extraction (attach_and_extract, OpenEMR round-trip, no dupes)", plan: "A.3–A.7, E.1", done: 5, total: 7, s: "active" },
+      { id: "R2", t: "Strict Zod schemas (lab_pdf 7 fields · intake 6+goals)", plan: "A.1", done: 4, total: 5, s: "active" },
+      { id: "S2/R3", t: "Hybrid RAG + rerank (corpus, pgvector+tsvector, RRF, Cohere, PHI-free queries)", plan: "0.1, 0.4, B.1–B.6", done: 7, total: 9, s: "active" },
+      { id: "S3/R4", t: "Supervisor + intake-extractor + evidence-retriever (LangGraph, logged handoffs)", plan: "C.1–C.6", done: 4, total: 7, s: "active" },
+      { id: "R5", t: "Citation contract v2 + required PDF bbox overlay", plan: "A.2, A.5, E.2", done: 4, total: 5, s: "active" },
+      { id: "S4/R6", t: "Eval gate COMPLETE: 58 cases, 6 categories baselined, rehearsal proven, required check live", plan: "0.5, D.1–D.7", done: 7, total: 7, s: "done" },
+      { id: "R7", t: "Observability + cost per encounter (PHI-free)", plan: "0.3, E.4, E.5", done: 2, total: 5, s: "active" },
+      { id: "S5", t: "Integrate, deploy, defend (upload UI, demo auth, traces, UC mapping)", plan: "E.1, E.3, E.9, F.5, F.8", done: 2, total: 5, s: "active" },
+    ]},
+    { name: "Extensions", rows: [
+      { id: "E1", t: "Critic agent — committed (gate promoted to graph node)", plan: "C.4", done: 0, total: 1, s: "pending" },
+      { id: "E2", t: "Click-to-source UI — delivered via R5's required overlay", plan: "E.2", done: 0, total: 0, s: "via-r5" },
+      { id: "E3", t: "Third doc type (referral fax) — deferred, seam built", plan: "—", done: 0, total: 0, s: "seam" },
+      { id: "E4", t: "Lab trend widget — deferred, fields already sufficient", plan: "—", done: 0, total: 0, s: "seam" },
+      { id: "E5", t: "Contextual retrieval — committed (counted in S2/R3)", plan: "B.5", done: 0, total: 0, s: "pending" },
+    ]},
+    { name: "Deliverables", rows: [
+      { id: "D1", t: "Repo: README separates W1 vs W2; no-guessing setup", plan: "F.3", done: 0, total: 1, s: "pending" },
+      { id: "D2", t: "W2_ARCHITECTURE.md at root (incl. G8 strategy + G9 failure modes)", plan: "P.2", done: 1, total: 1, s: "done" },
+      { id: "D3", t: "Schemas + validation tests", plan: "A.1", done: 1, total: 1, s: "done" },
+      { id: "D4", t: "Eval dataset: 50 cases + rubrics + judge config + results", plan: "D.2", done: 0, total: 1, s: "pending" },
+      { id: "D5", t: "CI evidence: hook + blocked-regression proof", plan: "D.4, D.7", done: 0, total: 1, s: "pending" },
+      { id: "D6", t: "Demo video 3–5 min", plan: "F.5", done: 0, total: 1, s: "pending" },
+      { id: "D7", t: "Cost & latency report", plan: "F.2", done: 0, total: 1, s: "pending" },
+      { id: "D8", t: "Deployed app, W2 flow public", plan: "F.8", done: 0, total: 1, s: "pending" },
+    ]},
+    { name: "Engineering (graded, non-optional)", rows: [
+      { id: "G1", t: "Typed contracts everywhere · migration notes · explicit data authority (open: Zod on the vitals-write payload — route pending)", plan: "A.2, F.7 (+table shipped in W2_ARCHITECTURE §10)", done: 2, total: 3, s: "active" },
+      { id: "G2", t: "SLOs · timeouts + retries on all egress · circuit behavior", plan: "A.4, B.4, E.9", done: 1, total: 3, s: "active" },
+      { id: "G3", t: "Raw VLM output never bypasses validation", plan: "A.4", done: 0, total: 1, s: "pending" },
+      { id: "G4", t: "Correlation ID through every W2 boundary; trace from ID alone", plan: "C.5", done: 1, total: 2, s: "active" },
+      { id: "G5", t: "Structured logs: new W2 event types, searchable, PHI-free", plan: "C.5, E.4", done: 0, total: 2, s: "pending" },
+      { id: "G6", t: "Dashboard tiles for W2 metrics", plan: "E.4", done: 1, total: 1, s: "active" },
+      { id: "G7", t: "CI: audit + security scan on main PRs (semgrep green'd 2026-07-14) · contract tests · extraction goldens in required gate · Dependabot sidecar", plan: "0.2, C.1, D.4, D.6", done: 4, total: 4, s: "done" },
+      { id: "G8", t: "Testing strategy documented — §11 layer table verified; open on the per-test failure-mode-naming clause", plan: "P.2 → W2_ARCHITECTURE §11", done: 0, total: 1, s: "active" },
+      { id: "G9", t: "Failure-mode runbook (identify in logs + recovery)", plan: "P.2 → W2_ARCHITECTURE §12", done: 1, total: 1, s: "done" },
+      { id: "G10", t: "Bruno collection covers all W2 workflows", plan: "E.8", done: 1, total: 1, s: "done" },
+      { id: "G11", t: "W2 baselines vs W1 (shared-path regression check)", plan: "F.1", done: 1, total: 1, s: "done" },
+      { id: "G12", t: "One logging convention (no parallel format)", plan: "C.5, E.4", done: 0, total: 1, s: "pending" },
+      { id: "G13", t: "Span hierarchy: worker ⊂ supervisor; sub-calls ⊂ worker", plan: "C.5", done: 0, total: 1, s: "pending" },
+      { id: "G14", t: "/ready: doc storage + vector index + reranker, degraded status", plan: "E.6", done: 1, total: 1, s: "done" },
+      { id: "G15", t: "Alerts A4–A6 with response actions", plan: "E.4", done: 1, total: 1, s: "active" },
+      { id: "G16", t: "Sidecar OpenAPI 3.0 committed + contract-tested + fresh", plan: "E.7", done: 1, total: 1, s: "done" },
+      { id: "G17", t: "Integration tests: fixtures + stubs, no live APIs in CI", plan: "D.3", done: 1, total: 1, s: "done" },
+      { id: "G18", t: "Data model/lineage (shipped §10) · PHI audit in CI · backup/recovery + RPO/RTO", plan: "B.5, D.5, F.4", done: 3, total: 3, s: "done" },
+    ]},
+  ],
+
+  evalCategories: [
+    { c: "safe_refusal", tier: "safety", rule: "any newly-failing case fails the build" },
+    { c: "no_phi_in_logs", tier: "safety", rule: "any newly-failing case fails the build" },
+    { c: "citation_present", tier: "safety", rule: "any newly-failing case fails the build" },
+    { c: "schema_valid", tier: "quality", rule: ">5% drop vs baseline, or below threshold" },
+    { c: "factually_consistent", tier: "quality", rule: ">5% drop vs baseline, or below threshold" },
+    { c: "retrieval_grounded", tier: "quality", rule: ">5% drop vs baseline, or below threshold" },
+  ],
+
+  slos: [
+    { flow: "Document ingestion (upload → facts + pinned evidence)", target: "p95 ≤ 90 s/doc", where: "prep gap (5–20 min)" },
+    { flow: "Evidence retrieval (hybrid + rerank)", target: "p95 ≤ 2.5 s", where: "tool time, streamed" },
+    { flow: "Evidence chat turn (full answer)", target: "≤ 5 s", where: "Tier 1" },
+    { flow: "Fast-path chat first token", target: "< 2 s (+ ≤ 0.4 s router)", where: "unchanged W1 target" },
+    { flow: "W1 read path (regression floor)", target: "p95 46 ms @10 / 193 ms @50", where: "measured baseline — must hold" },
+  ],
+
+  alerts: [
+    { id: "A4", t: "Extraction failure rate", status: "committed" },
+    { id: "A5", t: "RAG retrieval latency", status: "committed" },
+    { id: "A6", t: "Eval regression >5% (any category)", status: "committed" },
+  ],
+};
+
+// ============================================================================
+// Render (no external deps)
+// ============================================================================
+const $ = (id) => document.getElementById(id);
+const STATUS = {
+  done:    { cls: "done",    ico: "✓", label: "done" },
+  active:  { cls: "active",  ico: "◐", label: "in progress" },
+  pending: { cls: "pending", ico: "○", label: "pending" },
+  blocked: { cls: "blocked", ico: "✕", label: "blocked" },
+  seam:    { cls: "seam",    ico: "⏸", label: "deferred (seam built)" },
+  "via-r5":{ cls: "seam",    ico: "→", label: "delivered via R5" },
+};
+const chip = (s) => { const d = STATUS[s] || STATUS.pending;
+  return `<span class="chip ${d.cls}"><span class="ico">${d.ico}</span>${d.label}</span>`; };
+const reqChips = (rs) => rs.map(r => `<span class="req">${r}</span>`).join("");
+
+const buildWaves = DATA.waves.filter(w => w.id !== "P");
+const allBuild = buildWaves.flatMap(w => w.tickets);
+const count = (ts, s) => ts.filter(t => t.s === s).length;
+const doneB = count(allBuild, "done"), activeB = count(allBuild, "active");
+const accDone = DATA.reqGroups.flatMap(g => g.rows).reduce((a, r) => a + r.done, 0);
+const accTotal = DATA.reqGroups.flatMap(g => g.rows).reduce((a, r) => a + r.total, 0);
+const wavesDone = buildWaves.filter(w => w.tickets.every(t => t.s === "done")).length;
+
+$("stamp").textContent = "· " + DATA.stamp;
+
+$("tiles").innerHTML = `
+  <div class="tile hero">
+    <div class="label">Build progress (tickets complete)</div>
+    <div class="value">${Math.round(100 * doneB / allBuild.length)}%</div>
+    <div class="note">${doneB}/${allBuild.length} tickets · ${activeB} in progress</div>
+    <div class="meter" style="margin-top:8px"><i style="width:${100 * doneB / allBuild.length}%"></i></div>
+  </div>
+  <div class="tile"><div class="label">Acceptance items checked</div>
+    <div class="value">${accDone}/${accTotal}</div>
+    <div class="note">mirrors requirements.md checkboxes</div>
+    <div class="meter" style="margin-top:8px"><i style="width:${100 * accDone / accTotal}%"></i></div></div>
+  <div class="tile"><div class="label">Waves complete</div>
+    <div class="value">${wavesDone}/7</div>
+    <div class="note">planning wave P: 5/5 ✓</div></div>
+  <div class="tile"><div class="label">LLM budget (unchanged)</div>
+    <div class="value">${DATA.budget.capPerDay}<span style="font-size:14px;color:var(--ink2)">/day</span></div>
+    <div class="note">spent today: ${DATA.budget.spentToday} · ${DATA.budget.note}</div></div>
+  <div class="tile"><div class="label">Week 1 floor (must hold)</div>
+    <div class="value" style="font-size:18px;line-height:1.3">${DATA.w1Floor}</div></div>`;
+
+$("bands").innerHTML = DATA.bands.map(b => {
+  const ts = buildWaves.filter(w => b.waves.includes(w.id)).flatMap(w => w.tickets);
+  const d = count(ts, "done"), a = count(ts, "active"), p = ts.length - d - a;
+  return `<div class="card">
+    <div class="head"><span class="t">${b.name}</span>
+      <span class="band">waves ${b.waves.join(", ")} · ${ts.length} tickets — ${b.note}</span></div>
+    <div class="seg">
+      ${d ? `<i class="s-done" style="flex:${d}"></i>` : ""}
+      ${a ? `<i class="s-active" style="flex:${a}"></i>` : ""}
+      ${p ? `<i class="s-pending" style="flex:${p}"></i>` : ""}
+    </div>
+    <div class="legend">
+      <span class="k"><span class="swatch" style="background:var(--good)"></span>done ${d}</span>
+      <span class="k"><span class="swatch" style="background:var(--accent)"></span>in progress ${a}</span>
+      <span class="k"><span class="swatch" style="background:var(--grid)"></span>pending ${p}</span>
+    </div></div>`;
+}).join("");
+
+$("critpath").innerHTML = DATA.criticalPath
+  .map(n => `<span class="pnode"><span class="pid">${n.id}</span><span class="pt">${n.t}</span></span>`)
+  .join(`<span class="parr">→</span>`);
+$("pathnote").textContent = DATA.pathNote;
+
+$("waves").innerHTML = DATA.waves.map(w => {
+  const d = count(w.tickets, "done");
+  return `<div class="card">
+    <div class="head"><span class="t">${w.title}</span>
+      <span class="wavebar"><span class="band">${w.band === "done" ? "complete" : w.band}</span>
+        <span class="meter"><i style="width:${100 * d / w.tickets.length}%"></i></span>
+        <span class="n">${d}/${w.tickets.length}</span></span></div>
+    <div class="tblwrap"><table>
+      <tr><th style="width:44px">ID</th><th>Ticket</th><th>REQ</th><th>Depends</th><th style="width:150px">Status</th></tr>
+      ${w.tickets.map(t => `<tr><td class="id">${t.id}</td><td>${t.t}</td>
+        <td>${reqChips(t.reqs)}</td><td class="deps">${t.deps}</td><td>${chip(t.s)}</td></tr>`).join("")}
+    </table></div></div>`;
+}).join("");
+
+$("reqs").innerHTML = DATA.reqGroups.map(g => `<div class="card">
+  <div class="head"><span class="t">${g.name}</span></div>
+  <div class="tblwrap"><table>
+    <tr><th style="width:64px">ID</th><th>Requirement</th><th>Planned in</th><th class="mcell">Acceptance</th><th style="width:170px">Status</th></tr>
+    ${g.rows.map(r => `<tr><td class="id">${r.id}</td><td>${r.t}</td><td class="deps">${r.plan}</td>
+      <td class="mcell">${r.total ? `<span class="mn">${r.done}/${r.total}</span>
+        <div class="meter"><i style="width:${100 * r.done / r.total}%"></i></div>` : `<span class="mn">—</span>`}</td>
+      <td>${chip(r.s)}</td></tr>`).join("")}
+  </table></div></div>`).join("");
+
+$("evals").innerHTML = `
+  <tr><th>Category</th><th>Tier</th><th>Gate rule</th><th>Baseline</th><th>Current</th><th style="width:170px">Status</th></tr>` +
+  DATA.evalCategories.map(e => `<tr><td class="id">${e.c}</td><td>${e.tier}</td><td>${e.rule}</td>
+    <td class="num">—</td><td class="num">—</td><td>${chip("pending")} <span class="deps">awaiting D.1</span></td></tr>`).join("");
+
+$("slos").innerHTML = `<tr><th>Flow</th><th>Target</th><th>Budget lives in</th><th>Measured</th></tr>` +
+  DATA.slos.map(s => `<tr><td>${s.flow}</td><td class="num">${s.target}</td><td class="deps">${s.where}</td><td class="num">—</td></tr>`).join("");
+
+$("ops").innerHTML = `<tr><th>Item</th><th>Value / rule</th><th style="width:170px">Status</th></tr>
+  <tr><td>Daily LLM budget (SpendGuard)</td><td class="num">${DATA.budget.capPerDay}/day cap — unchanged; raise requires explicit user sign-off</td><td>${chip("done")}</td></tr>
+  <tr><td>W2 cost adders (estimates)</td><td>extraction ~$0.03–0.10/doc · rerank ~$0.002/query · day ~$20–25 projected</td><td>${chip("pending")} <span class="deps">ledger-backed at F.2</span></td></tr>` +
+  DATA.alerts.map(a => `<tr><td>Alert ${a.id} — ${a.t}</td><td class="deps">${a.status}</td><td>${chip("pending")}</td></tr>`).join("");
+
+// Theme toggle: auto → light → dark
+const tbtn = $("themeToggle");
+const setTheme = (m) => {
+  if (m === "auto") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = m;
+  tbtn.textContent = "theme: " + m;
+  try { localStorage.setItem("w2theme", m); } catch (e) {}
+};
+const modes = ["auto", "light", "dark"];
+let mode = "auto";
+try { mode = localStorage.getItem("w2theme") || "auto"; } catch (e) {}
+setTheme(mode);
+tbtn.onclick = () => { mode = modes[(modes.indexOf(mode) + 1) % 3]; setTheme(mode); };
+</script>
+</body>
+</html>

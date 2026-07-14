@@ -184,8 +184,8 @@ export default function App() {
     const viewSource = useCallback((citation: CitationRef) => {
         setSourceFocus({
             documentId: citation.source_document_id,
-            start: citation.excerpt_location?.start_char ?? null,
-            end: citation.excerpt_location?.end_char ?? null,
+            start: citation.excerpt_location?.type === 'character_range' ? citation.excerpt_location.start_char : null,
+            end: citation.excerpt_location?.type === 'character_range' ? citation.excerpt_location.end_char : null,
             excerpt: citation.excerpt_text,
         });
         setActiveTab('sources');
@@ -375,7 +375,14 @@ export default function App() {
                                                     {factsState.message}
                                                 </p>
                                             )}
-                                            <SourcesTab documents={documents} focus={sourceFocus} onClearFocus={() => setSourceFocus(null)} />
+                                            <SourcesTab
+                                                documents={documents}
+                                                focus={sourceFocus}
+                                                onClearFocus={() => setSourceFocus(null)}
+                                                patientId={patientId ?? undefined}
+                                                facts={factsState.kind === 'ready' ? factsState.bundle.facts : []}
+                                                onIngested={() => setReloadNonce((nonce) => nonce + 1)}
+                                            />
                                         </>
                                     )}
                                 </div>

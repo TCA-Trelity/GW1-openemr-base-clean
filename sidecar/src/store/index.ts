@@ -36,7 +36,10 @@ export function createPool(config: Config): Pool {
         return new Pool({ connectionString: url, ssl: true }); // full certificate verification
     }
     if (sslmode === 'require' || sslmode === 'prefer' || /[?&]ssl=true/.test(url)) {
-        return new Pool({ connectionString: url, ssl: { rejectUnauthorized: false } });
+        // Railway managed Postgres presents a self-signed chain, so sslmode=require gets
+        // encryption without CA verification; callers wanting verification use
+        // verify-ca/verify-full (handled above). Pinned by test/store.test.ts.
+        return new Pool({ connectionString: url, ssl: { rejectUnauthorized: false } }); // nosemgrep: problem-based-packs.insecure-transport.js-node.bypass-tls-verification.bypass-tls-verification
     }
     return new Pool({ connectionString: url });
 }

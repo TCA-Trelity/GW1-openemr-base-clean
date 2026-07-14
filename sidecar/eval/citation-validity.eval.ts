@@ -8,10 +8,13 @@ import { runCitationGate, type Claim } from '../src/gate/citationGate.js';
 import { recordEval } from './collector.js';
 import { CORPORA } from './corpus.js';
 
-// Authored ground truth (execution plan S1.4): 12 facts for Margaret, 4 for William.
+// Authored ground truth (execution plan S1.4 + D.2 corpus wiring): every seed corpus.
 const EXPECTED_CLAIMS: Record<string, number> = {
     'margaret-chen': 12,
     'william-thompson': 4,
+    'james-whitfield': 4,
+    'patricia-okafor': 6,
+    'robert-alvarez': 7,
 };
 
 describe('citation-validity-100', () => {

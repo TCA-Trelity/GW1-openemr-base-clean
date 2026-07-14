@@ -342,3 +342,33 @@ updates:
       # Don't update major versions automatically
   - dependency-name: '*'
     update-types: [version-update:semver-major]
+
+  # Week 2 (D.6, REQ G7): the sidecar and its panel were previously uncovered.
+- package-ecosystem: npm
+  directory: /sidecar
+  schedule:
+    interval: weekly
+    day: monday
+    time: "08:00"
+  rebase-strategy: disabled
+  open-pull-requests-limit: 5
+  labels:
+  - dependencies
+  - sidecar
+  commit-message:
+    prefix: chore
+    include: scope
+- package-ecosystem: npm
+  directory: /sidecar/panel
+  schedule:
+    interval: weekly
+    day: monday
+    time: "08:00"
+  rebase-strategy: disabled
+  open-pull-requests-limit: 5
+  labels:
+  - dependencies
+  - sidecar
+  commit-message:
+    prefix: chore
+    include: scope

@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .claude/hooks/session-start-dashboards.sh",
+            "timeout": 10,
+            "statusMessage": "Loading W2 dashboard ritual"
+          }
+        ]
+      }
+    ]
+  }
+}

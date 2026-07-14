@@ -24,9 +24,20 @@ async function fetchOk(url: string, init?: RequestInit): Promise<void> {
     }
 }
 
-/** Probes injected by server.ts when the backing dependency is wired (S1.7: postgres). */
+/** Probes injected by server.ts when the backing dependency is wired (S1.7: postgres;
+ *  Week 2 E.6/G14: document storage, retriever index, reranker). Absent probe = the
+ *  dependency is not wired on this deployment → `not_configured` (degraded, visible,
+ *  never binary-down). */
 export interface HealthProbes {
     checkPostgres?: () => Promise<void>;
+    /** OpenEMR standard-API write client (document storage): token mint proves the
+     *  password-grant client + scopes are live. */
+    checkDocumentStorage?: () => Promise<void>;
+    /** Hybrid retriever: resolves only when the guideline index holds chunks. */
+    checkRetrieverIndex?: () => Promise<void>;
+    /** Reranker: resolves when the live (Cohere) reranker is keyed; absent probe =
+     *  PassthroughReranker fallback (degraded is accurate — fusion order still serves). */
+    checkReranker?: () => Promise<void>;
 }
 
 function buildChecks(config: Config, probes?: HealthProbes): DepCheck[] {
@@ -72,6 +83,26 @@ function buildChecks(config: Config, probes?: HealthProbes): DepCheck[] {
             requiredInProduction: false,
             configured: false,
             check: async () => {},
+        },
+        // Week 2 (E.6, G14): the multimodal-agent dependencies. Each degrades to
+        // not_configured when its subsystem isn't wired — /ready stays honest, not binary.
+        {
+            name: 'document_storage',
+            requiredInProduction: false,
+            configured: probes?.checkDocumentStorage !== undefined,
+            check: probes?.checkDocumentStorage ?? (async () => {}),
+        },
+        {
+            name: 'retriever_index',
+            requiredInProduction: false,
+            configured: probes?.checkRetrieverIndex !== undefined,
+            check: probes?.checkRetrieverIndex ?? (async () => {}),
+        },
+        {
+            name: 'reranker',
+            requiredInProduction: false,
+            configured: probes?.checkReranker !== undefined,
+            check: probes?.checkReranker ?? (async () => {}),
         },
     ];
 }

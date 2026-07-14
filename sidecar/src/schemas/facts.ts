@@ -22,6 +22,8 @@ export const FACT_TYPES = [
     'family_history',
     'patient_goal',
     'chief_complaint',
+    // Week 2 (A.6, REQ S1/R1): structured lab values extracted from ingested documents.
+    'lab_result',
 ] as const;
 export const FactTypeSchema = z.enum(FACT_TYPES);
 export type FactType = z.infer<typeof FactTypeSchema>;
@@ -82,6 +84,21 @@ export const VitalSignContentSchema = z.object({
     captured_at: z.string().optional(),
 });
 export type VitalSignContent = z.infer<typeof VitalSignContentSchema>;
+
+// Week 2 (A.6): one extracted lab value. Mirrors the LabResultSchema extraction contract
+// (schemas/extraction.ts) minus the citation (facts carry citations in factBase.sources);
+// collection_date rides each fact so the E4 trend seam has everything it needs.
+export const LabResultContentSchema = z.object({
+    test_name: z.string().min(1),
+    value: z.string().min(1),
+    value_numeric: z.number().nullable().default(null),
+    unit: z.string().nullable().default(null),
+    reference_range: z.string().nullable().default(null),
+    abnormal_flag: z.enum(['normal', 'low', 'high', 'critical_low', 'critical_high', 'abnormal']).nullable().default(null),
+    collection_date: z.string().nullable().default(null),
+    performing_lab: z.string().nullable().default(null),
+});
+export type LabResultContent = z.infer<typeof LabResultContentSchema>;
 
 export const ImagingFindingContentSchema = z.object({
     finding_type: z.string().min(1),
@@ -180,5 +197,6 @@ export const PatientFactSchema = z.discriminatedUnion('fact_type', [
     z.object({ ...factBase, fact_type: z.literal('family_history'), content: FamilyHistoryContentSchema }),
     z.object({ ...factBase, fact_type: z.literal('patient_goal'), content: PatientGoalContentSchema }),
     z.object({ ...factBase, fact_type: z.literal('chief_complaint'), content: ChiefComplaintContentSchema }),
+    z.object({ ...factBase, fact_type: z.literal('lab_result'), content: LabResultContentSchema }),
 ]);
 export type PatientFact = z.infer<typeof PatientFactSchema>;

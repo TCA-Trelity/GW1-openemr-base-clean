@@ -21,12 +21,17 @@ import { OpenEmrAuthClient } from './openemr/auth.js';
 import { FhirClient } from './openemr/fhir.js';
 import { loadConfig, type Config } from './config.js';
 import { LangfuseTracer } from './obs/langfuse.js';
+import { tracingGraphLogger } from './obs/graphTracer.js';
 import { AnthropicClient } from './prep/anthropic.js';
 import { SpendGuard } from './prep/budget.js';
 import { FactExtractor } from './prep/extraction.js';
 import { GamePlanComposer } from './prep/gamePlan.js';
 import { StoreDocumentSource } from './prep/sources.js';
 import { registerChatRoutes, type ChatRouteDeps } from './routes/chat.js';
+import { registerEvidenceRoutes, registerIngestRoutes, type EvidenceRouteDeps, type IngestRouteDeps } from './routes/ingest.js';
+import { LlmAnswerComposer } from './graph/composer.js';
+import { LlmRouterModel } from './graph/routerModel.js';
+import { MemoryPinnedEvidenceStore } from './graph/pins.js';
 import { registerEhrRoutes, type EhrRouteDeps } from './routes/ehr.js';
 import { registerHealthRoutes } from './routes/health.js';
 import { registerOverviewRoutes, type OverviewRouteDeps } from './routes/overview.js';
@@ -34,10 +39,19 @@ import { registerPrepRoutes, type PrepRouteDeps } from './routes/prep.js';
 import { registerVerifyRoutes, type VerifyRouteDeps } from './routes/verify.js';
 import { createPool, FactStore } from './store/index.js';
 import { migrate } from './store/migrate.js';
+import { IngestionService, MemoryIngestionRecordStore } from './ingest/service.js';
+import { VlmExtractor } from './ingest/extractor.js';
+import { CohereEmbeddings, HashEmbeddings } from './retrieval/embeddings.js';
+import { CohereReranker, PassthroughReranker } from './retrieval/rerank.js';
+import { HybridRetriever, loadCorpusChunks } from './retrieval/retriever.js';
+import { OpenEmrPasswordAuthClient } from './openemr/auth.js';
+import { StandardApiClient } from './openemr/standardApi.js';
 
 export interface AppDeps {
     /** Real readiness probe for /ready (SELECT 1 through the pool). */
     checkPostgres: () => Promise<void>;
+    /** E.6: proves the OpenEMR write client can mint a token (document storage). */
+    checkDocumentStorage?: () => Promise<void>;
     /** Applies pending fact-store migrations (idempotent, advisory-locked). */
     runMigrations: () => Promise<string[]>;
     prep: PrepRouteDeps;
@@ -53,6 +67,10 @@ export interface AppDeps {
     authRoutes?: AuthRouteDeps;
     /** Role-gated fact verification (S3.3). */
     verify?: VerifyRouteDeps;
+    /** Week 2 A.3: document ingestion (attach_and_extract). */
+    ingest?: IngestRouteDeps;
+    /** Week 2 B.4: hybrid guideline retrieval — built async at boot (embeds the corpus). */
+    evidence?: EvidenceRouteDeps;
 }
 
 /** One resolution for the scan-pixels directory: /api/images static route + chat's loader. */
@@ -151,10 +169,58 @@ export function buildDeps(config: Config): AppDeps | undefined {
     const verifier = new CompositeVerifier(devTokens, smartVerifier);
     const authMode: AuthMode = config.AUTH_MODE === 'enforced' && verifier.isConfigured ? 'enforced' : 'off';
 
+    // Week 2 (A.3/A.6): document ingestion. The VLM extractor shares the prep-model
+    // client; EHR document storage engages only when the password-grant user is
+    // configured (standard API rejects client_credentials — see openemr/auth.ts).
+    const ingestionRecords = new MemoryIngestionRecordStore();
+    const ehrTokenProvider =
+        config.OPENEMR_BASE_URL !== undefined &&
+        config.OPENEMR_CLIENT_ID !== undefined &&
+        config.OPENEMR_API_USERNAME !== undefined &&
+        config.OPENEMR_API_PASSWORD !== undefined
+            ? new OpenEmrPasswordAuthClient({
+                  baseUrl: config.OPENEMR_BASE_URL,
+                  clientId: config.OPENEMR_CLIENT_ID,
+                  username: config.OPENEMR_API_USERNAME,
+                  password: config.OPENEMR_API_PASSWORD,
+              })
+            : undefined;
+    const ehrDocsClient =
+        ehrTokenProvider !== undefined && config.OPENEMR_BASE_URL !== undefined
+            ? new StandardApiClient({
+                  baseUrl: config.OPENEMR_BASE_URL,
+                  tokenProvider: ehrTokenProvider,
+              })
+            : undefined;
+    const ingestionService = new IngestionService({
+        extractor: new VlmExtractor(prepLlmClient),
+        records: ingestionRecords,
+        factSink: store,
+        ...(ehrDocsClient !== undefined
+            ? {
+                  ehr: {
+                      client: ehrDocsClient,
+                      openemrPatientId: async (patientId: string) =>
+                          (await store.getPatient(patientId))?.openemr_patient_id ?? null,
+                  },
+              }
+            : {}),
+    });
+
     return {
         checkPostgres: async () => {
             await pool.query('SELECT 1');
         },
+        // E.6: document-storage probe — a token mint proves base URL, client id, and
+        // password-grant credentials in one cheap round trip (cached between probes,
+        // no chart data touched).
+        ...(ehrTokenProvider !== undefined
+            ? {
+                  checkDocumentStorage: async () => {
+                      await ehrTokenProvider.getAccessToken();
+                  },
+              }
+            : {}),
         runMigrations: () => migrate(pool),
         prep: {
             store,
@@ -210,6 +276,14 @@ export function buildDeps(config: Config): AppDeps | undefined {
             mode: authMode,
         },
         verify: { store },
+        ingest: {
+            service: ingestionService,
+            records: ingestionRecords,
+            expectedPatientOf: async (patientId) => {
+                const bundle = await store.getFactBundle(patientId);
+                return bundle === null ? undefined : { name: bundle.patient.name };
+            },
+        },
     };
 }
 
@@ -229,13 +303,40 @@ export function buildServer(config: Config, deps?: AppDeps): FastifyInstance {
     // (a no-op in 'off' mode) before any route is registered, so every /api route is guarded.
     registerAuth(app, deps?.auth);
 
-    registerHealthRoutes(app, config, deps === undefined ? undefined : { checkPostgres: deps.checkPostgres });
+    registerHealthRoutes(
+        app,
+        config,
+        deps === undefined
+            ? undefined
+            : {
+                  checkPostgres: deps.checkPostgres,
+                  ...(deps.checkDocumentStorage === undefined ? {} : { checkDocumentStorage: deps.checkDocumentStorage }),
+                  // E.6: retriever probe — an empty guideline index is a real failure
+                  // once evidence routes are wired (out-of-domain floors depend on it).
+                  ...(deps.evidence === undefined
+                      ? {}
+                      : {
+                            checkRetrieverIndex: async () => {
+                                const size = deps.evidence?.retriever.size ?? 0;
+                                if (size === 0) {
+                                    throw new Error('guideline index holds zero chunks');
+                                }
+                            },
+                        }),
+                  // Reranker: keyed → live Cohere client was constructed at boot; unkeyed
+                  // deployments run PassthroughReranker and report not_configured (degraded,
+                  // accurate — fused order still serves).
+                  ...(config.COHERE_API_KEY === undefined ? {} : { checkReranker: async () => {} }),
+              },
+    );
     registerAuthRoutes(app, deps?.authRoutes);
     registerPrepRoutes(app, deps?.prep);
     registerVerifyRoutes(app, deps?.verify);
     registerOverviewRoutes(app, deps?.overview);
     registerChatRoutes(app, deps?.chat);
     registerEhrRoutes(app, deps?.ehr);
+    registerIngestRoutes(app, deps?.ingest);
+    registerEvidenceRoutes(app, deps?.evidence);
 
     // Scan images (S2.13): image_records carry a storage_key; the panel loads
     // /api/images/<storage_key>. fastify-static owns traversal safety.
@@ -265,11 +366,105 @@ export function buildServer(config: Config, deps?: AppDeps): FastifyInstance {
     return app;
 }
 
+/** Week 2 (B.3/B.4): build the guideline retriever. Cohere when keyed; deterministic
+ *  offline backends otherwise — retrieval never hard-depends on a vendor being up. */
+export async function buildEvidenceDeps(config: Config): Promise<EvidenceRouteDeps | undefined> {
+    const corpusDir = fileURLToPath(new URL('../corpus/', import.meta.url));
+    if (!existsSync(corpusDir)) {
+        return undefined;
+    }
+    const chunks = loadCorpusChunks(corpusDir);
+    const embeddings =
+        config.COHERE_API_KEY !== undefined
+            ? new CohereEmbeddings({ apiKey: config.COHERE_API_KEY, model: config.COHERE_EMBED_MODEL })
+            : new HashEmbeddings();
+    const reranker =
+        config.COHERE_API_KEY !== undefined
+            ? new CohereReranker({ apiKey: config.COHERE_API_KEY, model: config.COHERE_RERANK_MODEL })
+            : new PassthroughReranker();
+    return { retriever: await HybridRetriever.build(chunks, { embeddings, reranker }) };
+}
+
 // Boot only when executed directly (tests import buildServer instead).
 if (process.argv[1]?.endsWith('server.js') || process.argv[1]?.endsWith('server.ts')) {
     const config = loadConfig();
     const deps = buildDeps(config);
+    // Evidence retriever builds before the server so its routes register at startup;
+    // corpus embedding is a one-time boot cost (seconds, offline-free with HashEmbeddings).
+    const evidence = await buildEvidenceDeps(loadConfig());
+    if (deps !== undefined && evidence !== undefined) {
+        deps.evidence = evidence;
+        // E.9: assemble the chat evidence lane — router tie-break + LLM composer over
+        // the same retriever/ingestion the routes use. Keyless deployments skip it and
+        // every turn takes the Week 1 loop (an explicit boot log says so below).
+        if (config.ANTHROPIC_API_KEY !== undefined && deps.ingest !== undefined) {
+            const routerModel = new LlmRouterModel(
+                new AnthropicClient({
+                    apiKey: config.ANTHROPIC_API_KEY,
+                    model: config.ANTHROPIC_MODEL_CHAT,
+                    maxTokens: 16,
+                    idleTimeoutMs: 3_000,
+                    totalTimeoutMs: 5_000,
+                }),
+                console,
+            );
+            const composer = new LlmAnswerComposer(
+                new AnthropicClient({
+                    apiKey: config.ANTHROPIC_API_KEY,
+                    model: config.ANTHROPIC_MODEL_CHAT,
+                    maxTokens: 1500,
+                    idleTimeoutMs: 10_000,
+                    totalTimeoutMs: 20_000,
+                }),
+                deps.chat.spendGuard,
+                console,
+            );
+            // E.4: when Langfuse is keyed, graph events additionally become spans on a
+            // correlation-scoped trace (adapter over the same logger seam — no new
+            // instrumentation points; docs/w2/trace-example.md is the span skeleton).
+            const graphLogBase = {
+                info: (obj: Record<string, unknown>, msg: string) => console.log(JSON.stringify({ level: 'info', msg, ...obj })),
+                warn: (obj: Record<string, unknown>, msg: string) => console.warn(JSON.stringify({ level: 'warn', msg, ...obj })),
+            };
+            const graphLangfuse =
+                config.LANGFUSE_HOST !== undefined && config.LANGFUSE_PUBLIC_KEY !== undefined && config.LANGFUSE_SECRET_KEY !== undefined
+                    ? new Langfuse({
+                          baseUrl: config.LANGFUSE_HOST,
+                          publicKey: config.LANGFUSE_PUBLIC_KEY,
+                          secretKey: config.LANGFUSE_SECRET_KEY,
+                          requestTimeout: 10_000,
+                      })
+                    : undefined;
+            deps.chat.evidenceGraph = {
+                clinical: {
+                    retriever: evidence.retriever,
+                    ingestion: deps.ingest.service,
+                    composer,
+                    routerModel,
+                    pins: new MemoryPinnedEvidenceStore(),
+                    logger: graphLangfuse === undefined ? graphLogBase : tracingGraphLogger(graphLogBase, graphLangfuse, console),
+                },
+                routerModel,
+            };
+        }
+    }
     const app = buildServer(config, deps);
+    if (deps?.chat !== undefined && deps.chat.evidenceGraph === undefined) {
+        app.log.info({ composerConfigured: false }, 'evidence turns degrade to fast path — ANTHROPIC_API_KEY absent or ingestion off');
+    }
+    // E.5 (locked decision #2): LangSmith is a DEMO-ENV overlay only — LangGraph.js reads
+    // the LANGSMITH_* env vars natively, so the fence is configuration, not code. The
+    // committed posture stays Langfuse; production must never carry a LangSmith key.
+    app.log.info(
+        { langsmithTracing: config.LANGSMITH_TRACING === 'true', project: config.LANGSMITH_PROJECT },
+        config.LANGSMITH_TRACING === 'true'
+            ? 'LangSmith tracing ON — demo environment posture (synthetic data only)'
+            : 'LangSmith tracing off — production posture (Langfuse is the committed backend)',
+    );
+    app.log.info(
+        { corpusRetriever: evidence !== undefined, dense: config.COHERE_API_KEY !== undefined ? 'cohere' : 'hash-offline' },
+        evidence !== undefined ? 'guideline retriever ready' : 'guideline corpus absent — evidence routes off',
+    );
     // Startup signal for EHR sync wiring: the panel's "not configured" state is exactly
     // deps.ehr being absent, so name the reason at boot instead of leaving it a mystery.
     const missingEhrConfig = [

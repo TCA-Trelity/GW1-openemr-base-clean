@@ -17,6 +17,9 @@ export interface HcqRiskDetails {
     duration_years: number;
     cumulative_dose_grams: number;
     daily_dose_mg: number;
+    /** Week 2 (A.6): most recent eGFR when renal context was supplied — the AAO major
+     *  risk factor that escalates the tier (renal-function-ocular-drug-safety protocol). */
+    egfr?: number;
 }
 
 export interface MedicationRiskFlag {
@@ -78,13 +81,21 @@ type Satisfies<T extends U, U> = T;
 type _ProviderProfileFits = Satisfies<ProviderProfile, MedRiskProviderProfile>;
 type _MedicationContentFits = Satisfies<{ content: MedicationContent }, MedicationInput>;
 
+/** Week 2 (A.6): clinical context beyond the med list — extracted lab values feed this.
+ *  eGFR bands per the practice renal protocol (AAO 2016: renal disease is a major HCQ
+ *  risk factor): <60 escalates one tier; <30 escalates and demands a shortened interval. */
+export interface MedRiskClinicalContext {
+    renal?: { egfr: number; collected_date?: string | null };
+}
+
 /**
  * Compute medication risk flags based on medication type, duration, and provider profile.
- * Verbatim logic from medicationRiskFlags.jsx:6-150.
+ * Verbatim logic from medicationRiskFlags.jsx:6-150 (+ Week 2 renal escalation, A.6).
  */
 export function computeMedicationRiskFlags(
     medications: readonly MedicationInput[],
     providerProfile: MedRiskProviderProfile = {},
+    clinicalContext: MedRiskClinicalContext = {},
 ): MedicationRiskFlag[] {
     const flags: MedicationRiskFlag[] = [];
     const specialty = (
@@ -125,6 +136,28 @@ export function computeMedicationRiskFlags(
                 message = `HCQ use ${yearsOnMed} years — routine monitoring`;
             }
 
+            // Week 2 renal escalation (A.6): reduced eGFR is an AAO major risk factor —
+            // it escalates the tier it lands on; it never de-escalates.
+            const egfr = clinicalContext.renal?.egfr;
+            let renalNote = '';
+            if (egfr !== undefined && egfr < 60) {
+                const escalate = (tier: RiskSeverity): RiskSeverity => (tier === 'low' ? 'medium' : 'high');
+                severity = escalate(severity);
+                renalNote =
+                    egfr < 30
+                        ? `; renal impairment (eGFR ${egfr}, high tier) — AAO major risk factor; screen now and shorten the interval`
+                        : `; renal impairment (eGFR ${egfr}) — AAO major risk factor elevates toxicity risk`;
+                message += renalNote;
+            }
+
+            const details: HcqRiskDetails = {
+                duration_years: yearsOnMed,
+                cumulative_dose_grams: Math.round(cumulativeDoseGrams),
+                daily_dose_mg: dailyDose,
+            };
+            if (egfr !== undefined) {
+                details.egfr = egfr;
+            }
             flags.push({
                 medication: med.content?.name || 'Hydroxychloroquine',
                 flag_type: 'retinal_toxicity',
@@ -132,14 +165,12 @@ export function computeMedicationRiskFlags(
                 message,
                 recommendation:
                     severity === 'high'
-                        ? 'Require annual retinal screening with 10-2 VF, SD-OCT, and FAF'
+                        ? renalNote !== ''
+                            ? 'Require annual retinal screening with 10-2 VF, SD-OCT, and FAF; coordinate with prescriber on renal-adjusted dosing'
+                            : 'Require annual retinal screening with 10-2 VF, SD-OCT, and FAF'
                         : 'Standard monitoring per AAO guidelines',
                 source: 'AAO HCQ Screening Guidelines 2016 (revised 2020)',
-                details: {
-                    duration_years: yearsOnMed,
-                    cumulative_dose_grams: Math.round(cumulativeDoseGrams),
-                    daily_dose_mg: dailyDose,
-                },
+                details,
             });
         }
 

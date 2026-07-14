@@ -1,0 +1,30 @@
+meta {
+  name: GET ingestion status — the staged record
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/ingestions/{{ingestionId}}
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("record carries a known status and staged progress", function () {
+    const body = res.getBody();
+    expect(['received', 'complete', 'blocked_patient_mismatch', 'failed_validation', 'failed_extraction', 'failed_storage']).to.include(body.status);
+    expect(body.stages).to.be.an('array');
+  });
+}
+
+docs {
+  # Staged ingestion record (G4)
+  Extraction is async after the 202 — a fresh upload may legitimately read
+  `received`; re-run until `complete`. Every stage is stamped and the whole
+  record reconstructs from the correlation id alone.
+}

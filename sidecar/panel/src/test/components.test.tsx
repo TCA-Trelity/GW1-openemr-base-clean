@@ -173,14 +173,16 @@ describe('SourcesTab', () => {
     // Failure mode: the character-range highlight drifts (wrong offsets, mutated text)
     // and marks the wrong span — worse than no highlight in a clinical UI.
     it('highlights exactly the cited character range in the full document text', () => {
+        // v2: excerpt_location is a union; only character_range carries a char span.
         const location = hcqCitation.excerpt_location;
+        const range = location?.type === 'character_range' ? location : null;
         const { container } = render(
             <SourcesTab
                 documents={documents}
                 focus={{
                     documentId: 'doc-mc-003',
-                    start: location?.start_char ?? null,
-                    end: location?.end_char ?? null,
+                    start: range?.start_char ?? null,
+                    end: range?.end_char ?? null,
                     excerpt: hcqCitation.excerpt_text,
                 }}
                 onClearFocus={() => undefined}

@@ -273,6 +273,45 @@ describe('ChatDrawer streaming', () => {
     });
 });
 
+describe('ChatDrawer evidence-turn status (E.9)', () => {
+    // Failure mode: the evidence lane's "checking practice protocols…" status either
+    // never renders or sticks around after prose arrives.
+    it('renders the transient status line and clears it on the first delta', async () => {
+        let controller!: ReadableStreamDefaultController<Uint8Array>;
+        const body = new ReadableStream<Uint8Array>({
+            start(c) {
+                controller = c;
+            },
+        });
+        stubFetch((url, init) => {
+            if (url.includes('/api/chat/margaret-chen') && init?.method === 'POST') {
+                return { ok: true, status: 200, body } as unknown as Response;
+            }
+            return undefined;
+        });
+        render(<Harness />);
+        openDrawer();
+        sendMessage('What do the guidelines recommend for screening intervals?');
+
+        await act(async () => {
+            controller.enqueue(sseChunk({ type: 'status', text: 'checking practice protocols…' }));
+        });
+        expect(await screen.findByTestId('evidence-status')).toHaveTextContent('checking practice protocols…');
+
+        await act(async () => {
+            controller.enqueue(sseChunk({ type: 'delta', text: 'Per the practice protocol: annual screening.' }));
+        });
+        expect(await screen.findByText(/annual screening/)).toBeInTheDocument();
+        expect(screen.queryByTestId('evidence-status')).toBeNull();
+
+        await act(async () => {
+            controller.enqueue(sseChunk({ type: 'done', conversation_id: 'conv-e9', citations: [], unverified_count: 0, tools_used: [] }));
+            controller.close();
+        });
+        expect(screen.queryByTestId('evidence-status')).toBeNull();
+    });
+});
+
 describe('ChatDrawer tool activity (TC3)', () => {
     // Failure mode: the model invokes tools but the drawer shows nothing — tool use must be
     // visible in the demo, each chip labelled with a friendly name + input hint and marked

@@ -1,0 +1,35 @@
+meta {
+  name: POST evidence search — hybrid retrieval over the protocol corpus
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/evidence/search
+  body: json
+  auth: none
+}
+
+body:json {
+  { "q": "hydroxychloroquine screening interval with reduced renal function", "top_k": 4 }
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("returns snippets with rerank flag", function () {
+    const body = res.getBody();
+    expect(body.snippets).to.be.an('array');
+    expect(body).to.have.property('rerank_applied');
+    expect(body.empty).to.equal(false);
+  });
+}
+
+docs {
+  # Hybrid retrieval (S2/R3)
+  BM25 + dense → RRF → rerank. `searched_query` is the PHI-scrubbed form that
+  actually ran. Out-of-domain questions return empty=true — never a forced
+  match; try "knee replacement rehabilitation" to see the refusal floor.
+}

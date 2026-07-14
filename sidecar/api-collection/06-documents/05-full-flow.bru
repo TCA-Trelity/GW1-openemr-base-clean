@@ -1,0 +1,34 @@
+meta {
+  name: Full W2 flow — the chain, narrated
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/health
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  # The full Week 2 flow (G10)
+  Run this folder in order — vars flow between steps:
+
+  1. 00 mints a physician bearer → var `token` (write-path auth, E.3).
+  2. 01 uploads the hero renal panel (multipart) → 202 → var `ingestionId`.
+  3. 02 polls the staged record until `status: complete` (extraction +
+     geometric grounding + fact persistence + evidence pinning).
+  4. 03 fetches the stored original — what the panel's bbox overlay renders.
+  5. 04 searches the guideline corpus for the HCQ/renal protocol — the same
+     retrieval the chat evidence turn uses.
+
+  Continuation in the product: the panel Sources tab shows the upload with
+  the citation overlay; asking the chat "What screening interval do the
+  guidelines recommend for hydroxychloroquine with reduced renal function?"
+  streams status → a critic-verified, guideline-cited answer (E.9), with the
+  extracted eGFR re-tiering the HCQ risk flag (UC-4).
+}

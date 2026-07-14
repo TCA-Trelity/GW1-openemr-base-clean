@@ -1,0 +1,28 @@
+meta {
+  name: GET ingestion file — the stored original (overlay preview)
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/ingestions/{{ingestionId}}/file
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("serves the original PDF back", function () {
+    expect(String(res.getHeader('content-type'))).to.contain('application/pdf');
+  });
+}
+
+docs {
+  # Preview cache (E.2)
+  Serves the uploaded original for the panel's bbox overlay. Preview cache
+  only: evicted/restarted entries 404 with a pointer to OpenEMR Documents
+  (the system of record) — expected on a cold Railway instance; re-run 01 first.
+}

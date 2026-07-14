@@ -41,15 +41,17 @@ function Excerpt({ citation }: { citation: CitationRef }) {
     if (citation.excerpt_text == null || citation.excerpt_text === '') {
         return <p className="text-sm text-slate-500 italic">No excerpt available</p>;
     }
+    // v2: excerpt_location is a union; only character_range carries surrounding context.
     const location = citation.excerpt_location;
-    const hasContext = location != null && (location.context_before != null || location.context_after != null);
+    const range = location?.type === 'character_range' ? location : null;
+    const hasContext = range != null && (range.context_before != null || range.context_after != null);
     return (
         <p className="text-sm text-slate-600 leading-relaxed">
             {hasContext ? (
                 <>
-                    {location.context_before != null && <span className="text-slate-500">{location.context_before}</span>}
+                    {range.context_before != null && <span className="text-slate-500">{range.context_before}</span>}
                     <mark className="bg-yellow-100 px-0.5 rounded font-medium text-slate-800">{citation.excerpt_text}</mark>
-                    {location.context_after != null && <span className="text-slate-500">{location.context_after}</span>}
+                    {range.context_after != null && <span className="text-slate-500">{range.context_after}</span>}
                 </>
             ) : (
                 <span className="italic">&ldquo;{citation.excerpt_text}&rdquo;</span>

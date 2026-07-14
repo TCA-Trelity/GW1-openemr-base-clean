@@ -79,6 +79,12 @@ export const STANDARD_API_SEED_SCOPES: readonly string[] = [
     'user/insurance_company.read',
     'user/insurance_company.write',
     'user/facility.read',
+    // Week 2 (Wave 0.2, REQ S1/R1): document ingestion stores the source PDF in OpenEMR
+    // Documents via POST /api/patient/:pid/document (ACL patients/docs; scope entries at
+    // ServerScopeListEntity.php:219-220). A client registered before these existed must be
+    // RE-registered — granted scopes are intersected with registration (see note above).
+    'user/document.read',
+    'user/document.write',
 ];
 
 // Typed OAuth failure: carries HTTP status and the OAuth error code/description only —

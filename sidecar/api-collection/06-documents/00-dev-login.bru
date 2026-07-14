@@ -1,0 +1,31 @@
+meta {
+  name: POST /api/dev-login — mint a physician token
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/dev-login
+  body: json
+  auth: none
+}
+
+body:json {
+  { "role": "physician", "patient": "margaret-chen" }
+}
+
+assert {
+  res.status: eq 200
+}
+
+script:post-response {
+  bru.setVar('token', res.getBody().access_token);
+}
+
+docs {
+  # Dev login (write-path auth, E.3)
+  Document upload is a chart WRITE: it requires an attributable principal with
+  the documentsWrite capability (physician/nurse) REGARDLESS of AUTH_MODE.
+  Requires DEV_LOGIN_SECRET on the target deployment (RUNBOOK §D). The minted
+  bearer is a sidecar demo credential, not a SMART launch.
+}

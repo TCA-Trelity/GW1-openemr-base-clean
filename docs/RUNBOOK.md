@@ -123,6 +123,16 @@ demographics screen, opening/embedding the panel for that patient.
 
 ## C. Langfuse observability (G2) — the live dashboard + 3 alerts
 
+### C2. LangSmith — demo environment ONLY (Week 2, locked decision #2)
+
+LangGraph.js reads `LANGSMITH_TRACING` / `LANGSMITH_API_KEY` /
+`LANGSMITH_PROJECT` natively — no sidecar code path depends on them. The
+fence is configuration: set the three vars **only on the demo Railway
+service** (synthetic data), never on the production posture, whose committed
+backend is Langfuse. The boot log states the posture on every start
+(`LangSmith tracing ON — demo environment posture` vs `off — production
+posture`). Key drop steps: `docs/internal/tickets/USER-ACTIONS.md`.
+
 **Goal:** turn the emitted traces into the dashboard + alerts specified in
 `docs/execution/observability.md`.
 
@@ -206,3 +216,81 @@ enable the token path *before* enforcement, or the panel 401s itself.
 > To turn enforcement back off (e.g. an open kiosk demo), set `AUTH_MODE=off` (or
 > remove it). The code still attaches a principal when a token is present; it just
 > never rejects.
+
+## E. Backup & recovery (G18)
+
+*Operationalizes `W2_ARCHITECTURE.md` §14. The design property that makes this
+section short: the fact store is a **derived view** — its recovery primitive is
+wipe-and-rebuild, and this runbook's job is to make rebuild boring.*
+
+### E1. What must be backed up — and what must not
+
+| Store | Posture | Backup mechanism |
+|---|---|---|
+| OpenEMR DB + Documents | **System of record** (charts + uploaded originals) | Out of sidecar scope: OpenEMR's own guidance (open-emr.org wiki → Backup and Restore Guidelines) + Railway Postgres backups on the EHR service |
+| Sidecar fact store (Postgres) | Derived view | Backup is convenience (fast restore); **rebuild is truth** (E4) |
+| Corpus, fixtures, eval cases, `eval/baseline.json` | Repo artifacts | `git` IS the backup — clone = full recovery |
+| `llm_calls` ledger | Non-derivable (audit/cost) | Rides the DB backup; loss acceptable in a rebuild (cost history, not clinical data). **Retention decision: keep 90 days.** |
+| Ingestion records | **In-memory today** (`MemoryIngestionRecordStore`) | Known limitation, stated plainly: they do not survive a restart. The durable trail is OpenEMR Documents (the original) + persisted facts (the extraction); the staged record is progress telemetry. |
+
+### E2. Automatic
+
+Enable Railway Postgres backups on the sidecar DB: Railway dashboard → the
+Postgres service → **Backups** (retention per the plan tier shown at click
+time — a user action, USER-ACTIONS.md). If the tier lacks scheduled backups,
+the documented alternative is a Railway cron service running:
+
+```bash
+pg_dump --format=custom "$DATABASE_URL" | gzip > "nightly-$(date +%F).dump.gz"
+```
+
+### E3. Manual
+
+```bash
+pg_dump --format=custom "$DATABASE_URL" -f "copilot-$(date +%F).dump"
+pg_restore --clean --if-exists -d "$DATABASE_URL" "copilot-<date>.dump"
+```
+
+### E4. The true recovery path (wipe-and-rebuild)
+
+1. Provision an empty Postgres; set `DATABASE_URL`.
+2. Boot the sidecar — migrations run at boot (idempotent, advisory-locked).
+3. Re-seed (`npx tsx src/scripts/seed.ts`) or EHR-sync the patients.
+4. Trigger prep per patient (`POST /api/prep/:patientId`).
+5. Re-upload any outside documents — the originals live in OpenEMR Documents;
+   the preview cache and extracted facts regenerate deterministically
+   (same bytes → same ingestion id → same fact ids).
+
+**RPO = the last prep/ingestion run (≈0 for everything derivable; ≤24 h via
+backups for the ledger). RTO = restore ≤30 min, or one full re-prep cycle —
+minutes per patient.**
+
+### E5. Golden-set invariant (G18)
+
+Everything the eval gate needs is in-repo: fixture PDFs
+(`sidecar/eval/fixtures/documents/`), the authored corpus (`sidecar/corpus/`,
+re-indexed at every boot), the 58 cases, and the committed
+`eval/baseline.json`. Recovery is `git clone` + `npm ci` + `npm run eval` —
+no DB-only state anywhere in the gate.
+
+### E6. Rehearsal record (executed 2026-07-13, scratch Postgres 16)
+
+Performed against a seeded scratch cluster with the real sidecar booted on it
+(migrations at boot, `seed.ts`, reads verified before and after):
+
+```text
+$ pg_dump --format=custom "$PGURL" -f /tmp/w2pg/copilot-2026-07-13.dump
+  → 54,936 bytes
+$ psql .../postgres -c "DROP DATABASE copilot;" -c "CREATE DATABASE copilot;"
+  DROP DATABASE / CREATE DATABASE
+$ pg_restore --clean --if-exists -d "$PGURL" /tmp/w2pg/copilot-2026-07-13.dump
+$ psql "$PGURL" -A -t -c "SELECT COUNT(*) FROM patients"        → 5
+                 -c "SELECT COUNT(*) FROM patient_facts"        → 33
+                 -c "SELECT COUNT(*) FROM source_documents"     → 20
+                 -c "SELECT COUNT(*) FROM image_records"        → 17
+$ curl /api/patients   → 5 patients served post-restore
+```
+
+Counts match the seeded corpus (5 patients / 33 facts / 20 documents / 17
+images) and the running sidecar served reads from the restored database
+without a restart.

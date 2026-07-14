@@ -12,6 +12,8 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { ChatService, ChatStore } from '../chat/chat.js';
 import { composeOpeningMove } from '../chat/openingMove.js';
 import { screenOutboundText } from '../gate/responseGate.js';
+import { runClinicalGraph, type ClinicalGraphDeps } from '../graph/graph.js';
+import { routeAsk, type RouterModel } from '../graph/router.js';
 import { BudgetExceededError } from '../prep/budget.js';
 import type { PrepSpendGuard } from '../prep/pipeline.js';
 import type { FactBundle, StoredBrief } from '../store/index.js';
@@ -23,10 +25,18 @@ export interface ChatRouteStore extends ChatStore {
     getBrief(patientId: string): Promise<StoredBrief | null>;
 }
 
+/** E.9: the evidence lane — a fully assembled clinical graph + the router tie-break. */
+export interface ChatGraphDeps {
+    clinical: ClinicalGraphDeps;
+    routerModel?: RouterModel;
+}
+
 export interface ChatRouteDeps {
     store: ChatRouteStore;
     service: ChatService;
     spendGuard?: PrepSpendGuard;
+    /** Absent → every turn takes the Week 1 loop (evidence lane not configured). */
+    evidenceGraph?: ChatGraphDeps;
 }
 
 type ChatParams = { Params: { patientId: string } };
@@ -119,6 +129,14 @@ export function registerChatRoutes(app: FastifyInstance, deps: ChatRouteDeps | u
             }
         }
 
+        // E.9 (locked decision #4): one cheap routing decision per turn — deterministic
+        // short-circuits first, model tie-break only on ambiguity. Decided BEFORE the
+        // stream opens; only `needs_evidence` diverts, everything else is untouched.
+        const routing =
+            deps.evidenceGraph === undefined
+                ? null
+                : await routeAsk({ kind: 'chat_turn', question: message }, deps.evidenceGraph.routerModel, String(request.id));
+
         // IC3 viewing context: the panel names the scan open in the imaging workspace so
         // "this scan" resolves. Validated against the bundle — an unknown id is ignored
         // (logged), never an error: UI state must not be able to fail a chat turn. The
@@ -183,6 +201,53 @@ export function registerChatRoutes(app: FastifyInstance, deps: ChatRouteDeps | u
             writeEvent({ type: 'seed', conversation_id: conversationId, content: openingMove });
         }
         try {
+            // E.9 Tier-1 evidence lane: supervisor-routed graph run, critic-verified
+            // citations, honest empty/degraded text. Any graph failure falls through to
+            // the unchanged Week 1 loop — a graph bug must never kill a chat turn.
+            if (routing?.route === 'needs_evidence' && deps.evidenceGraph !== undefined) {
+                writeEvent({ type: 'status', text: 'checking practice protocols…' });
+                try {
+                    const outcome = await runClinicalGraph(
+                        deps.evidenceGraph.clinical,
+                        { kind: 'chat_turn', patientId: request.params.patientId, question: message },
+                        String(request.id),
+                    );
+                    if (outcome.answer !== null) {
+                        // Persist both sides so GET replay shows the evidence turn.
+                        await deps.store.saveChatMessage({
+                            patient_id: request.params.patientId,
+                            conversation_id: conversationId,
+                            role: 'user',
+                            content: message,
+                            correlation_id: String(request.id),
+                        });
+                        await deps.store.saveChatMessage({
+                            patient_id: request.params.patientId,
+                            conversation_id: conversationId,
+                            role: 'assistant',
+                            content: outcome.answer.text,
+                            correlation_id: String(request.id),
+                        });
+                        writeEvent({ type: 'delta', text: outcome.answer.text });
+                        for (const citation of outcome.answer.citations) {
+                            writeEvent({ type: 'citation', citation });
+                        }
+                        writeEvent({
+                            type: 'done',
+                            conversation_id: conversationId,
+                            citations: outcome.answer.citations,
+                            unverified_count: outcome.answer.blocked_claims,
+                            tools_used: [],
+                            prescriptive_flag_count: outcome.answer.prescriptive_flags,
+                        });
+                        reply.raw.end();
+                        return reply;
+                    }
+                    request.log.warn({ correlationId: String(request.id) }, 'evidence_turn_fell_back');
+                } catch (error) {
+                    request.log.warn({ correlationId: String(request.id), err: String(error) }, 'evidence_turn_fell_back');
+                }
+            }
             const result = await deps.service.turn(
                 { bundle, conversationId, message, correlationId: String(request.id), ...(uiContext === undefined ? {} : { uiContext }) },
                 request.log,

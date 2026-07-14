@@ -39,6 +39,49 @@ describe('health endpoints', () => {
         expect(res.statusCode).toBe(503);
         expect(res.json().ready).toBe(false);
     });
+
+    // Week 2 (E.6, G14): the multimodal deps degrade honestly — absent = not_configured
+    // (never binary-down), wired-but-broken = failed + 503.
+    it('GET /ready reports the W2 deps (document storage, retriever index, reranker) as degraded when unwired', async () => {
+        const app = testServer();
+        const body = (await app.inject({ method: 'GET', url: '/ready' })).json();
+        expect(body.ready).toBe(true);
+        expect(body.dependencies.document_storage.status).toBe('not_configured');
+        expect(body.dependencies.retriever_index.status).toBe('not_configured');
+        expect(body.dependencies.reranker.status).toBe('not_configured');
+    });
+
+    it('a wired-but-empty retriever index FAILS readiness; healthy probes report ok', async () => {
+        const { default: Fastify } = await import('fastify');
+        const { registerHealthRoutes } = await import('../src/routes/health.js');
+        const config = loadConfig({ NODE_ENV: 'test' });
+
+        const broken = Fastify();
+        registerHealthRoutes(broken, config, {
+            checkPostgres: async () => {},
+            checkDocumentStorage: async () => {},
+            checkRetrieverIndex: async () => {
+                throw new Error('guideline index holds zero chunks');
+            },
+        });
+        const brokenRes = await broken.inject({ method: 'GET', url: '/ready' });
+        expect(brokenRes.statusCode).toBe(503);
+        const brokenBody = brokenRes.json();
+        expect(brokenBody.dependencies.retriever_index.status).toBe('failed');
+        expect(brokenBody.dependencies.retriever_index.error).toContain('zero chunks');
+        expect(brokenBody.dependencies.document_storage.status).toBe('ok');
+
+        const healthy = Fastify();
+        registerHealthRoutes(healthy, config, {
+            checkPostgres: async () => {},
+            checkDocumentStorage: async () => {},
+            checkRetrieverIndex: async () => {},
+            checkReranker: async () => {},
+        });
+        const healthyBody = (await healthy.inject({ method: 'GET', url: '/ready' })).json();
+        expect(healthyBody.ready).toBe(true);
+        expect(healthyBody.dependencies.reranker.status).toBe('ok');
+    });
 });
 
 describe('scan images route', () => {

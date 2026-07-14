@@ -64,6 +64,23 @@ describe('loadConfig boot resilience', () => {
         expect(warn.mock.calls.length).toBeGreaterThanOrEqual(4); // one warning per bad var
     });
 
+    // Failure mode (Wave 0.4): a bad Week 2 retrieval/tracing var must disable that feature,
+    // never crash boot — and LangSmith must stay off unless explicitly enabled (demo fence).
+    it('falls back safely on invalid Week 2 vars and keeps LangSmith off by default', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const config = loadConfig({
+            RETRIEVER_DENSE_BACKEND: 'qdrant',
+            LANGSMITH_TRACING: 'yes-please',
+            COHERE_API_KEY: '',
+        });
+        warn.mockRestore();
+        expect(config.RETRIEVER_DENSE_BACKEND).toBe('pgvector');
+        expect(config.LANGSMITH_TRACING).toBe('false');
+        expect(config.COHERE_API_KEY).toBeUndefined();
+        expect(config.COHERE_EMBED_MODEL).toBe('embed-english-v3.0');
+        expect(config.COHERE_RERANK_MODEL).toBe('rerank-english-v3.0');
+    });
+
     // Failure mode: a fully valid config regresses (hardening changed a real value).
     it('passes valid values through unchanged', () => {
         const config = loadConfig({

@@ -52,7 +52,10 @@ export function checkCitation(citation: CitationRef, resolve: DocumentTextResolv
         return { result: 'excerpt_mismatch' };
     }
     const location = citation.excerpt_location;
-    if (location !== null && text.slice(location.start_char, location.end_char) === excerpt) {
+    // v2: only character_range locations carry an exact checkable range; page/page_bbox
+    // locations (document-extraction citations) verify through the verbatim-search paths
+    // below — the quote is still checked against stored text regardless of overlay geometry.
+    if (location !== null && location.type === 'character_range' && text.slice(location.start_char, location.end_char) === excerpt) {
         return { result: 'ok_range' };
     }
     // Range drift (e.g. document re-import) is tolerable only if the excerpt

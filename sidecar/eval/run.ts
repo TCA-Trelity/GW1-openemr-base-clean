@@ -7,6 +7,7 @@ import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RESULTS_PATH } from './collector.js';
+import { applyGate, formatGateReport, readBaseline, readLedgerRecords } from './gate.js';
 import { generateReport } from './report.js';
 
 const sidecarDir = fileURLToPath(new URL('..', import.meta.url));
@@ -28,7 +29,21 @@ const suiteFailed = vitest.status !== 0;
 const { total, failed } = generateReport({ suiteFailed });
 console.log(`\neval report: ${total - failed}/${total} evals passed — docs/execution/eval-results.md regenerated`);
 
+// Week 2 category gate (D.1): tiered baseline comparison over the same ledger. Runs even
+// when the suite already failed, so the category view is always printed; a missing
+// baseline fails the run (the gate is not optional equipment).
+let gateFailed = false;
+const baseline = readBaseline();
+if (baseline === undefined) {
+    console.error('category gate: eval/baseline.json missing — run `npm run eval:baseline` and commit it');
+    gateFailed = true;
+} else {
+    const gate = applyGate(readLedgerRecords(), baseline);
+    console.log(formatGateReport(gate, baseline));
+    gateFailed = !gate.pass;
+}
+
 if (total === 0) {
     console.error('eval run recorded no results — treating as failure');
 }
-process.exit(suiteFailed || failed > 0 || total === 0 ? 1 : 0);
+process.exit(suiteFailed || failed > 0 || total === 0 || gateFailed ? 1 : 0);

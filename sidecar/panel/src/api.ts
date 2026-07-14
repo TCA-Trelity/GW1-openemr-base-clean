@@ -178,6 +178,76 @@ export async function fetchFacts(patientId: string): Promise<FactsFetchResult> {
     }
 }
 
+// ---- Document ingestion (Week 2 E.1/E.2) ----
+
+export interface IngestionStageRecord {
+    stage: string;
+    at: string;
+    detail?: string;
+}
+
+export interface IngestionRecordView {
+    id: string;
+    patient_id: string;
+    doc_type: 'lab_pdf' | 'intake_form';
+    filename: string;
+    status: string;
+    stages: IngestionStageRecord[];
+    source_document_id: string | null;
+    grounding: { total: number; word_box: number; page: number; unverified: number; confidence: number } | null;
+    facts_persisted: number;
+    vitals_written: boolean;
+    error: string | null;
+}
+
+export type UploadDocumentResult = { ok: true; ingestionId: string } | { ok: false; message: string };
+
+/** POST the file to attach_and_extract; the 202 carries the pollable ingestion id. */
+export async function uploadDocument(patientId: string, file: File, docType: 'lab_pdf' | 'intake_form'): Promise<UploadDocumentResult> {
+    try {
+        const form = new FormData();
+        form.append('doc_type', docType);
+        form.append('file', file, file.name);
+        const res = await apiFetch(`/api/patients/${encodeURIComponent(patientId)}/documents`, { method: 'POST', body: form });
+        if (res.status === 503) {
+            return { ok: false, message: 'Document ingestion is not configured on this deployment.' };
+        }
+        // E.3: chart writes require an attributable clinical role — translate the auth
+        // outcomes into demo-friendly guidance instead of raw error codes.
+        if (res.status === 401) {
+            return { ok: false, message: 'Attaching documents requires a signed-in clinical role — pick a role in the header to mint a demo token.' };
+        }
+        if (res.status === 403) {
+            return { ok: false, message: 'This demo role cannot attach documents to the chart (physician or nurse required).' };
+        }
+        if (!res.ok) {
+            const body = (await res.json().catch(() => null)) as { error?: string } | null;
+            return { ok: false, message: body?.error ?? `Upload failed (HTTP ${res.status}).` };
+        }
+        const body = (await res.json()) as { ingestion_id: string };
+        return { ok: true, ingestionId: body.ingestion_id };
+    } catch {
+        return { ok: false, message: UNREACHABLE };
+    }
+}
+
+export async function fetchIngestion(ingestionId: string): Promise<IngestionRecordView | null> {
+    try {
+        const res = await apiFetch(`/api/ingestions/${encodeURIComponent(ingestionId)}`);
+        if (!res.ok) {
+            return null;
+        }
+        return (await res.json()) as IngestionRecordView;
+    } catch {
+        return null;
+    }
+}
+
+/** The uploaded original, for the PDF preview + bbox overlay (preview cache; E.2). */
+export function ingestionFileUrl(ingestionId: string): string {
+    return `/api/ingestions/${encodeURIComponent(ingestionId)}/file`;
+}
+
 export type EhrSyncFetchResult =
     | { kind: 'synced'; factCount: number; resourceCounts: Record<string, number>; syncedAt: string }
     /** 409 not_linked_to_openemr — the patient has no OpenEMR chart to pull from yet. */
@@ -463,6 +533,8 @@ export async function sendChatMessage(
     onToolUse?: (tool: ChatToolUse) => void,
     onToolResult?: (tool: ChatToolResult) => void,
     onSeed?: (content: string) => void,
+    /** E.9: transient evidence-lane status ("checking practice protocols…"). */
+    onStatus?: (text: string) => void,
     options?: {
         /** IC3: the scan open in the imaging workspace, so "this scan" resolves server-side. */
         viewingImageId?: string | null;
@@ -516,6 +588,9 @@ export async function sendChatMessage(
         } else if (event.type === 'tool_result' && typeof event.name === 'string') {
             const summary = parseToolSummary(event.summary);
             onToolResult?.({ name: event.name, ok: event.ok === true, ...(summary === null ? {} : { summary }) });
+        } else if (event.type === 'status' && typeof event.text === 'string') {
+            // E.9: evidence-lane progress — display-only, never persisted.
+            onStatus?.(event.text);
         } else if (event.type === 'seed' && typeof event.content === 'string') {
             // M9 opening move: the agent's prepared digest, persisted server-side as the
             // conversation's first assistant message and echoed here for live rendering.
