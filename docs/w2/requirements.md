@@ -168,9 +168,11 @@ entirely, pgvector unverified doc claim.)*
   live against an extensionless Postgres; `RETRIEVER_DENSE_BACKEND` genuinely
   branches now, and `npm run corpus:index` exists (`--rebuild` wipes first).
   Keyword leg re-scoped to in-process BM25 — same sparse-retrieval contract
-  the spec asks for, deliberately not tsvector at this corpus size. Live
-  pgvector confirmation post-merge: boot log `denseBackend: "pgvector"` +
-  `corpus_index_synced` counts.)*
+  the spec asks for, deliberately not tsvector at this corpus size.
+  CONFIRMED LIVE 2026-07-14: production deploy log `corpus_index_synced
+  {backend: pgvector, total: 71, embedded: 0, reused: 71, deleted: 0}` — a
+  restart reusing every persisted vector with zero re-embeds, the
+  persistence proof itself.)*
 - [x] Rerank: Cohere Rerank on fused candidates (locked decision — the vendor
   the spec names); only top-k (k ≤ 5) chunks reach the answer model.
 - [x] Evidence snippets returned with full source metadata (doc, section,
