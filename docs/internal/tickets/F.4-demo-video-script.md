@@ -87,7 +87,7 @@ None — a script document. (Ship ritual still runs.)
 ## Tracker updates
 
 - `docs/w2/requirements.md` — **D6 is a table row** (section 3): no checkbox; annotate the row "script committed (docs/w2/demo-script.md); recording pending" until the link exists.
-- `docs/w2/build-status.html` — DATA (starts L189): ticket **`F.5`** (`{ id: "F.5", … }` — NOT "F.4"; spec filename differs from the plan ticket) → `s: "active"` on script commit, `s: "done"` only when the video is linked in README; bump the Deliverables (D6) reqGroup count at that point.
+- `docs/internal/build-status.html` — DATA (starts L189): ticket **`F.5`** (`{ id: "F.5", … }` — NOT "F.4"; spec filename differs from the plan ticket) → `s: "active"` on script commit, `s: "done"` only when the video is linked in README; bump the Deliverables (D6) reqGroup count at that point.
 - `W2_ARCHITECTURE.md` — no section marker owned by this ticket; skip.
 
 ## Verify + ship ritual
@@ -99,4 +99,4 @@ cd sidecar && npm test && npm run typecheck && npm run eval && npm run build
 Panel untouched — skip the panel leg. Then: conventional commit with
 `--trailer "Assisted-by: Claude Code"` (trackers in the SAME commit) →
 `git push -u origin claude/openemr-rag-requirements-x25vzm` → update PR #9
-body → SendUserFile `docs/w2/build-status.html`.
+body → SendUserFile `docs/internal/build-status.html`.

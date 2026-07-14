@@ -95,7 +95,7 @@ covering it (it lives under `src/`, so `tsc -p tsconfig.json` already does).
 ## Tracker updates
 
 - `docs/w2/requirements.md` — under **G11** flip: `- [ ] Baselines recorded for W2 flows (ingestion, extraction, retrieval, full graph run) — latency p50/p95, CPU/memory where obtainable, throughput — and compared against Week 1 baselines (p95 46 ms @10 / 193 ms @50)…` → `- [x]`. Under **S3/R4**: the supervisor-as-entry box's remaining item is "measured ~200–400 ms baseline" — flip it if the rules-path measurement + stated-target treatment of the model path satisfies the register wording; otherwise annotate "(model-path measurement awaits keys — F.6/live run)". Under **G2**, the SLO box `- [x] SLOs stated (locked)…` gains "measured against baselines (G11)" truth — verify its annotation.
-- `docs/w2/build-status.html` — DATA (starts L189): `{ id: "F.1", … s: "pending" }` → `s: "done"`; bump G11 reqGroup; refresh the `slos` DATA array (L342, mirrors §9) with the measured labels.
+- `docs/internal/build-status.html` — DATA (starts L189): `{ id: "F.1", … s: "pending" }` → `s: "done"`; bump G11 reqGroup; refresh the `slos` DATA array (L342, mirrors §9) with the measured labels.
 - `W2_ARCHITECTURE.md` — §9 header `— [TARGET]` → `[SHIPPED: measured stub-backend baselines + W1 regression check · TARGET: live-backend numbers post key-drop]`.
 
 ## Verify + ship ritual
@@ -107,4 +107,4 @@ cd sidecar && npm test && npm run typecheck && npm run eval && npm run build
 Panel untouched — skip the panel leg. Then: conventional commit with
 `--trailer "Assisted-by: Claude Code"` (trackers in the SAME commit) →
 `git push -u origin claude/openemr-rag-requirements-x25vzm` → update PR #9
-body → SendUserFile `docs/w2/build-status.html`.
+body → SendUserFile `docs/internal/build-status.html`.

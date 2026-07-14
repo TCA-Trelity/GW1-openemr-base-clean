@@ -137,7 +137,7 @@ the switch-roles message; nurse/physician → staged progress as before.
 ## Tracker updates
 
 - `docs/w2/requirements.md` — under **S5** flip: `- [ ] Demo auth (locked): write paths (upload, vitals write, verify) require a dev-login bearer with role gate; read/chat surfaces stay open for graders.` → `- [x]`, annotating: "(vitals write joins this gate when its route lands — no vitals route exists yet)".
-- `docs/w2/build-status.html` — DATA (starts L189): `{ id: "E.3", t: "Write-path auth: dev-login bearer + role gate", reqs: ["#14"], deps: "A.3", s: "pending" }` (L247) → `s: "done"`; bump the S5 reqGroup done-count.
+- `docs/internal/build-status.html` — DATA (starts L189): `{ id: "E.3", t: "Write-path auth: dev-login bearer + role gate", reqs: ["#14"], deps: "A.3", s: "pending" }` (L247) → `s: "done"`; bump the S5 reqGroup done-count.
 - `W2_ARCHITECTURE.md` — §13 header (`## 13. Security & privacy posture (REQ: G18, P5) — [TARGET deltas on SHIPPED model]`): record the upload write-gate as shipped in the header marker or the section's delta list.
 
 ## Verify + ship ritual
@@ -150,4 +150,4 @@ cd sidecar/panel && npx tsc -p tsconfig.json --noEmit && npx vitest run && npm r
 Then: conventional commit with `--trailer "Assisted-by: Claude Code"`
 (trackers in the SAME commit) → `git push -u origin
 claude/openemr-rag-requirements-x25vzm` → update PR #9 body → SendUserFile
-`docs/w2/build-status.html`.
+`docs/internal/build-status.html`.

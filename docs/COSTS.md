@@ -81,7 +81,7 @@ ledger rates. **Zero live Week 2 LLM spend has accrued** — every W2 eval, CI
 run, and baseline in this branch is keyless by design (G17: scripted
 VLM/composer stubs, offline retrieval backends), so the `llm_calls` ledger
 carries only the Week 1 actuals in §1. Live W2 calls begin at the key drop
-(`docs/w2/tickets/USER-ACTIONS.md`) and will land in the same ledger under
+(`docs/internal/tickets/USER-ACTIONS.md`) and will land in the same ledger under
 purposes `evidence_composition` (wired in `src/graph/composer.ts`) and the
 extraction purpose.*
 

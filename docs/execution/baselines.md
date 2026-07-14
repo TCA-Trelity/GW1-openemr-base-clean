@@ -55,7 +55,7 @@ scripted stubs. **These are pipeline-mechanics numbers** — strict-schema parse
 real pdf.js word geometry + deterministic grounding, BM25 + hash-dense fusion,
 the full supervisor graph with the real router/critic/gate. What the stubs
 exclude (live VLM/composer/rerank round trips) is measured after the key drop
-(`docs/w2/tickets/USER-ACTIONS.md`).
+(`docs/internal/tickets/USER-ACTIONS.md`).
 
 | Flow | Backends | Runs | p50 | p95 | p99 | max |
 |---|---|---|---|---|---|---|

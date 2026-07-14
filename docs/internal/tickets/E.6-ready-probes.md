@@ -84,7 +84,7 @@ other deps still report independently.
 
 - `docs/w2/requirements.md` — under **G14 — Health/readiness**, flip:
   - `- [ ] \`/ready\` adds probes: document storage (OpenEMR standard API` … `(existing pattern extended).` → `- [x]`
-- `docs/w2/build-status.html` — DATA block: ticket `E.6` → done status; bump the G14 reqGroup done-count by its checkbox delta.
+- `docs/internal/build-status.html` — DATA block: ticket `E.6` → done status; bump the G14 reqGroup done-count by its checkbox delta.
 - `W2_ARCHITECTURE.md` — §9 header (`## 9. SLOs, resilience, readiness (REQ: G2, G14) — [TARGET]`): move the readiness-probe portion to SHIPPED (e.g. `[SHIPPED: W2 /ready probes · TARGET: rest]` — match the mixed-marker style of §3/§5 headers).
 
 ## Verify + ship ritual
@@ -96,4 +96,4 @@ cd sidecar && npm test && npm run typecheck && npm run eval && npm run build
 Panel untouched — skip the panel leg. Then: conventional commit with
 `--trailer "Assisted-by: Claude Code"` (trackers in the SAME commit) →
 `git push -u origin claude/openemr-rag-requirements-x25vzm` → update PR #9
-body → SendUserFile `docs/w2/build-status.html`.
+body → SendUserFile `docs/internal/build-status.html`.

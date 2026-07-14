@@ -122,7 +122,7 @@ stat grid. Alerts: `docs/execution/observability.md` shows A1–A6 in one table.
 ## Tracker updates
 
 - `docs/w2/requirements.md` — flip under **G15**: `- [ ] Three new alert definitions with thresholds + documented response actions…` → `- [x]`. Flip under **G6**: `- [ ] Dashboard (Langfuse + ops-status page) adds W2 tiles…` → `- [x]` (tiles committed; note "static until deploy" inline). Under **R7** and **G13**, flip only what is true: the spans-adapter + span assertions land here; "Langfuse activated"/"verified visually" complete after the key drop (USER-ACTIONS.md) — annotate rather than flip if keys are still absent.
-- `docs/w2/build-status.html` — DATA block (starts L189): ticket `E.9`-adjacent entry `{ id: "E.4", … s: "pending" }` (L248 region) → `s: "done"`; bump reqGroups `G6`, `G15` done-counts (+1 each) and `R7` by the checkbox delta; the DATA `alerts` array (L350) entries A4–A6 change `status: "spec at E.4"` → `status: "committed"`.
+- `docs/internal/build-status.html` — DATA block (starts L189): ticket `E.9`-adjacent entry `{ id: "E.4", … s: "pending" }` (L248 region) → `s: "done"`; bump reqGroups `G6`, `G15` done-counts (+1 each) and `R7` by the checkbox delta; the DATA `alerts` array (L350) entries A4–A6 change `status: "spec at E.4"` → `status: "committed"`.
 - `W2_ARCHITECTURE.md` — §8 header `## 8. Observability & cost (REQ: R7, G4–G6, G13, G15) — [TARGET on top of SHIPPED spine]` → move tiles/alerts/graph-span adapter into a SHIPPED list, keep key-activation TARGET.
 
 ## Verify + ship ritual
@@ -134,4 +134,4 @@ cd sidecar && npm test && npm run typecheck && npm run eval && npm run build
 Panel untouched — skip the panel leg. Then: conventional commit with
 `--trailer "Assisted-by: Claude Code"` (trackers in the SAME commit) →
 `git push -u origin claude/openemr-rag-requirements-x25vzm` → update PR #9
-body → SendUserFile `docs/w2/build-status.html`.
+body → SendUserFile `docs/internal/build-status.html`.

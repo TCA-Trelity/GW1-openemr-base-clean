@@ -160,7 +160,7 @@ status line and behaves exactly as before.
 ## Tracker updates
 
 - `docs/w2/requirements.md` — under **S3/R4** update the parenthetical of: `- [ ] Supervisor-as-entry routing (locked decision): …` (delegation wiring now shipped; the box itself flips when F.1 measures the ~200–400 ms router baseline — say so in the note). Under **R5** flip: `- [ ] Guideline citations verify quote-vs-stored-chunk through the same gate path as record citations.` → `- [x]`, and re-evaluate `- [ ] Every clinical claim in a final response carries a machine-readable citation of the minimum spec shape…` (guideline class now enforced end-to-end; flip if the extraction-facts class is also live by then, else annotate).
-- `docs/w2/build-status.html` — DATA (starts L189): `{ id: "E.9", … s: "pending" }` (L253) → `s: "done"`; bump `S3/R4` and `R5` reqGroup done-counts by the flipped-checkbox delta; refresh the `stamp` string.
+- `docs/internal/build-status.html` — DATA (starts L189): `{ id: "E.9", … s: "pending" }` (L253) → `s: "done"`; bump `S3/R4` and `R5` reqGroup done-counts by the flipped-checkbox delta; refresh the `stamp` string.
 - `W2_ARCHITECTURE.md` — §4 header: remove "ChatService fast_path delegation + production composer (answer leg)" from TARGET; §5 header: remove "production composer (answer leg, chat integration)" from TARGET.
 
 ## Verify + ship ritual
@@ -173,4 +173,4 @@ cd sidecar/panel && npx tsc -p tsconfig.json --noEmit && npx vitest run && npm r
 Then: conventional commit with `--trailer "Assisted-by: Claude Code"`
 (trackers in the SAME commit) → `git push -u origin
 claude/openemr-rag-requirements-x25vzm` → update PR #9 body → SendUserFile
-`docs/w2/build-status.html`.
+`docs/internal/build-status.html`.

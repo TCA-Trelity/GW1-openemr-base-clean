@@ -112,7 +112,7 @@ value never crashes boot — the feature disables with a `[config]` warning.
 | `SCAN_IMAGES_DIR` | baked seed | scan pixels dir for `/api/images` |
 | `REDIS_URL` | — | reserved (unused; queue is documented Week 1 debt) |
 
-Key-drop steps with verification: [`docs/w2/tickets/USER-ACTIONS.md`](docs/w2/tickets/USER-ACTIONS.md).
+Key-drop steps with verification: [`docs/internal/tickets/USER-ACTIONS.md`](docs/internal/tickets/USER-ACTIONS.md).
 
 ## Deliverables & doc map
 
@@ -129,10 +129,8 @@ Key-drop steps with verification: [`docs/w2/tickets/USER-ACTIONS.md`](docs/w2/ti
 | D7 | Cost & latency report | [`docs/COSTS.md`](docs/COSTS.md) §6, [`docs/execution/baselines.md`](docs/execution/baselines.md) |
 | D8 | Deployed app | URLs above |
 
-**Week 2 working docs:** [build-status dashboard](docs/w2/build-status.html) ·
-[requirements register](docs/w2/requirements.md) ·
+**Week 2 working docs:** [requirements register](docs/w2/requirements.md) ·
 [execution plan](docs/w2/execution-plan.md) ·
-[ticket specs (cold-executable)](docs/w2/tickets/) ·
 [trace worked example](docs/w2/trace-example.md) ·
 [defense outline](docs/w2/defense-outline.md) ·
 [OpenAPI contract](sidecar/openapi.yaml) ·

@@ -1,5 +1,10 @@
 # USER-ACTIONS — the key-drop & click checklist (human-only steps)
 
+> **Human surface: [`../user-actions.html`](../user-actions.html)** — the same
+> checklist as an interactive form (checkboxes persist in-browser, copy
+> buttons, navigation links). This markdown stays the canonical source agents
+> read; **update both together** when actions change.
+
 REQ: 0.3, 0.5, S2/R3, R7, S1/R1 enablement · Plan tickets: 0.3 / 0.5 / F.6 prerequisites · Band: 2–3
 
 These are the steps only **you** (the account owner) can do: pasting secrets

@@ -98,7 +98,7 @@ commit must not skip it, per standing rule 1.)
 ## Tracker updates
 
 - `docs/w2/requirements.md` — **D7 is a table row, not a checkbox** (section 3, Deliverables): no checkbox to flip; verify the D7 acceptance text matches what shipped (COSTS.md extension chosen over a separate report file — annotate the row if needed). Under **R7**, the cost-ledger box `- [ ] Cost ledger extended: extraction and Cohere calls priced into llm_calls…` — flip only if E.9's `evidence_composition` recording plus this report satisfy it; Cohere calls are not ledger-priced until a Cohere pricing line exists — annotate honestly if partial.
-- `docs/w2/build-status.html` — DATA (starts L189): `{ id: "F.2", … s: "pending" }` → `s: "done"`; bump the Deliverables reqGroup (D7) count.
+- `docs/internal/build-status.html` — DATA (starts L189): `{ id: "F.2", … s: "pending" }` → `s: "done"`; bump the Deliverables reqGroup (D7) count.
 - `W2_ARCHITECTURE.md` — §8: append "(D7 report: docs/COSTS.md §6)" to the cost-tracking bullet; reconcile the projection numbers if step 3 moved them.
 
 ## Verify + ship ritual
@@ -110,4 +110,4 @@ cd sidecar && npm test && npm run typecheck && npm run eval && npm run build
 Panel untouched — skip the panel leg. Then: conventional commit with
 `--trailer "Assisted-by: Claude Code"` (trackers in the SAME commit) →
 `git push -u origin claude/openemr-rag-requirements-x25vzm` → update PR #9
-body → SendUserFile `docs/w2/build-status.html`.
+body → SendUserFile `docs/internal/build-status.html`.

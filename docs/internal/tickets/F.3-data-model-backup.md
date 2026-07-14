@@ -110,7 +110,7 @@ full suite.)
 ## Tracker updates
 
 - `docs/w2/requirements.md` — under **G18** flip: `- [ ] Backup & recovery: automatic + manual procedures documented … golden set reproducible from the repo alone (no DB-only state). Today this runbook does not exist — real gap.` → `- [x]`; and `- [ ] Data-model doc (W2_ARCHITECTURE.md): for each W2 artifact — … defined owner (authoritative system), lineage (…), access control (…), validation rules.` → `- [x]` after the step-2 verification. Under **G1** flip: `- [ ] Data-authority table (in W2_ARCHITECTURE.md §data-model): per data type — owner system, writers, readers, overwrite policy. Idempotent re-processing is wipe-and-rewrite by deterministic ID, never silent accretion.` → `- [x]`.
-- `docs/w2/build-status.html` — DATA (starts L189): ticket **`F.4`** (`{ id: "F.4", … }` — NOT "F.3"; this spec file's number differs from the plan ticket) → `s: "done"`; bump G18 and G1 reqGroup done-counts.
+- `docs/internal/build-status.html` — DATA (starts L189): ticket **`F.4`** (`{ id: "F.4", … }` — NOT "F.3"; this spec file's number differs from the plan ticket) → `s: "done"`; bump G18 and G1 reqGroup done-counts.
 - `W2_ARCHITECTURE.md` — §10 and §14 header markers as in steps 2–3.
 
 ## Verify + ship ritual
@@ -122,4 +122,4 @@ cd sidecar && npm test && npm run typecheck && npm run eval && npm run build
 Panel untouched — skip the panel leg. Then: conventional commit with
 `--trailer "Assisted-by: Claude Code"` (trackers in the SAME commit) →
 `git push -u origin claude/openemr-rag-requirements-x25vzm` → update PR #9
-body → SendUserFile `docs/w2/build-status.html`.
+body → SendUserFile `docs/internal/build-status.html`.

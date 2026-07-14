@@ -104,7 +104,7 @@ None — documentation. (Ship ritual still runs.)
 ## Tracker updates
 
 - `docs/w2/requirements.md` — **D1 is a table row** (section 3): verify its acceptance text now holds; annotate the row `(shipped — README restructure, <commit>)`.
-- `docs/w2/build-status.html` — DATA (starts L189): ticket **`F.3`** (`{ id: "F.3", … }` — NOT "F.5"; spec filename differs from the plan ticket) → `s: "done"`; bump the Deliverables (D1) reqGroup count.
+- `docs/internal/build-status.html` — DATA (starts L189): ticket **`F.3`** (`{ id: "F.3", … }` — NOT "F.5"; spec filename differs from the plan ticket) → `s: "done"`; bump the Deliverables (D1) reqGroup count.
 - `W2_ARCHITECTURE.md` — no marker owned; ensure README's doc map links it (D2 cross-link requirement).
 
 ## Verify + ship ritual
@@ -116,4 +116,4 @@ cd sidecar && npm test && npm run typecheck && npm run eval && npm run build
 Panel untouched — skip the panel leg. Then: conventional commit with
 `--trailer "Assisted-by: Claude Code"` (trackers in the SAME commit) →
 `git push -u origin claude/openemr-rag-requirements-x25vzm` → update PR #9
-body → SendUserFile `docs/w2/build-status.html`.
+body → SendUserFile `docs/internal/build-status.html`.

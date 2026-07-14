@@ -10,7 +10,7 @@ change edits `requirements.md` in the same PR (anti-drift rule).
 
 Architecture for every ticket: [`W2_ARCHITECTURE.md`](../../W2_ARCHITECTURE.md)
 (section numbers cited as §). Remaining tickets carry a **spec** link into
-[`tickets/`](tickets/README.md) — per-ticket implementation specs written to be
+[`tickets/`](../internal/tickets/README.md) — per-ticket implementation specs written to be
 executable cold (template + standing rules in that README).
 
 **Checkpoint expectation bands:**
@@ -32,9 +32,9 @@ executable cold (template + standing rules in that README).
 |----|--------|-----|-------------------|------------|
 | 0.1 | Verify pgvector on Railway Postgres; enable extension or flip retriever to in-process fallback flag | S2/R3 | `CREATE EXTENSION vector` succeeds (or fallback documented + flag set); finding recorded in W2_ARCHITECTURE §15 | — |
 | 0.2 | Register `user/document.write` scope for the sidecar's password-grant client; integration-test one document POST against dev OpenEMR | S1/R1, G7 | Test uploads + lists + hash-matches a PDF on a dev patient; scope change noted in RUNBOOK | — |
-| 0.3 | Activate Langfuse (Cloud project, synthetic-data demo posture); existing prep tracer emits; keys in Railway — [user actions](tickets/USER-ACTIONS.md) | R7, §8; debt item #4 | A prep run renders a trace in Langfuse; `docs/RUNBOOK.md` §C updated | — |
+| 0.3 | Activate Langfuse (Cloud project, synthetic-data demo posture); existing prep tracer emits; keys in Railway — [user actions](../internal/tickets/USER-ACTIONS.md) | R7, §8; debt item #4 | A prep run renders a trace in Langfuse; `docs/RUNBOOK.md` §C updated | — |
 | 0.4 | Add `COHERE_API_KEY`, LangSmith env vars to the boot-crash-proof config layer (invalid → feature off + warning, never crash) | S2/R3, R7, G2 | Config parse tests; missing key degrades cleanly | — |
-| 0.5 | Wire branch protection: new eval workflow will be a required check on `main` (repo-admin action; document in RELEASE.md) — [user actions](tickets/USER-ACTIONS.md) | S4/R6, D5 | RELEASE.md promotion gate lists the eval check | — |
+| 0.5 | Wire branch protection: new eval workflow will be a required check on `main` (repo-admin action; document in RELEASE.md) — [user actions](../internal/tickets/USER-ACTIONS.md) | S4/R6, D5 | RELEASE.md promotion gate lists the eval check | — |
 
 ## Wave A — Ingestion spine (parallel with Wave B)
 
@@ -88,24 +88,24 @@ executable cold (template + standing rules in that README).
 |----|--------|-----|-------------------|------------|
 | E.1 | Panel upload UI: drag-drop (front-desk role via role switcher), doc-type select, live ingestion status | S5 (locked #7) | Grader can upload the hero fixtures from the panel and watch extraction complete | A.3, A.4 |
 | E.2 | PDF preview + bbox overlay + click-to-source in Sources tab (three visibly distinct citation outcomes) | R5, E2 | Clicking a lab citation opens the page with the region highlighted; unverified facts visibly flagged | A.5 |
-| E.3 | Write-path auth: dev-login bearer + role gate on upload/vitals/verify; read/chat stay open — [spec](tickets/E.3-write-path-auth.md) | locked #14 | Unauthenticated upload → 401; wrong role → 403; documented in README/RUNBOOK | A.3 |
-| E.4 | Observability build-out: graph/retrieval/extraction spans in Langfuse; dashboard tiles (ingestion count, field-level pass rate, retrieval hit rate, routing outcomes, eval per-category); alerts A4–A6 with response actions — [spec](tickets/E.4-langfuse-observability.md) | R7, G6, G15 | Tiles render on the ops page; alert definitions committed in observability.md | C.5, 0.3 |
-| E.5 | LangSmith demo-env wiring (fenced: demo env only, synthetic data) — [spec](tickets/E.5-langsmith-demo.md) | R7 (locked #2), P5 | LangGraph trace renders in LangSmith from the demo env; production config has no LangSmith key | C.3 |
-| E.6 | `/ready` probes: document storage (write-scoped client), vector index, reranker — degraded statuses — [spec](tickets/E.6-ready-probes.md) | G14 | Killing each dependency flips its probe to degraded without taking `/ready` binary-down | A.3, B.3 |
-| E.7 | Sidecar OpenAPI 3.0 spec (all W2 endpoints) + contract tests + CI freshness check — [spec](tickets/E.7-openapi.md) | G16 | Spec committed; contract test fails on drift (mirrors core `api-docs.yml` pattern) | A.3 stable routes |
-| E.8 | Bruno collection: upload, extraction status, evidence retrieval, full W2 flow (+ dev-login for write auth) — [spec](tickets/E.8-bruno.md) | G10 | `bru run --env railway` green including the new folder | E.3, E.6 |
-| E.9 | Evidence-turn streaming UX: "checking practice protocols…" status events; degraded message on retrieval timeout — [spec](tickets/E.9-evidence-turn-and-composer.md) | §4 Tier 1, G2 | SSE shows status → evidence → cited answer; timeout path renders the honest fallback | C.3 |
+| E.3 | Write-path auth: dev-login bearer + role gate on upload/vitals/verify; read/chat stay open — [spec](../internal/tickets/E.3-write-path-auth.md) | locked #14 | Unauthenticated upload → 401; wrong role → 403; documented in README/RUNBOOK | A.3 |
+| E.4 | Observability build-out: graph/retrieval/extraction spans in Langfuse; dashboard tiles (ingestion count, field-level pass rate, retrieval hit rate, routing outcomes, eval per-category); alerts A4–A6 with response actions — [spec](../internal/tickets/E.4-langfuse-observability.md) | R7, G6, G15 | Tiles render on the ops page; alert definitions committed in observability.md | C.5, 0.3 |
+| E.5 | LangSmith demo-env wiring (fenced: demo env only, synthetic data) — [spec](../internal/tickets/E.5-langsmith-demo.md) | R7 (locked #2), P5 | LangGraph trace renders in LangSmith from the demo env; production config has no LangSmith key | C.3 |
+| E.6 | `/ready` probes: document storage (write-scoped client), vector index, reranker — degraded statuses — [spec](../internal/tickets/E.6-ready-probes.md) | G14 | Killing each dependency flips its probe to degraded without taking `/ready` binary-down | A.3, B.3 |
+| E.7 | Sidecar OpenAPI 3.0 spec (all W2 endpoints) + contract tests + CI freshness check — [spec](../internal/tickets/E.7-openapi.md) | G16 | Spec committed; contract test fails on drift (mirrors core `api-docs.yml` pattern) | A.3 stable routes |
+| E.8 | Bruno collection: upload, extraction status, evidence retrieval, full W2 flow (+ dev-login for write auth) — [spec](../internal/tickets/E.8-bruno.md) | G10 | `bru run --env railway` green including the new folder | E.3, E.6 |
+| E.9 | Evidence-turn streaming UX: "checking practice protocols…" status events; degraded message on retrieval timeout — [spec](../internal/tickets/E.9-evidence-turn-and-composer.md) | §4 Tier 1, G2 | SSE shows status → evidence → cited answer; timeout path renders the honest fallback | C.3 |
 
 ## Wave F — Hardening + deliverables (Band 3: Final expectation)
 
 | ID | Ticket | REQ | Acceptance sketch | Depends on |
 |----|--------|-----|-------------------|------------|
-| F.1 | W2 baselines: ingestion / extraction / retrieval / full-graph latency (p50/p95) + shared-path regression check vs Week 1 (46/193 ms) — [spec](tickets/F.1-baselines.md) | G11 | `docs/execution/baselines.md` extended; SLO table (§9) updated with measured numbers | E.* landed |
-| F.2 | Cost & latency report: ledger-backed dev spend, per-doc + per-query costs, p50/p95 vs SLOs, bottleneck analysis — [spec](tickets/F.2-cost-latency-report.md) | D7 | Report committed; numbers traceable to `llm_calls` ledger + baselines | F.1 |
-| F.3 | README restructure: Week 1 baseline vs Week 2 multimodal behavior; one no-guessing setup section (branch, env vars incl. Cohere/Langfuse/LangSmith/AUTH, both services); W2 deliverables table — [spec](tickets/F.5-readme-deliverables.md) | D1 | A grader can run the core W2 flow from README alone | E.* |
-| F.4 | Backup & recovery runbook: automatic + manual procedures, RPO/RTO, wipe-and-rebuild as recovery primitive, golden-set-in-repo invariant — [spec](tickets/F.3-data-model-backup.md) | G18 | Runbook committed; manual restore rehearsed once | — |
-| F.5 | Demo video (3–5 min): upload → extraction → evidence retrieval → citations → eval results → observability — [spec](tickets/F.4-demo-video-script.md) | D6 | Video linked in README; covers all six spec items; synthetic data only | E.*, D.7 |
-| F.6 | Pre-milestone live eval run (`LIVE_EVALS=1`) + live smoke on Railway; verification-rate alert sanity check — key-drop prerequisites: [USER-ACTIONS](tickets/USER-ACTIONS.md) | locked #9, S5 | Live results appended to eval-results.md; drift (if any) triaged before tag | D.2 |
+| F.1 | W2 baselines: ingestion / extraction / retrieval / full-graph latency (p50/p95) + shared-path regression check vs Week 1 (46/193 ms) — [spec](../internal/tickets/F.1-baselines.md) | G11 | `docs/execution/baselines.md` extended; SLO table (§9) updated with measured numbers | E.* landed |
+| F.2 | Cost & latency report: ledger-backed dev spend, per-doc + per-query costs, p50/p95 vs SLOs, bottleneck analysis — [spec](../internal/tickets/F.2-cost-latency-report.md) | D7 | Report committed; numbers traceable to `llm_calls` ledger + baselines | F.1 |
+| F.3 | README restructure: Week 1 baseline vs Week 2 multimodal behavior; one no-guessing setup section (branch, env vars incl. Cohere/Langfuse/LangSmith/AUTH, both services); W2 deliverables table — [spec](../internal/tickets/F.5-readme-deliverables.md) | D1 | A grader can run the core W2 flow from README alone | E.* |
+| F.4 | Backup & recovery runbook: automatic + manual procedures, RPO/RTO, wipe-and-rebuild as recovery primitive, golden-set-in-repo invariant — [spec](../internal/tickets/F.3-data-model-backup.md) | G18 | Runbook committed; manual restore rehearsed once | — |
+| F.5 | Demo video (3–5 min): upload → extraction → evidence retrieval → citations → eval results → observability — [spec](../internal/tickets/F.4-demo-video-script.md) | D6 | Video linked in README; covers all six spec items; synthetic data only | E.*, D.7 |
+| F.6 | Pre-milestone live eval run (`LIVE_EVALS=1`) + live smoke on Railway; verification-rate alert sanity check — key-drop prerequisites: [USER-ACTIONS](../internal/tickets/USER-ACTIONS.md) | locked #9, S5 | Live results appended to eval-results.md; drift (if any) triaged before tag | D.2 |
 | F.7 | Anti-drift sweep: every requirements.md checkbox verified or explicitly re-scoped (with migration note); statuses flipped in W2_ARCHITECTURE.md | G1, register purpose | No unchecked box without a recorded decision | all |
 | F.8 | Stable tag + deploy verification (`stable-*` via tag workflow; `/ready` green/degraded-explained on prod) | D8, RELEASE.md | Tag minted; README links verified live | F.3, F.6 |
 

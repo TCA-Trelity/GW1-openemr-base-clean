@@ -100,7 +100,7 @@ log still says `off`.
 ## Tracker updates
 
 - `docs/w2/requirements.md` — under **R7** flip: `- [ ] LangSmith enabled **only** in the demo environment (locked), documented as a demo-env overlay with synthetic data — never the committed production posture (P5 guard).` → `- [x]` once the docs + boot log land (the env-var flip itself is the user's USER-ACTIONS.md step; annotate "(demo-env vars: user action)" if they haven't been set yet).
-- `docs/w2/build-status.html` — DATA (starts L189): `{ id: "E.5", … s: "pending" }` → `s: "done"`; bump the R7 reqGroup done-count by the flipped delta.
+- `docs/internal/build-status.html` — DATA (starts L189): `{ id: "E.5", … s: "pending" }` → `s: "done"`; bump the R7 reqGroup done-count by the flipped delta.
 - `W2_ARCHITECTURE.md` — §8 already states the fencing; no marker change unless §8's TARGET list names LangSmith wiring — if it does, mark that item shipped.
 
 ## Verify + ship ritual
@@ -112,4 +112,4 @@ cd sidecar && npm test && npm run typecheck && npm run eval && npm run build
 Panel untouched — skip the panel leg. Then: conventional commit with
 `--trailer "Assisted-by: Claude Code"` (trackers in the SAME commit) →
 `git push -u origin claude/openemr-rag-requirements-x25vzm` → update PR #9
-body → SendUserFile `docs/w2/build-status.html`.
+body → SendUserFile `docs/internal/build-status.html`.

@@ -131,7 +131,7 @@ fence is configuration: set the three vars **only on the demo Railway
 service** (synthetic data), never on the production posture, whose committed
 backend is Langfuse. The boot log states the posture on every start
 (`LangSmith tracing ON — demo environment posture` vs `off — production
-posture`). Key drop steps: `docs/w2/tickets/USER-ACTIONS.md`.
+posture`). Key drop steps: `docs/internal/tickets/USER-ACTIONS.md`.
 
 **Goal:** turn the emitted traces into the dashboard + alerts specified in
 `docs/execution/observability.md`.

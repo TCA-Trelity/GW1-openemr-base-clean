@@ -51,7 +51,7 @@ File path + describe/it names + what each asserts.
 
 ## Tracker updates
 - The exact `docs/w2/requirements.md` checkbox lines to flip (quoted).
-- `docs/w2/build-status.html` DATA block: ticket ids to mark done + reqGroup
+- `docs/internal/build-status.html` DATA block: ticket ids to mark done + reqGroup
   done-counts to bump.
 - The `W2_ARCHITECTURE.md` section header whose status marker to edit.
 
@@ -80,7 +80,7 @@ Then:
 2. `git push -u origin claude/openemr-rag-requirements-x25vzm`
 3. Update the PR #9 body (checklist line for the ticket).
 4. Send the user the refreshed dashboard: SendUserFile
-   `docs/w2/build-status.html` (rendered inline).
+   `docs/internal/build-status.html` (rendered inline).
 
 ---
 

@@ -185,7 +185,7 @@ headless in both envs). Keep every request carrying at least one `assert`.
 ## Tracker updates
 
 - `docs/w2/requirements.md` — under **G10** flip: `- [ ] Bruno collection (\`sidecar/api-collection/\`) adds: document upload, extraction status, evidence retrieval, and the full W2 agent flow; runnable headless (\`bru run\`) against local + railway envs; auth'd write requests documented with dev-login flow.` → `- [x]`.
-- `docs/w2/build-status.html` — DATA (starts L189): `{ id: "E.8", … s: "pending" }` → `s: "done"`; bump the G10 reqGroup done-count.
+- `docs/internal/build-status.html` — DATA (starts L189): `{ id: "E.8", … s: "pending" }` → `s: "done"`; bump the G10 reqGroup done-count.
 - `W2_ARCHITECTURE.md` — no section marker owned by this ticket; skip.
 
 ## Verify + ship ritual
@@ -197,4 +197,4 @@ cd sidecar && npm test && npm run typecheck && npm run eval && npm run build
 Panel untouched — skip the panel leg. Then: conventional commit with
 `--trailer "Assisted-by: Claude Code"` (trackers in the SAME commit) →
 `git push -u origin claude/openemr-rag-requirements-x25vzm` → update PR #9
-body → SendUserFile `docs/w2/build-status.html`.
+body → SendUserFile `docs/internal/build-status.html`.

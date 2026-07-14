@@ -105,7 +105,7 @@ npm run typecheck
 ## Tracker updates
 
 - `docs/w2/requirements.md` — under **G16** flip: `- [ ] Sidecar OpenAPI 3.0 spec committed (today the sidecar has none; …) covering all W2 HTTP endpoints (…); contract tests verify implementation matches the spec; kept in sync (CI freshness check mirroring the core api-docs.yml pattern).` → `- [x]`.
-- `docs/w2/build-status.html` — DATA (starts L189): `{ id: "E.7", … s: "pending" }` → `s: "done"`; bump the G16 reqGroup done-count.
+- `docs/internal/build-status.html` — DATA (starts L189): `{ id: "E.7", … s: "pending" }` → `s: "done"`; bump the G16 reqGroup done-count.
 - `W2_ARCHITECTURE.md` — no section header owns G16 directly; if §11 (Testing strategy) names the OpenAPI contract test, refresh it there, else no architecture edit.
 
 ## Verify + ship ritual
@@ -117,4 +117,4 @@ cd sidecar && npm test && npm run typecheck && npm run eval && npm run build
 Panel untouched — skip the panel leg. Then: conventional commit with
 `--trailer "Assisted-by: Claude Code"` (trackers in the SAME commit) →
 `git push -u origin claude/openemr-rag-requirements-x25vzm` → update PR #9
-body → SendUserFile `docs/w2/build-status.html`.
+body → SendUserFile `docs/internal/build-status.html`.
