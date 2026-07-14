@@ -108,7 +108,7 @@
   A <code>null</code> is <b>expected</b>, not a failed key drop: the variables sit staged on Railway and take
   effect on the post-merge redeploy. Verifies that DO work pre-merge: item 3's <code>langfuse</code> flip + prep
   trace, item 6's dev-login, item 2's laptop <code>verify:pgvector</code> run (your clone is on the W2 branch).
-  <br>Reported done so far: <b>0</b> + <b>7</b> (2026-07-13); <b>5</b>, <b>1</b>, <b>3</b>, <b>6</b> (2026-07-14). Open: <b>2</b> (laptop run works today), <b>4</b> (skip while single-service), <b>8</b> (last). Then PR #9's merge flips every deferred verify live.
+  <br>Reported done so far: <b>0</b> + <b>7</b> (2026-07-13); <b>5</b>, <b>1</b>, <b>3</b>, <b>6</b> (2026-07-14). Open: <b>2</b> (step-by-step below; laptop run works today) and <b>8</b> (last). <b>4</b> is ON HOLD (user, 2026-07-14). Then PR #9's merge flips every deferred verify live.
 </div>
 
 <main id="items"></main>
@@ -196,17 +196,34 @@ OPENEMR_BASE_URL='https://gw1-openemr-base-clean-production.up.railway.app' npx 
 <pre><button class="copy">copy</button><code>curl -s -X POST https://enchanting-mercy-production-5d32.up.railway.app/api/dev-login -H 'content-type: application/json' -d '{"role":"physician","patient":"margaret-chen"}'</code></pre>
 returns <code>{"access_token":"…"}</code>; a 404 means the secret is absent or too short.</div>`},
 
-{ id:'a2', order:'do 7th', title:'2 · pgvector decision — dense index backend', sub:'Wave 0.1 — one command from the laptop clone against Railway Postgres', body:`
-<p><b>Get the connection string:</b> Railway → the <b>Postgres</b> card → <b>Variables</b> tab. From your laptop use the <b>public</b> URL (<code>DATABASE_PUBLIC_URL</code>, host like <code>…proxy.rlwy.net:PORT</code>) — the plain <code>DATABASE_URL</code> (<code>…railway.internal</code>) only resolves inside Railway and will hang from your machine.</p>
-<pre><button class="copy">copy</button><code>cd ~/GW1-openemr-base-clean/sidecar
-DATABASE_URL='postgres://…proxy.rlwy.net:PORT/railway' npm run verify:pgvector</code></pre>
-<table><tr><th>Output</th><th>What you do</th></tr>
-<tr><td><code>AVAILABLE</code></td><td>nothing — leave <code>RETRIEVER_DENSE_BACKEND</code> unset (default <code>pgvector</code>)</td></tr>
-<tr><td><code>NOT AVAILABLE</code> (exit 1)</td><td>set <code>RETRIEVER_DENSE_BACKEND=memory</code> on the <b>sidecar</b> service (fully supported at this corpus size)</td></tr>
-<tr><td><code>NO DATABASE</code> (exit 2)</td><td>the URL was wrong (likely the internal one) — recopy the public URL, rerun</td></tr></table>
-<div class="verify"><b>Verify:</b> the <code>verify:pgvector</code> run itself works <b>today</b> (your laptop clone is on the W2 branch). The <code>/ready</code> half is post-merge: <code>.dependencies.retriever_index.status</code> is <code>ok</code> only once PR #9's build is deployed. Record the script's outcome in <code>W2_ARCHITECTURE.md</code> §15.</div>`},
+{ id:'a2', order:'do 7th', title:'2 · pgvector decision — dense index backend, step by step', sub:'Wave 0.1 — one command from the laptop; both outcomes fully supported', body:`
+<p>One command from the laptop clone that asks the Railway Postgres whether the <code>pgvector</code> extension exists. Whichever answer it prints, one step later you're done — <b>both outcomes are fully supported</b>.</p>
+<h4>Step 1 — freshen the clone (the branch moves daily)</h4>
+<pre><button class="copy">copy</button><code>cd ~/GW1-openemr-base-clean
+git pull
+cd sidecar</code></pre>
+<h4>Step 2 — find the sidecar's Postgres card</h4>
+<p><a href="https://railway.app/dashboard" target="_blank" rel="noopener">Railway</a> project canvas → the <b>PostgreSQL</b> card (usually just named "Postgres"). More than one database card? Open the <b>sidecar</b> card → Variables → its <code>DATABASE_URL</code> row shows a reference like <code>\${{Postgres.DATABASE_URL}}</code> — the name inside <code>\${{…}}</code> is the database card you want.</p>
+<h4>Step 3 — copy the PUBLIC connection URL</h4>
+<p>On that Postgres card → <b>Variables</b> tab → the row named <code>DATABASE_PUBLIC_URL</code> (⚠️ not <code>DATABASE_URL</code>). Values are masked — click the <b>copy icon</b> at the right end of that row (safer than revealing + hand-selecting). Sanity-check the paste: it must contain <code>proxy.rlwy.net:</code> followed by a port number; if it contains <code>railway.internal</code> you copied the wrong row — that host only resolves inside Railway and hangs from a laptop.</p>
+<h4>Step 4 — run the check (still inside <code>sidecar/</code>)</h4>
+<pre><button class="copy">copy</button><code>DATABASE_URL='PASTE-THE-URL-HERE' npm run verify:pgvector</code></pre>
+<p>Replace <code>PASTE-THE-URL-HERE</code> with the step-3 URL — <b>keep the single quotes</b>, everything on <b>one line</b>, one space before <code>npm</code>. The left-hand name stays <code>DATABASE_URL</code> even though the value came from the <code>DATABASE_PUBLIC_URL</code> row — the script reads the variable <i>named</i> <code>DATABASE_URL</code>; you're handing it the public value. Filled-in example (fake credentials, real shape):</p>
+<pre><button class="copy">copy</button><code>DATABASE_URL='postgresql://postgres:AbC123xYz456@maglev.proxy.rlwy.net:43210/railway' npm run verify:pgvector</code></pre>
+<h4>Step 5 — read the result (exact lines the script prints)</h4>
+<table><tr><th>The output says</th><th>Meaning</th><th>What you do</th></tr>
+<tr><td><code>pgvector AVAILABLE (already installed, version …)</code> or <code>pgvector AVAILABLE (installed now, version …)</code></td><td>best outcome — "installed now" = the script enabled it; that's its job, not an error</td><td><b>nothing</b> — leave <code>RETRIEVER_DENSE_BACKEND</code> unset. Item 2 done.</td></tr>
+<tr><td><code>pgvector NOT AVAILABLE on this Postgres image.</code></td><td>Railway's Postgres image ships without the extension</td><td>add ONE variable on the <b>sidecar</b> card (card-0 click path): name <code>RETRIEVER_DENSE_BACKEND</code>, value <code>memory</code> → Apply/Deploy. Fully supported fallback at this corpus size. Item 2 done.</td></tr>
+<tr><td><code>verify:pgvector — query failed: getaddrinfo ENOTFOUND …railway.internal</code> (or it hangs ~30 s, then times out)</td><td>you pasted the internal URL</td><td>redo step 3 — copy the <code>DATABASE_PUBLIC_URL</code> row</td></tr>
+<tr><td><code>verify:pgvector — query failed: password authentication failed …</code></td><td>the URL got truncated or edited in the paste</td><td>redo step 3 with the row's copy icon; re-paste the whole thing between the quotes</td></tr>
+<tr><td><code>verify:pgvector — DATABASE_URL is not set; nothing to verify (exit 2)</code></td><td>the inline variable never reached the command (name typo'd, or command split across lines)</td><td>retype step 4 as ONE line starting exactly <code>DATABASE_URL='</code></td></tr>
+<tr><td><code>Cannot find module …</code> / <code>tsx: command not found</code></td><td>dependencies missing in this clone</td><td><code>npm ci</code> inside <code>sidecar/</code>, then rerun step 4</td></tr>
+<tr><td>any other <code>query failed: …</code></td><td>—</td><td>paste the full line in chat; the agent diagnoses it</td></tr></table>
+<h4>Step 6 — report the outcome in chat</h4>
+<p>Say <code>AVAILABLE</code> or <code>NOT AVAILABLE</code> — the agent records the decision in <code>W2_ARCHITECTURE.md</code> §15 / board ticket 0.1.</p>
+<div class="verify"><b>Verify:</b> step 5's first two rows ARE today's verification (the run works now — your clone is on the W2 branch). The <code>/ready</code> echo is post-merge: <code>.dependencies.retriever_index.status</code> reads <code>ok</code> once PR #9's build is deployed.</div>`},
 
-{ id:'a4', order:'do 8th', title:'4 · LangSmith — DEMO service only', sub:'locked #2, P5 — never on production; synthetic data only', body:`
+{ id:'a4', order:'on hold', title:'4 · LangSmith — DEMO service only', sub:'⏸ ON HOLD (user, 2026-07-14) — single-service posture; revisit only if a separate demo service appears', body:`
 <div class="warnbox"><b>Fence:</b> demo Railway service only. If you run a single sidecar service today, <b>skip this</b> until a separate demo service exists — never put it on the main service.</div>
 <p><b>Get the key:</b> <a href="https://smith.langchain.com" target="_blank" rel="noopener">smith.langchain.com</a> → <b>Settings</b> (gear, bottom-left) → <b>API Keys</b> → <b>Create API Key</b> (looks like <code>lsv2_pt_…</code>). The project auto-creates on the first trace — no pre-creation needed.</p>
 <h4>Variables — DEMO service only</h4>

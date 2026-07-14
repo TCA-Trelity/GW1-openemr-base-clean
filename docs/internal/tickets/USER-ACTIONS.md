@@ -25,7 +25,9 @@ land — nothing below blocks a merge. Each item: exact names → where to click
 | 1 | Cohere | ✅ key staged on the sidecar service (2026-07-14) — `reranker` verify returned `null` as expected pre-merge; re-verify post-merge |
 | 3 | Langfuse | ✅ done (2026-07-14) — Cloud keys live, verified against today's deploy; graph spans join post-merge |
 | 6 | Dev-login secret | ✅ done (2026-07-14) — verified against today's deploy |
-| 2 · 4 · 8 | — | open |
+| 2 | pgvector | open — directions rewritten step-by-step (2026-07-14); laptop run works today |
+| 4 | LangSmith | ⏸ ON HOLD (user, 2026-07-14) — single-service posture; revisit only if a separate demo service appears |
+| 8 | Eval dispatch | open — save for last |
 
 > ⚠️ **Deploy sequencing — read before running any `/ready` verify.** Railway
 > deploys `main`, and until **PR #9 merges** (then Railway auto-redeploys) the
@@ -105,35 +107,67 @@ curl -s -X POST https://enchanting-mercy-production-5d32.up.railway.app/api/evid
   -H 'content-type: application/json' -d '{"q":"hydroxychloroquine screening interval"}' | grep -o '"rerank_applied":[a-z]*'
 ```
 
-## 2. pgvector decision (Wave 0.1 — dense index backend)
+## 2. pgvector decision (Wave 0.1 — dense index backend) — step by step
 
-Runs **from your laptop clone** (item 0) against the **Railway Postgres** the
-sidecar uses.
+One command, run **from your laptop clone** (item 0), that asks the **Railway
+Postgres** whether the `pgvector` extension exists. Whichever answer it
+prints, one step later you're done — **both outcomes are fully supported**.
 
-**Get the connection string:** Railway → the **Postgres** card → **Variables**
-tab. Two URLs live there — from your laptop you need the **public** one
-(`DATABASE_PUBLIC_URL`, host like `…proxy.rlwy.net:PORT`); the plain
-`DATABASE_URL` (`…railway.internal`) only resolves *inside* Railway and will
-hang from your machine. Copy the public URL.
-
+**Step 1 — freshen the clone** (the branch moves daily):
 ```bash
-cd ~/GW1-openemr-base-clean/sidecar
-DATABASE_URL='postgres://…proxy.rlwy.net:PORT/railway' npm run verify:pgvector
+cd ~/GW1-openemr-base-clean
+git pull
+cd sidecar
 ```
 
-The script prints exactly one outcome:
+**Step 2 — find the sidecar's Postgres card on Railway.** Project canvas →
+the **PostgreSQL** card (usually just named "Postgres"). If you see more than
+one database card: open the **sidecar** card → Variables → its `DATABASE_URL`
+row shows a reference like `${{Postgres.DATABASE_URL}}` — the name inside
+`${{…}}` is the database card you want.
 
-| Output | What you do |
-|---|---|
-| `AVAILABLE` | nothing — leave `RETRIEVER_DENSE_BACKEND` unset (default `pgvector`) |
-| `NOT AVAILABLE` (exit 1) | set `RETRIEVER_DENSE_BACKEND=memory` on the **sidecar** service (in-process cosine, fully supported at this corpus size) |
-| `NO DATABASE` (exit 2) | the URL was wrong (likely the internal one) — recopy the public URL and rerun |
+**Step 3 — copy the PUBLIC connection URL.** On that Postgres card →
+**Variables** tab → the row named **`DATABASE_PUBLIC_URL`** (⚠️ not
+`DATABASE_URL`). Values are masked — click the **copy icon** at the right end
+of that row (safer than revealing and hand-selecting). Sanity-check the
+paste: it must contain `proxy.rlwy.net:` followed by a port number. If it
+contains `railway.internal`, you copied the wrong row — that host only
+resolves *inside* Railway and hangs from a laptop.
 
-**Verify:** the `verify:pgvector` run itself works **today** (it runs from
-your laptop clone, which is on the W2 branch). The `/ready` half is post-merge:
-`.dependencies.retriever_index.status` is `ok` only once PR #9's build is
-deployed. Record the script's outcome in `W2_ARCHITECTURE.md` §15 (the 0.1
-acceptance).
+**Step 4 — run the check** (still inside `sidecar/` from step 1):
+```bash
+DATABASE_URL='PASTE-THE-URL-HERE' npm run verify:pgvector
+```
+- Replace `PASTE-THE-URL-HERE` with the step-3 URL — **keep the single
+  quotes**, keep everything on **one line**, one space before `npm`.
+- Yes, the left-hand name stays `DATABASE_URL` even though the *value* came
+  from the `DATABASE_PUBLIC_URL` row: the script reads the variable *named*
+  `DATABASE_URL`; you're handing it the public value.
+- Filled-in example (fake credentials, real shape):
+```bash
+DATABASE_URL='postgresql://postgres:AbC123xYz456@maglev.proxy.rlwy.net:43210/railway' npm run verify:pgvector
+```
+
+**Step 5 — read the result.** The exact lines the script prints, and what
+each means:
+
+| The output says | Meaning | What you do |
+|---|---|---|
+| `pgvector AVAILABLE (already installed, version …)` **or** `pgvector AVAILABLE (installed now, version …)` | best outcome — extension present ("installed now" = the script enabled it; that's its job, not an error) | **nothing** — leave `RETRIEVER_DENSE_BACKEND` unset. Item 2 done. |
+| `pgvector NOT AVAILABLE on this Postgres image.` | Railway's Postgres image ships without the extension | add ONE variable on the **sidecar** card (item-0 click path): name `RETRIEVER_DENSE_BACKEND`, value `memory` → Apply/Deploy. Fully supported fallback at this corpus size. Item 2 done. |
+| `verify:pgvector — query failed: getaddrinfo ENOTFOUND …railway.internal` (or it hangs ~30 s, then times out) | you pasted the internal URL | redo step 3 — copy the `DATABASE_PUBLIC_URL` row |
+| `verify:pgvector — query failed: password authentication failed …` | the URL got truncated or edited in the paste | redo step 3 using the row's copy icon; re-paste the whole thing between the quotes |
+| `verify:pgvector — DATABASE_URL is not set; nothing to verify (exit 2)` | the inline variable never reached the command (name typo'd, or the command split across lines) | retype step 4 as ONE line starting exactly `DATABASE_URL='` |
+| `Cannot find module …` / `tsx: command not found` | dependencies missing in this clone | run `npm ci` inside `sidecar/`, then rerun step 4 |
+| any other `query failed: …` | — | paste the full line in chat; the agent diagnoses it |
+
+**Step 6 — report the outcome in chat** (`AVAILABLE` or `NOT AVAILABLE`) —
+the agent records the decision in `W2_ARCHITECTURE.md` §15 / board ticket 0.1.
+
+**Verify:** step 5's first two rows ARE today's verification (the run works
+now — your clone is on the W2 branch). The `/ready` echo is post-merge:
+`.dependencies.retriever_index.status` reads `ok` once PR #9's build is
+deployed.
 
 ## 3. Langfuse (committed observability posture — R7, 0.3) — ✅ DONE (user, 2026-07-14)
 
@@ -159,7 +193,7 @@ project whose id equals the response's `x-correlation-id` header. One evidence
 chat turn additionally shows a `graph` trace with `supervisor→…` spans (E.4).
 Full walkthrough: `docs/RUNBOOK.md` §C.
 
-## 4. LangSmith (DEMO service only — locked #2, P5)
+## 4. LangSmith (DEMO service only — locked #2, P5) — ⏸ ON HOLD (user, 2026-07-14)
 
 **Fence: only on the demo Railway service. Never on production. Synthetic
 data only.** (Running a single sidecar service today? Skip this until a
