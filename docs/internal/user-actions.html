@@ -79,7 +79,7 @@
   <p>The steps only the account owner can do. Everything in the sidecar no-ops cleanly until these
      land — nothing here blocks a merge. Checkbox state saves in <em>this browser</em> (localStorage).
      <b>Never paste secret values into this page</b> — it stores only your check-off state.</p>
-  <p><b>Order that unblocks the most, first: 7 → 5 → 1 → 3 → 6 → 2 → 4 → 8.</b></p>
+  <p><b>Order that unblocks the most, first: 0 → 7 → 5 → 1 → 3 → 6 → 2 → 4 → 8.</b></p>
 </header>
 
 <div class="navrow">
@@ -102,85 +102,112 @@
 <main id="items"></main>
 
 <footer>
-  Railway click path used throughout: railway.app → project → select the <b>service</b> →
-  <b>Variables</b> → New Variable → paste → Deploy (Railway redeploys on variable change; confirm it
-  goes green). Canonical source: <a href="tickets/USER-ACTIONS.md">tickets/USER-ACTIONS.md</a> —
+  Railway click path + service identification live in card 0. Canonical source: <a href="tickets/USER-ACTIONS.md">tickets/USER-ACTIONS.md</a> —
   agents read that file; this form mirrors it for humans.
 </footer>
 </div>
 
 <script>
 const ITEMS = [
-{ id:'a7', order:'do 1st', title:'7 · Branch protection: make the eval gate a REQUIRED check', sub:'0.5, D5 — one click, hard-gate credit', body:`
-<h4>Where</h4>
-<p><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/settings/branches" target="_blank" rel="noopener">Settings → Branches</a>
-→ Add rule (or edit <code>main</code>) → pattern <code>main</code> → check <b>Require status checks to pass before merging</b> → add, exactly:</p>
+{ id:'a0', order:'do 1st', title:'0 · One-time laptop setup', sub:'prerequisite for items 2 and 5 — terminal commands need a local clone', body:`
+<p>Commands in this checklist run <b>from inside a local clone</b> — a bare <code>cd sidecar</code> from your home directory fails because the folder only exists inside the clone.</p>
+<pre><button class="copy">copy</button><code>git clone https://github.com/TCA-Trelity/GW1-openemr-base-clean.git ~/GW1-openemr-base-clean
+cd ~/GW1-openemr-base-clean
+git checkout claude/openemr-rag-requirements-x25vzm
+cd sidecar && npm ci</code></pre>
+<p>Needs <b>Node 22</b> (<code>node --version</code>; install via nvm if older). <code>npm ci</code> takes a couple of minutes. Later commands are written from <code>~/GW1-openemr-base-clean</code> — adjust if you cloned elsewhere.</p>
+<h4>Finding the right Railway service (items 1, 3, 4, 5, 6)</h4>
+<p>railway.app → project canvas → click a service card → <b>Settings → Networking</b> shows its domain:
+<code>enchanting-mercy-…</code> = <b>sidecar</b> (most variables go here); <code>gw1-openemr-…</code> = <b>the EHR</b>.
+To set a variable: card → <b>Variables</b> tab → <b>New Variable</b> → name + value → click the <b>Apply/Deploy</b> banner → watch Deployments go green (variables only take effect after that redeploy).</p>
+<div class="verify"><b>Verify:</b> <code>cd ~/GW1-openemr-base-clean/sidecar && npm test</code> runs green (keyless by design).</div>`},
+
+{ id:'a7', order:'do 2nd', title:'7 · Branch protection: make the eval gate a REQUIRED check', sub:'0.5, D5 — Settings → Branches, field by field', body:`
+<p><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/settings/branches" target="_blank" rel="noopener">Settings → Branches</a> → <b>Add branch protection rule</b>:</p>
+<ol>
+<li><b>Branch name pattern</b> = <code>main</code> — this field names <b>which branch is protected</b>. ⚠️ The check name does NOT go here.</li>
+<li>Check <b>Require status checks to pass before merging</b>.</li>
+<li>Leave "Require branches to be up to date" unchecked (forces reruns on every main move — skippable here).</li>
+<li>Click into the box <i>"Search for status checks in the last week for this repository"</i> and type:
 <pre><button class="copy">copy</button><code>Run eval suite</code></pre>
-<p>That string is the <b>job name</b> in <code>.github/workflows/evals.yml</code> — the workflow is titled “Sidecar Evals” but branch protection matches the JOB name. Recommended additions while there: <code>sidecar (test + typecheck + build)</code> and <code>panel (test + typecheck + build)</code>.</p>
-<div class="verify"><b>Verify:</b> open any PR touching <code>sidecar/**</code> → the merge box lists <i>Run eval suite — Required</i>. Note the flip in RELEASE.md's promotion gate (the 0.5 acceptance).</div>`},
+then click the suggestion. That string is the <b>job name</b> in <code>.github/workflows/evals.yml</code> — the workflow <i>title</i> is “Sidecar Evals”; branch protection matches JOB names.</li>
+</ol>
+<div class="warnbox"><b>Nothing suggested?</b> GitHub only offers checks that ran in the last 7 days. Fix: <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions" target="_blank" rel="noopener">Actions</a> → Sidecar Evals → Run workflow (branch <code>claude/openemr-rag-requirements-x25vzm</code>) → wait for green → reload the protection page → search again.</div>
+<p>Recommended, same box: add <code>sidecar (test + typecheck + build)</code> and <code>export parity (deploy archive == committed tree)</code>. Optional hardening: check <b>"Do not allow bypassing the above settings"</b> so even admins can't merge past a red gate (leave off if you want an escape hatch). Everything else unchecked → <b>Create</b>.</p>
+<div class="verify"><b>Verify:</b> open PR #9 → the merge box lists <i>Run eval suite — Required</i>. Note the flip in RELEASE.md's promotion gate.</div>`},
 
-{ id:'a5', order:'do 2nd', title:'5 · OpenEMR document-write credentials + OAuth client RE-registration', sub:'S1/R1 — enables the upload → EHR round trip', body:`
-<p>OAuth grants are <b>intersected with the client's registered scopes</b> — a client registered before
-<code>user/document.read</code> + <code>user/document.write</code> existed can never receive them. Re-register:</p>
-<pre><button class="copy">copy</button><code>cd sidecar && OPENEMR_BASE_URL='https://gw1-openemr-base-clean-production.up.railway.app' npx tsx src/scripts/register-oauth.ts</code></pre>
-<p>Then OpenEMR UI → <b>Admin → System → API Clients</b> → find the new client → <b>Enable</b> (fresh clients start disabled). Full procedure: <a href="../RUNBOOK.md">RUNBOOK</a> §A step 2.</p>
-<h4>Variables — sidecar service</h4>
+{ id:'a5', order:'do 3rd', title:'5 · OpenEMR document-write enablement — FOUR sub-steps, in order', sub:'S1/R1 — connectors, re-register, enable client, four variables', body:`
+<p>Uploads store PDFs in OpenEMR via a <b>password-grant user token</b>. Grants are <b>intersected with the client's registered scopes</b> — a client registered before the document scopes existed can never receive them, so the client must be <b>re-registered</b>.</p>
+<h4>5a — enable the API connectors (one-time; registration fails without it)</h4>
+<p>Log into the <a href="https://gw1-openemr-base-clean-production.up.railway.app" target="_blank" rel="noopener">deployed EHR</a> (<code>admin</code>/<code>pass</code>) → <b>Administration → Globals → Connectors</b> → enable <b>"OpenEMR Standard REST API"</b> and <b>OAuth2 password grant</b> → Save.</p>
+<h4>5b — re-register the client (from the laptop clone, item 0)</h4>
+<pre><button class="copy">copy</button><code>cd ~/GW1-openemr-base-clean/sidecar
+OPENEMR_BASE_URL='https://gw1-openemr-base-clean-production.up.railway.app' npx tsx src/scripts/register-oauth.ts</code></pre>
+<p>The script generates a fresh RSA keypair and <b>prints TWO variables to copy</b>: the new <code>OPENEMR_CLIENT_ID=…</code> and a one-lined <code>OPENEMR_CLIENT_KEY=…</code> (paste as-is — the <code>\\n</code> escapes are expected).</p>
+<h4>5c — enable the new client (fresh clients start DISABLED)</h4>
+<p>OpenEMR → <b>Administration → System → API Clients</b> → newest "Clinical Co-Pilot Sidecar" → <b>Enable Client</b>.</p>
+<h4>5d — variables, SIDECAR service (all four; the new keypair replaces the old)</h4>
 <table><tr><th>Variable</th><th>Value</th></tr>
-<tr><td><code>OPENEMR_CLIENT_ID</code></td><td>the NEW client id the script prints</td></tr>
-<tr><td><code>OPENEMR_API_USERNAME</code></td><td>an OpenEMR user with the patients/docs ACL (<code>admin</code> works for the demo)</td></tr>
-<tr><td><code>OPENEMR_API_PASSWORD</code></td><td>that user's password</td></tr></table>
-<div class="verify"><b>Verify:</b> <code>curl -s …/ready | jq '.dependencies.document_storage'</code> flips <code>not_configured → ok</code> (a token-mint round trip). Then upload once via the panel or Bruno <code>06-documents</code> and confirm the document appears in the OpenEMR chart (Patient → Documents); the ingestion record shows <code>openemr_document_id</code> set.</div>`},
-
-{ id:'a1', order:'do 3rd', title:'1 · Cohere — live dense embeddings + rerank', sub:'S2/R3 — flips retrieval off the offline backends', body:`
-<h4>Variables — sidecar service</h4>
-<table><tr><th>Variable</th><th>Value</th></tr>
-<tr><td><code>COHERE_API_KEY</code></td><td>from <a href="https://dashboard.cohere.com/api-keys" target="_blank" rel="noopener">dashboard.cohere.com → API Keys</a></td></tr>
-<tr><td><code>COHERE_EMBED_MODEL</code></td><td>leave unset (default <code>embed-english-v3.0</code>)</td></tr>
-<tr><td><code>COHERE_RERANK_MODEL</code></td><td>leave unset (default <code>rerank-english-v3.0</code>)</td></tr></table>
+<tr><td><code>OPENEMR_CLIENT_ID</code></td><td>printed by 5b (the NEW id)</td></tr>
+<tr><td><code>OPENEMR_CLIENT_KEY</code></td><td>printed by 5b (one-lined PEM, exact paste)</td></tr>
+<tr><td><code>OPENEMR_API_USERNAME</code></td><td>an OpenEMR <b>user</b> with patients/docs access (<code>admin</code> for the demo)</td></tr>
+<tr><td><code>OPENEMR_API_PASSWORD</code></td><td>that user's password (<code>pass</code> on the demo EHR)</td></tr></table>
 <div class="verify"><b>Verify:</b>
-<pre><button class="copy">copy</button><code>curl -s https://enchanting-mercy-production-5d32.up.railway.app/ready | jq '.dependencies.reranker'</code></pre>
-<code>not_configured → ok</code>; boot log flips <code>dense: 'hash-offline' → 'cohere'</code>; one
-<code>POST /api/evidence/search</code> with <code>{"q":"hydroxychloroquine screening interval"}</code> returns <code>"rerank_applied": true</code>.
-While you're in the Cohere dashboard: note the pricing/tier numbers for COSTS.md §6.2's "verify at key-drop" cells.</div>`},
+<pre><button class="copy">copy</button><code>curl -s https://enchanting-mercy-production-5d32.up.railway.app/ready | jq '.dependencies.document_storage'</code></pre>
+<code>not_configured → ok</code> (a live token mint). Then upload once via the panel Sources tab (or Bruno <code>06-documents</code>) and confirm the document appears in OpenEMR (Patient → Documents); the ingestion record shows <code>openemr_document_id</code> set.</div>`},
 
-{ id:'a3', order:'do 4th', title:'3 · Langfuse — committed observability posture', sub:'R7, 0.3 — prep traces + the W2 graph spans', body:`
-<p>Create a project at <a href="https://cloud.langfuse.com" target="_blank" rel="noopener">cloud.langfuse.com</a>
-(synthetic-data demo posture) → Settings → API Keys.</p>
-<h4>Variables — sidecar service (all three or tracing stays off by design)</h4>
+{ id:'a1', order:'do 4th', title:'1 · Cohere — live dense embeddings + rerank', sub:'S2/R3 — flips retrieval off the offline backends', body:`
+<p><b>Get the key:</b> <a href="https://dashboard.cohere.com/api-keys" target="_blank" rel="noopener">dashboard.cohere.com → API Keys</a> (left nav). A free <b>Trial key</b> exists by default — copy it (rate-limited but fine for demo volume). While there, note the pricing numbers for COSTS.md §6.2's "verify at key-drop" cells.</p>
+<h4>Variables — SIDECAR service</h4>
 <table><tr><th>Variable</th><th>Value</th></tr>
-<tr><td><code>LANGFUSE_HOST</code></td><td>e.g. <code>https://cloud.langfuse.com</code></td></tr>
+<tr><td><code>COHERE_API_KEY</code></td><td>the key you copied</td></tr>
+<tr><td><code>COHERE_EMBED_MODEL</code></td><td>do not set (default <code>embed-english-v3.0</code>)</td></tr>
+<tr><td><code>COHERE_RERANK_MODEL</code></td><td>do not set (default <code>rerank-english-v3.0</code>)</td></tr></table>
+<div class="verify"><b>Verify (after the redeploy goes green):</b>
+<pre><button class="copy">copy</button><code>curl -s https://enchanting-mercy-production-5d32.up.railway.app/ready | jq '.dependencies.reranker'</code></pre>
+<p>No jq? <code>curl -s …/ready | python3 -m json.tool | grep -A2 '"reranker"'</code>. Expect <code>not_configured → ok</code>. Deploy logs show <code>dense: 'hash-offline' → 'cohere'</code>. One live search returns the rerank flag:</p>
+<pre><button class="copy">copy</button><code>curl -s -X POST https://enchanting-mercy-production-5d32.up.railway.app/api/evidence/search -H 'content-type: application/json' -d '{"q":"hydroxychloroquine screening interval"}' | grep -o '"rerank_applied":[a-z]*'</code></pre></div>`},
+
+{ id:'a3', order:'do 5th', title:'3 · Langfuse — committed observability posture', sub:'R7, 0.3 — prep traces + the W2 graph spans', body:`
+<p><b>Get the keys:</b> <a href="https://cloud.langfuse.com" target="_blank" rel="noopener">cloud.langfuse.com</a> → sign up → create an <b>Organization</b>, then a <b>Project</b> → <b>Project Settings → API Keys → Create new API keys</b>. The dialog shows three values — copy all three <b>exactly as displayed, including the host</b> (region-dependent: <code>https://cloud.langfuse.com</code> EU, <code>https://us.cloud.langfuse.com</code> US).</p>
+<h4>Variables — SIDECAR service (all three or tracing stays off by design)</h4>
+<table><tr><th>Variable</th><th>Value</th></tr>
+<tr><td><code>LANGFUSE_HOST</code></td><td>the host from the key dialog</td></tr>
 <tr><td><code>LANGFUSE_PUBLIC_KEY</code></td><td><code>pk-lf-…</code></td></tr>
 <tr><td><code>LANGFUSE_SECRET_KEY</code></td><td><code>sk-lf-…</code></td></tr></table>
-<div class="verify"><b>Verify:</b> <code>/ready → .dependencies.langfuse</code> flips to <code>ok</code>; trigger one prep (<code>POST /api/prep/margaret-chen</code>) → a <code>prep</code> trace whose id equals the response's <code>x-correlation-id</code>; one evidence chat turn → a <code>graph</code> trace with <code>supervisor→…</code> spans. Walkthrough: <a href="../RUNBOOK.md">RUNBOOK</a> §C.</div>`},
+<div class="verify"><b>Verify:</b> <code>/ready → .dependencies.langfuse</code> flips to <code>ok</code>. Trigger one prep (panel: Margaret Chen → AI Insights → prepare) → a <code>prep</code> trace whose id equals the response's <code>x-correlation-id</code>; one evidence chat turn adds a <code>graph</code> trace with <code>supervisor→…</code> spans. Walkthrough: <a href="../RUNBOOK.md">RUNBOOK</a> §C.</div>`},
 
-{ id:'a6', order:'do 5th', title:'6 · Dev-login secret — write-path demo auth', sub:'E.3/E.8 — uploads require a minted bearer in every mode', body:`
-<h4>Variables — sidecar service</h4>
+{ id:'a6', order:'do 6th', title:'6 · Dev-login secret — write-path demo auth', sub:'E.3/E.8 — uploads require a minted bearer in every mode', body:`
 <pre><button class="copy">copy</button><code>openssl rand -hex 24</code></pre>
-<p>Set the output as <code>DEV_LOGIN_SECRET</code> (≥16 chars).</p>
-<div class="verify"><b>Verify:</b> <code>POST /api/dev-login</code> with <code>{"role":"physician","patient":"margaret-chen"}</code> returns an <code>access_token</code> (404 means the secret is absent/too short).</div>`},
+<p>Set the output as <code>DEV_LOGIN_SECRET</code> on the <b>sidecar</b> service (any ≥16 random chars).</p>
+<div class="verify"><b>Verify:</b>
+<pre><button class="copy">copy</button><code>curl -s -X POST https://enchanting-mercy-production-5d32.up.railway.app/api/dev-login -H 'content-type: application/json' -d '{"role":"physician","patient":"margaret-chen"}'</code></pre>
+returns <code>{"access_token":"…"}</code>; a 404 means the secret is absent or too short.</div>`},
 
-{ id:'a2', order:'do 6th', title:'2 · pgvector decision — dense index backend', sub:'Wave 0.1 — one command against the Railway Postgres', body:`
-<pre><button class="copy">copy</button><code>cd sidecar && DATABASE_URL='postgres://…railway…' npm run verify:pgvector</code></pre>
-<p>The script prints exactly one outcome:</p>
-<table><tr><th>Outcome</th><th>Action</th></tr>
-<tr><td><code>AVAILABLE</code></td><td>leave <code>RETRIEVER_DENSE_BACKEND</code> unset (default <code>pgvector</code>)</td></tr>
-<tr><td><code>NOT AVAILABLE</code> (exit 1)</td><td>set <code>RETRIEVER_DENSE_BACKEND=memory</code> on the sidecar service (fully supported at this corpus size)</td></tr>
-<tr><td><code>NO DATABASE</code> (exit 2)</td><td>the URL was wrong; fix and rerun</td></tr></table>
-<div class="verify"><b>Verify:</b> <code>/ready → .dependencies.retriever_index.status</code> is <code>ok</code> after redeploy; record the outcome in <code>W2_ARCHITECTURE.md</code> §15 (the 0.1 acceptance).</div>`},
+{ id:'a2', order:'do 7th', title:'2 · pgvector decision — dense index backend', sub:'Wave 0.1 — one command from the laptop clone against Railway Postgres', body:`
+<p><b>Get the connection string:</b> Railway → the <b>Postgres</b> card → <b>Variables</b> tab. From your laptop use the <b>public</b> URL (<code>DATABASE_PUBLIC_URL</code>, host like <code>…proxy.rlwy.net:PORT</code>) — the plain <code>DATABASE_URL</code> (<code>…railway.internal</code>) only resolves inside Railway and will hang from your machine.</p>
+<pre><button class="copy">copy</button><code>cd ~/GW1-openemr-base-clean/sidecar
+DATABASE_URL='postgres://…proxy.rlwy.net:PORT/railway' npm run verify:pgvector</code></pre>
+<table><tr><th>Output</th><th>What you do</th></tr>
+<tr><td><code>AVAILABLE</code></td><td>nothing — leave <code>RETRIEVER_DENSE_BACKEND</code> unset (default <code>pgvector</code>)</td></tr>
+<tr><td><code>NOT AVAILABLE</code> (exit 1)</td><td>set <code>RETRIEVER_DENSE_BACKEND=memory</code> on the <b>sidecar</b> service (fully supported at this corpus size)</td></tr>
+<tr><td><code>NO DATABASE</code> (exit 2)</td><td>the URL was wrong (likely the internal one) — recopy the public URL, rerun</td></tr></table>
+<div class="verify"><b>Verify:</b> <code>/ready → .dependencies.retriever_index.status</code> is <code>ok</code> after redeploy; record the outcome in <code>W2_ARCHITECTURE.md</code> §15.</div>`},
 
-{ id:'a4', order:'do 7th', title:'4 · LangSmith — DEMO service only', sub:'locked #2, P5 — never on production; synthetic data only', body:`
-<div class="warnbox"><b>Fence:</b> set these only on the <b>demo</b> Railway service. The committed posture stays Langfuse; production must never carry a LangSmith key.</div>
-<h4>Variables — demo service only</h4>
+{ id:'a4', order:'do 8th', title:'4 · LangSmith — DEMO service only', sub:'locked #2, P5 — never on production; synthetic data only', body:`
+<div class="warnbox"><b>Fence:</b> demo Railway service only. If you run a single sidecar service today, <b>skip this</b> until a separate demo service exists — never put it on the main service.</div>
+<p><b>Get the key:</b> <a href="https://smith.langchain.com" target="_blank" rel="noopener">smith.langchain.com</a> → <b>Settings</b> (gear, bottom-left) → <b>API Keys</b> → <b>Create API Key</b> (looks like <code>lsv2_pt_…</code>). The project auto-creates on the first trace — no pre-creation needed.</p>
+<h4>Variables — DEMO service only</h4>
 <table><tr><th>Variable</th><th>Value</th></tr>
 <tr><td><code>LANGSMITH_TRACING</code></td><td><code>true</code></td></tr>
-<tr><td><code>LANGSMITH_API_KEY</code></td><td><a href="https://smith.langchain.com" target="_blank" rel="noopener">smith.langchain.com</a> → Settings → API Keys</td></tr>
+<tr><td><code>LANGSMITH_API_KEY</code></td><td><code>lsv2_…</code></td></tr>
 <tr><td><code>LANGSMITH_PROJECT</code></td><td><code>clinical-copilot-w2-demo</code></td></tr></table>
-<div class="verify"><b>Verify:</b> demo boot log prints <code>LangSmith tracing ON — demo environment posture</code>; one evidence turn → a LangGraph run tree under that project. Confirm the production boot log still says <code>tracing off</code>.</div>`},
+<div class="verify"><b>Verify:</b> demo deploy log prints <code>LangSmith tracing ON — demo environment posture</code>; one evidence turn → a LangGraph run tree under that project. The production log must still say <code>tracing off</code>.</div>`},
 
 { id:'a8', order:'do last', title:'8 · Live eval dispatch — pre-milestone sanity', sub:'F.6 prerequisite — after items 1/3/5 land', body:`
-<p><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions" target="_blank" rel="noopener">Actions</a> → <b>Sidecar Evals</b> → Run workflow (branch <code>claude/openemr-rag-requirements-x25vzm</code> or <code>main</code>), or:</p>
+<p><a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/actions" target="_blank" rel="noopener">Actions</a> (top tab) → <b>Sidecar Evals</b> (left sidebar) → <b>Run workflow</b> (grey dropdown, right side) → branch <code>claude/openemr-rag-requirements-x25vzm</code> or <code>main</code> → green <b>Run workflow</b>. CLI alternative (needs <code>gh auth login</code>):</p>
 <pre><button class="copy">copy</button><code>gh workflow run "Sidecar Evals" --ref main</code></pre>
-<div class="verify"><b>Verify:</b> the run is green and uploads the <code>eval-results</code> artifact. The scheduled live-model suite (<code>LIVE_EVALS=1</code>) rides ticket F.6 — this dispatch proves the pipe.</div>`},
+<div class="verify"><b>Verify:</b> the run goes green; open it → the <b>Artifacts</b> section at the bottom has <code>eval-results</code>. The scheduled live-model suite (<code>LIVE_EVALS=1</code>) rides ticket F.6 — this dispatch proves the pipe.</div>`},
 ];
 
 const KEY = 'w2-user-actions-v1';
