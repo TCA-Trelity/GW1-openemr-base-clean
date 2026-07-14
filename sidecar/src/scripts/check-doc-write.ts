@@ -51,9 +51,14 @@ console.log(`granted scopes (${granted.length}):`);
 for (const scope of granted.toSorted()) {
     console.log(`  ${scope}`);
 }
-for (const needed of ['api:oemr', 'user/document.read', 'user/document.write']) {
+for (const needed of ['user/document.read', 'user/document.write']) {
     console.log(`${granted.includes(needed) ? '✓ granted' : '✗ MISSING'}  ${needed}`);
 }
+// api:oemr (the standard-API gateway scope) is deliberately NOT checked against this
+// list: OpenEMR grants it but does not echo api:* scopes in the token response, so its
+// absence above means nothing (observed live 2026-07-14 — a token whose echo lacked
+// api:oemr wrote a document successfully). The probes below are the authoritative test.
+console.log('note: api:* gateway scopes are never echoed in the token response — trust the probes below, not their absence above');
 
 if (testPid === undefined) {
     console.log('\n(no OPENEMR_TEST_PID set — skipping the live GET/POST probes; the scope report above is the main answer)');
