@@ -21,11 +21,11 @@ land — nothing below blocks a merge. Each item: exact names → where to click
 |---|---|---|
 | 0 | Laptop setup | ✅ done (2026-07-13) |
 | 7 | Branch protection | ✅ done (2026-07-13) — `Run eval suite` REQUIRED on `main` |
-| 5 | OpenEMR document-write | ✅ all four sub-steps done (2026-07-14) — deployed verify pending PR #9 merge (see below) |
-| 1 | Cohere | ✅ key staged on the sidecar service (2026-07-14) — `reranker` verify returned `null` as expected pre-merge; re-verify post-merge |
+| 5 | OpenEMR document-write | ✅ done + **verified live** (2026-07-14 post-merge: `document_storage: ok` = successful token mint; note — after EHR redeploys, re-sync `OPENEMR_CLIENT_ID` to the enabled client row, id-only auth) |
+| 1 | Cohere | ✅ done + **verified live** (2026-07-14 post-merge: `reranker: ok`) |
 | 3 | Langfuse | ✅ done (2026-07-14) — Cloud keys live, verified against today's deploy; graph spans join post-merge |
 | 6 | Dev-login secret | ✅ done (2026-07-14) — verified against today's deploy |
-| 2 | pgvector | ✅ done (2026-07-14) — `AVAILABLE (installed now, version 0.8.4)`; `RETRIEVER_DENSE_BACKEND` stays default `pgvector`; recorded in `W2_ARCHITECTURE.md` §5/§15 + board 0.1 |
+| 2 | pgvector | ✅ done + **verified live** (2026-07-14: script `AVAILABLE` v0.8.4; post-merge `retriever_index: ok`) |
 | 4 | LangSmith | ⏸ ON HOLD (user, 2026-07-14) — single-service posture; revisit only if a separate demo service appears |
 | 8 | Eval dispatch | ✅ done (user, 2026-07-14) — verified via the Actions API: `workflow_dispatch` on `main` at 11:39 UTC, success, `eval-results` artifact present |
 

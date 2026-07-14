@@ -365,7 +365,7 @@
 // Update in the SAME PR as the code it describes (anti-drift rule #3).
 // ============================================================================
 const DATA = {
-  stamp: "updated 2026-07-14 · session 4 — PR #9 MERGED to main (18175a2); PDF re-sweep closed G3/G5/G12/S5-UC: extraction_field_outcome + retrieval_hit/miss + eval_run_outcome events shipped; register 59/79",
+  stamp: "updated 2026-07-14 · session 4 — DEPLOY FULLY GREEN: ready:true, all W2 probes ok (PRs #9/#10/#11 merged; corpus COPY fix; OPENEMR_CLIENT_ID re-sync). Manual test plan in progress; merges to main held until testing done",
   budget: { capPerDay: "$5.00", spentToday: "—", note: "SpendGuard unchanged (locked #16); Cohere rides a ledger line at B.4" },
   w1Floor: "24/24 W1 evals passing · read-path p95 46 ms @10 / 193 ms @50 (regression floor)",
 
@@ -380,7 +380,7 @@ const DATA = {
       ]},
     { id: "0", title: "Wave 0 — Preflight", band: "Band 1 · MVP", tickets: [
         { id: "0.1", t: "pgvector VERIFIED on Railway Postgres (user, 2026-07-14): AVAILABLE, extension enabled v0.8.4 — RETRIEVER_DENSE_BACKEND stays default pgvector", reqs: ["S2/R3"], deps: "—", s: "done" },
-        { id: "0.2", t: "document.write scope + upload client shipped; OAuth re-registered + 4 creds on Railway (user, 2026-07-14); live POST awaits PR #9 merge→redeploy", reqs: ["S1/R1","G7"], deps: "PR #9 merge", s: "active" },
+        { id: "0.2", t: "document.write enablement VERIFIED LIVE (2026-07-14: document_storage ok = real token mint; id-only auth — re-sync OPENEMR_CLIENT_ID after EHR redeploys); live upload POST = test plan A1/A2", reqs: ["S1/R1","G7"], deps: "—", s: "done" },
         { id: "0.3", t: "Langfuse activated: Cloud keys live + prep trace verified (user, 2026-07-14); graph spans join post-merge", reqs: ["R7"], deps: "—", s: "done" },
         { id: "0.4", t: "Cohere/LangSmith keys in boot-crash-proof config", reqs: ["S2/R3","R7","G2"], deps: "—", s: "done" },
         { id: "0.5", t: "Branch protection FLIPPED: Run eval suite is a required check on main (user, 2026-07-13)", reqs: ["S4/R6","D5"], deps: "—", s: "done" },

@@ -108,7 +108,7 @@
   A <code>null</code> is <b>expected</b>, not a failed key drop: the variables sit staged on Railway and take
   effect on the post-merge redeploy. Verifies that DO work pre-merge: item 3's <code>langfuse</code> flip + prep
   trace, item 6's dev-login, item 2's laptop <code>verify:pgvector</code> run (your clone is on the W2 branch).
-  <br><b>All actionable items are done</b> — 0 + 7 (2026-07-13); 5, 1, 3, 6, 2, 8 (2026-07-14). <b>4</b> is ON HOLD (user call, single-service posture). The one remaining lever: <b>merge PR #9</b> — it flips every deferred verify live on the next Railway deploy.
+  <br><b>All items done and VERIFIED LIVE (2026-07-14, post-merge): <code>ready: true</code></b> — <code>document_storage</code>/<code>retriever_index</code>/<code>reranker</code> all <code>ok</code>. <b>4</b> stays ON HOLD (user call). Incident notes: the sidecar image needed <code>COPY corpus</code> (PR #11), and EHR redeploys wipe client registrations — password-grant auth is <b>id-only</b>, so the fix is re-syncing <code>OPENEMR_CLIENT_ID</code> to the enabled client row. Remaining live proof rides the build board's <b>Manual test plan</b> tab (upload round-trip A1/A2, rerank D1).
 </div>
 
 <main id="items"></main>
