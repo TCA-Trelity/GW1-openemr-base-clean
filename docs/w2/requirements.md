@@ -152,7 +152,7 @@ entirely, pgvector unverified doc claim.)*
   treat-and-extend protocol — committed to the repo (license-clean, zero PHI,
   reproducible per G18), with per-doc metadata `{guideline_source, section,
   recommendation_strength, disease_tags, laterality_applicability, version/date}`.
-  *(Verified under-flip, corrected 2026-07-14: 7 authored docs in
+  *(Verified under-flip, corrected 2026-07-14: 8 authored docs in
   `sidecar/corpus/` with full YAML frontmatter — every required metadata
   field present and enforced by the 25-case corpus-conformance suite.)*
 - [x] Structure-aware chunker keeps thresholds with their conditions

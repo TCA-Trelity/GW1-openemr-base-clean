@@ -453,9 +453,49 @@ export class StandardApiClient {
     // GET .../document listing {filename, hash, id, mimetype, docdate} rows
     // (DocumentService::getAllAtPath — the hash is sha3-512 of the file bytes,
     // Document.class.php:1114). The category must already exist or the upload is rejected.
+    //
+    // :pid is the NUMERIC patient id, and the route fails OPEN on anything else:
+    // Document::calculateStoragePath (library/classes/Document.class.php:93-103) validates
+    // the id with validateInt(min: 1) and on failure silently reassigns it to 0, so a
+    // uuid-keyed POST returns 200 while filing the row with foreign_id = 0 — attached to
+    // no patient's chart. The listing side hides the same mistake (MySQL coerces a uuid
+    // to 0 in the foreign_id comparison, matching those very orphans). Sidecar patients
+    // are linked by uuid, so both methods resolve uuid → pid via GET /api/patient/:puuid
+    // and refuse ids that are neither a uuid nor a positive integer.
+
+    /** uuid → numeric pid cache; a chart's pid never changes, so one lookup per client. */
+    private readonly pidByUuid = new Map<string, string>();
+
+    private async resolveNumericPid(pidOrUuid: number | string): Promise<string> {
+        const raw = String(pidOrUuid).trim();
+        if (/^[1-9]\d*$/.test(raw)) {
+            return raw;
+        }
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
+            throw new StandardApiError(
+                `/patient/${raw}/document`,
+                400,
+                'patient id is neither a numeric pid nor a uuid — refusing, OpenEMR would silently file the document to patient 0',
+            );
+        }
+        const cached = this.pidByUuid.get(raw);
+        if (cached !== undefined) {
+            return cached;
+        }
+        const path = `/patient/${encodeURIComponent(raw)}`;
+        const body = await this.request('GET', path);
+        const pid = asRecord(envelopeData(body, path))?.['pid'];
+        const numeric = typeof pid === 'number' || typeof pid === 'string' ? String(pid) : '';
+        if (!/^[1-9]\d*$/.test(numeric)) {
+            throw new StandardApiError(path, 200, 'patient record carries no numeric pid to file documents under');
+        }
+        this.pidByUuid.set(raw, numeric);
+        return numeric;
+    }
 
     /** List the patient's documents filed under a category path (e.g. 'Lab Report'). */
-    async listPatientDocuments(pid: number | string, categoryPath: string): Promise<EhrDocumentRow[]> {
+    async listPatientDocuments(pidOrUuid: number | string, categoryPath: string): Promise<EhrDocumentRow[]> {
+        const pid = await this.resolveNumericPid(pidOrUuid);
         const path = `/patient/${pid}/document?path=${encodeURIComponent(categoryPath)}`;
         const body = await this.request('GET', path);
         const rows = envelopeData(body, path);
@@ -489,12 +529,13 @@ export class StandardApiClient {
      * is the caller's job. Byte-identical content → the existing document id, no POST.
      */
     async uploadPatientDocumentDeduped(
-        pid: number | string,
+        pidOrUuid: number | string,
         categoryPath: string,
         filename: string,
         bytes: Uint8Array,
         mimeType: string,
     ): Promise<EhrDocumentUploadResult> {
+        const pid = await this.resolveNumericPid(pidOrUuid);
         const hash = sha3_512Hex(bytes);
         const existing = await this.listPatientDocuments(pid, categoryPath);
         const match = existing.find((row) => row.hash === hash);

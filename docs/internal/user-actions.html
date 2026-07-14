@@ -75,11 +75,13 @@
 <body>
 <div class="wrap">
 <header>
-  <h1>User actions — key drops &amp; clicks</h1>
-  <p>The steps only the account owner can do. Everything in the sidecar no-ops cleanly until these
-     land — nothing here blocks a merge. Checkbox state saves in <em>this browser</em> (localStorage).
-     <b>Never paste secret values into this page</b> — it stores only your check-off state.</p>
-  <p><b>Order that unblocks the most, first: 0 → 7 → 5 → 1 → 3 → 6 → 2 → 4 → 8.</b></p>
+  <h1>User actions — ARCHIVE <span style="font-weight:400;font-size:14px;color:var(--muted)">(completed 2026-07-14)</span></h1>
+  <p><b>Nothing left to do here.</b> All 8 actionable items are complete and verified live
+     (<code>ready: true</code>, all W2 probes <code>ok</code>, held across redeploys); item 4 (LangSmith)
+     is on hold by user decision. This page is kept as a reference — click any card to expand its
+     original instructions (useful if a credential ever needs re-doing). What remains for Week 2 lives
+     on the <a href="build-status.html"><b>build board</b></a>: the Manual test plan tab and the open
+     rows in the requirements matrix.</p>
 </header>
 
 <div class="navrow">
@@ -96,21 +98,15 @@
   <a href="../RUNBOOK.md">RUNBOOK</a>
 </div>
 
-<div class="progress"><div class="bar"><div id="fill"></div></div><span class="n" id="count"></span>
-  <button class="resetbtn" id="reset" title="Clear all checkboxes">reset</button></div>
-
-<div class="warnbox" style="margin:0 0 14px">
-  <b>Deploy sequencing — read before running any <code>/ready</code> verify.</b>
-  Railway deploys <code>main</code>; until <b>PR&nbsp;#9 merges</b> (Railway then auto-redeploys) the deployed
-  sidecar is <b>Week&nbsp;1 code</b>: the W2 probes (<code>document_storage</code>, <code>retriever_index</code>,
-  <code>reranker</code>) are absent — <code>jq</code> prints <code>null</code> — and the W2 routes
-  (<code>/api/documents</code> upload, <code>/api/evidence/search</code>) 404.
-  A <code>null</code> is <b>expected</b>, not a failed key drop: the variables sit staged on Railway and take
-  effect on the post-merge redeploy. Verifies that DO work pre-merge: item 3's <code>langfuse</code> flip + prep
-  trace, item 6's dev-login, item 2's laptop <code>verify:pgvector</code> run (your clone is on the W2 branch).
-  <br><b>All items done and VERIFIED LIVE (2026-07-14): <code>ready: true</code></b>, held through the #12 redeploy with no re-sync — the EHR database persists, so there is <b>no per-merge ritual</b>. <b>4</b> stays ON HOLD (user call). Session incident notes: sidecar image needed <code>COPY corpus</code> (PR #11); one <code>invalid_client</code> from an id mismatch among duplicate client rows (fix: sync <code>OPENEMR_CLIENT_ID</code> to an enabled row — id-only auth). pgvector dense index confirmed in production (71 vectors persisted, reused on restart). Remaining: the build board's <b>Manual test plan</b> tab.
+<div class="verify" style="margin:0 0 14px">
+  <b>Session outcome notes (for future reference):</b> the EHR database <b>persists across redeploys</b> —
+  no per-merge ritual exists. The one <code>invalid_client</code> incident was an id mismatch among duplicate
+  client rows (fix inside card 5: sync <code>OPENEMR_CLIENT_ID</code> to an enabled row — auth is id-only).
+  The sidecar image needed <code>COPY corpus</code> (fixed, PR #11). pgvector dense index confirmed in
+  production: 71 vectors persisted, reused on restart.
 </div>
 
+<h2 style="font-size:15px;margin:18px 0 8px;color:var(--muted)">Archive — original instructions, collapsed</h2>
 <main id="items"></main>
 
 <footer>
@@ -241,44 +237,25 @@ cd sidecar</code></pre>
 <div class="verify"><b>Verify:</b> the run goes green; open it → the <b>Artifacts</b> section at the bottom has <code>eval-results</code>. The scheduled live-model suite (<code>LIVE_EVALS=1</code>) rides ticket F.6 — this dispatch proves the pipe.</div>`},
 ];
 
-const KEY = 'w2-user-actions-v1';
-const state = JSON.parse(localStorage.getItem(KEY) || '{}');
 const main = document.getElementById('items');
 
+// ARCHIVE MODE (2026-07-14): every item is complete (a4 on hold). Cards render
+// collapsed and read-only — click a header to expand the original instructions.
 for (const item of ITEMS) {
+  const onHold = item.id === 'a4';
   const card = document.createElement('section');
-  card.className = 'card' + (state[item.id] ? ' done' : '');
+  card.className = 'card' + (onHold ? '' : ' done');
   card.innerHTML = `
     <div class="head">
-      <input type="checkbox" id="cb-${item.id}" ${state[item.id] ? 'checked' : ''} aria-label="done">
       <div class="t"><b>${item.title}</b><div class="sub">${item.sub}</div></div>
-      <span class="order">${item.order}</span>
+      <span class="order">${onHold ? '⏸ on hold' : '✓ done 07-14'}</span>
     </div>
     <div class="body links">${item.body}</div>`;
   main.appendChild(card);
-  const cb = card.querySelector('input');
-  card.querySelector('.head').addEventListener('click', (e) => {
-    if (e.target === cb) return;
+  card.querySelector('.head').addEventListener('click', () => {
     card.classList.toggle('open');
   });
-  cb.addEventListener('change', () => {
-    state[item.id] = cb.checked;
-    localStorage.setItem(KEY, JSON.stringify(state));
-    card.classList.toggle('done', cb.checked);
-    paint();
-  });
 }
-function paint() {
-  const done = ITEMS.filter(i => state[i.id]).length;
-  document.getElementById('fill').style.width = (100 * done / ITEMS.length) + '%';
-  document.getElementById('count').textContent = `${done}/${ITEMS.length} done`;
-}
-paint();
-document.getElementById('reset').addEventListener('click', () => {
-  if (!confirm('Clear all checkboxes?')) return;
-  localStorage.removeItem(KEY);
-  location.reload();
-});
 document.addEventListener('click', (e) => {
   if (!e.target.classList || !e.target.classList.contains('copy')) return;
   const code = e.target.parentElement.querySelector('code');

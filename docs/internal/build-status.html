@@ -365,7 +365,7 @@
 // Update in the SAME PR as the code it describes (anti-drift rule #3).
 // ============================================================================
 const DATA = {
-  stamp: "updated 2026-07-14 · session 4 CLOSE-OUT — deploy fully green incl. pgvector in prod; document_storage survived the #12 redeploy WITHOUT re-sync (EHR data persists — wipe theory retired; the one 401 was an id mismatch among duplicate client rows). Open: manual test plan run-through, PR #13 (docs)",
+  stamp: "updated 2026-07-14 · deploy green, but NOT all-done — open: manual test plan (0/21), 17 register boxes across 9 groups (see matrix), A.3 round-trip + A.6 vitals route, D6 video (user-waived), F.6 live-eval leg, F.8 tag one-liner, G13 span-hierarchy visual check",
   budget: { capPerDay: "$5.00", spentToday: "—", note: "SpendGuard unchanged (locked #16); Cohere rides a ledger line at B.4" },
   w1Floor: "24/24 W1 evals passing · read-path p95 46 ms @10 / 193 ms @50 (regression floor)",
 
@@ -388,16 +388,16 @@ const DATA = {
     { id: "A", title: "Wave A — Ingestion spine", band: "Band 1 · MVP · ∥ with B", tickets: [
         { id: "A.1", t: "LabPdfExtraction + IntakeFormExtraction Zod schemas + validation tests", reqs: ["R2","D3","G3"], deps: "—", s: "done" },
         { id: "A.2", t: "Citation contract v2 (guideline_evidence, page_bbox) + migration note", reqs: ["R5","G1"], deps: "—", s: "done" },
-        { id: "A.3", t: "Upload endpoint + OpenEMR document write + dedupe + attach_and_extract (live EHR POST pending deploy)", reqs: ["S1/R1","G1"], deps: "0.2", s: "active" },
+        { id: "A.3", t: "Upload endpoint + OpenEMR document write + dedupe + attach_and_extract; FIXED 07-14: document routes take numeric pid — a uuid was silently filed to patient 0 (invisible in the chart despite POST 200); client now resolves uuid→pid via GET /api/patient/:puuid. End-to-end round-trip = test plan A1/A2", reqs: ["S1/R1","G1"], deps: "0.2", s: "active" },
         { id: "A.4", t: "Extraction job: Claude vision → Zod parse → retry → ingestion states", reqs: ["S1/R1","G3","G2"], deps: "A.1, A.3", s: "done" },
         { id: "A.5", t: "Geometric grounding: word-box bbox / page fallback / unverified (tested on real fixtures)", reqs: ["R5","P2"], deps: "A.2, A.4", s: "done" },
-        { id: "A.6", t: "Persistence: facts + provenance + renal→HCQ re-tier; vitals mapping (live vitals row pending deploy)", reqs: ["S1/R1","G1"], deps: "A.4", s: "active" },
+        { id: "A.6", t: "Persistence: facts + provenance + renal→HCQ re-tier shipped; OPEN: native vitals route (seam built, not wired — G1's open box)", reqs: ["S1/R1","G1"], deps: "A.4", s: "active" },
         { id: "A.7", t: "Fixtures: renal panel (eGFR↓) + updated intake + degradation ladder + HbA1c (6 PDFs, regenerable)", reqs: ["S1","D4"], deps: "—", s: "done" },
       ]},
     { id: "B", title: "Wave B — Corpus + retrieval", band: "Band 1 · MVP · ∥ with A", tickets: [
         { id: "B.1", t: "8 authored practice protocols committed (AAO-grounded, metadata, zero PHI) + README", reqs: ["S2/R3","G18"], deps: "—", s: "done" },
         { id: "B.2", t: "Structure-aware chunker (thresholds stay with conditions)", reqs: ["S2/R3"], deps: "B.1", s: "done" },
-        { id: "B.3", t: "Index: in-memory dense+BM25 shipped behind the interface; pgvector/tsvector at deploy", reqs: ["S2/R3","G18"], deps: "0.1, 0.4, B.2", s: "active" },
+        { id: "B.3", t: "Index: pgvector-PERSISTED dense (corpus_embeddings, hash-sync, corpus:index CLI) confirmed in prod + BM25 keyword; in-memory fallback proven", reqs: ["S2/R3","G18"], deps: "0.1, 0.4, B.2", s: "done" },
         { id: "B.4", t: "Hybrid retrieve: keyword+dense → RRF → Cohere Rerank → top-k; degraded path", reqs: ["S2/R3","G2"], deps: "B.3", s: "done" },
         { id: "B.5", t: "PHI-free query scrubber + query rewriting + disease/laterality filters", reqs: ["E5","G18","P5"], deps: "B.4", s: "done" },
         { id: "B.6", t: "Retrieval goldens: 10 canonical + 2 refusal + PHI canary (retrieval_grounded live)", reqs: ["S4/R6","D4"], deps: "B.4, D.1", s: "done" },
@@ -435,7 +435,7 @@ const DATA = {
         { id: "F.2", t: "D7 cost & latency report: COSTS.md §6 — unit costs, Dan-volume projections, bottlenecks, $0 W2 spend", reqs: ["D7","R7"], deps: "F.1", s: "done" },
         { id: "F.3", t: "README restructure: W1-vs-W2 split, no-guessing quickstart, 34-key env table, D1–D8 map", reqs: ["D1"], deps: "E wave", s: "done" },
         { id: "F.4", t: "Backup & recovery RUNBOOK §E + EXECUTED restore rehearsal + §10 authority verify", reqs: ["G18","G1"], deps: "—", s: "done" },
-        { id: "F.5", t: "Demo script committed (7 shots, REQ/UC captions, keyless fallbacks) — recording WAIVED by user for early submission (2026-07-14)", reqs: ["D6","S5"], deps: "E.9, D.7", s: "done" },
+        { id: "F.5", t: "Demo script rewritten chat-first (3:50 cut, W1-vs-W2 delta, dedupe-trap note) — recording IN PROGRESS (user); D6 closes when the link lands in README", reqs: ["D6","S5"], deps: "E.9, D.7", s: "active" },
         { id: "F.6", t: "Eval dispatch pipe proven (user, run 29329650748 + artifact); LIVE_EVALS scheduled leg deferred post-submission", reqs: ["S5"], deps: "D.2", s: "active" },
         { id: "F.7", t: "Anti-drift sweep DONE (2026-07-14): PDF re-read line-by-line, register/board reconciled programmatically 62/79, every open box annotated or re-scoped; caught + fixed §12 phantom events, G5 gap, 9 under-flips, 3 over-claims", reqs: ["G1"], deps: "all", s: "done" },
         { id: "F.8", t: "Deploy verification DONE (ready:true all probes + pgvector confirmed in prod logs); stable tag = one user command (agent creds are branch-scoped, can't push tags): git tag -a w2-early-submission dd8a134 && git push origin w2-early-submission", reqs: ["D8"], deps: "F.3, F.6", s: "active" },
@@ -445,7 +445,7 @@ const DATA = {
   bands: [
     { name: "Band 1 — MVP expectation", waves: ["0","A","B","C","D"], note: "two doc types + hybrid RAG + supervisor/2 workers + 50-case PR-blocking gate, demoable" },
     { name: "Band 2 — Early Submission expectation", waves: ["E"], note: "full UI + observability + engineering spine" },
-    { name: "Band 3 — Final expectation", waves: ["F"], note: "reports, video, hardening, rehearsal evidence, tag" },
+    { name: "Band 3 — Final expectation", waves: ["F"], note: "reports, hardening, rehearsal evidence shipped · OPEN: video (recording, script ready), live-eval leg, tag one-liner" },
   ],
 
   criticalPath: [
@@ -470,21 +470,21 @@ const DATA = {
       { id: "S5", t: "Integrate, deploy, defend (upload UI, demo auth, traces, UC mapping) — merged to main; deployed-flow + trace boxes close on post-deploy verify", plan: "E.1, E.3, E.9, F.5, F.8", done: 3, total: 5, s: "active" },
     ]},
     { name: "Extensions", rows: [
-      { id: "E1", t: "Critic agent — committed (gate promoted to graph node)", plan: "C.4", done: 0, total: 1, s: "pending" },
+      { id: "E1", t: "Critic agent — SHIPPED (citation gate promoted to a graph node; rejects uncited claims)", plan: "C.4", done: 1, total: 1, s: "done" },
       { id: "E2", t: "Click-to-source UI — delivered via R5's required overlay", plan: "E.2", done: 0, total: 0, s: "via-r5" },
       { id: "E3", t: "Third doc type (referral fax) — deferred, seam built", plan: "—", done: 0, total: 0, s: "seam" },
       { id: "E4", t: "Lab trend widget — deferred, fields already sufficient", plan: "—", done: 0, total: 0, s: "seam" },
-      { id: "E5", t: "Contextual retrieval — committed (counted in S2/R3)", plan: "B.5", done: 0, total: 0, s: "pending" },
+      { id: "E5", t: "Contextual retrieval — SHIPPED (query rewriting + disease/laterality filters + structure-aware chunking; counted in S2/R3)", plan: "B.5", done: 1, total: 1, s: "done" },
     ]},
     { name: "Deliverables", rows: [
-      { id: "D1", t: "Repo: README separates W1 vs W2; no-guessing setup", plan: "F.3", done: 0, total: 1, s: "pending" },
+      { id: "D1", t: "Repo: README separates W1 vs W2; quickstart + 34-key env table + deliverables map shipped", plan: "F.3", done: 1, total: 1, s: "done" },
       { id: "D2", t: "W2_ARCHITECTURE.md at root (incl. G8 strategy + G9 failure modes)", plan: "P.2", done: 1, total: 1, s: "done" },
       { id: "D3", t: "Schemas + validation tests", plan: "A.1", done: 1, total: 1, s: "done" },
-      { id: "D4", t: "Eval dataset: 50 cases + rubrics + judge config + results", plan: "D.2", done: 0, total: 1, s: "pending" },
-      { id: "D5", t: "CI evidence: hook + blocked-regression proof", plan: "D.4, D.7", done: 0, total: 1, s: "pending" },
-      { id: "D6", t: "Demo video 3–5 min", plan: "F.5", done: 0, total: 1, s: "pending" },
-      { id: "D7", t: "Cost & latency report", plan: "F.2", done: 0, total: 1, s: "pending" },
-      { id: "D8", t: "Deployed app, W2 flow public", plan: "F.8", done: 0, total: 1, s: "pending" },
+      { id: "D4", t: "Eval dataset: 58 committed cases, boolean rubrics, deterministic judge config, results auto-regenerated", plan: "D.2", done: 1, total: 1, s: "done" },
+      { id: "D5", t: "CI evidence: pre-push hook + REQUIRED check on main + executed 3-fault gate rehearsal", plan: "D.4, D.7", done: 1, total: 1, s: "done" },
+      { id: "D6", t: "Demo video 3–5 min — recording in progress (chat-first 3:50 script committed: docs/w2/demo-script.md); done when the link lands in README", plan: "F.5", done: 0, total: 1, s: "active" },
+      { id: "D7", t: "Cost & latency report: COSTS.md §6 (unit costs, projections, bottlenecks; Cohere pricing cells await verified rates)", plan: "F.2", done: 1, total: 1, s: "done" },
+      { id: "D8", t: "Deployed app, W2 flow public — ready:true, all probes ok, pgvector confirmed in prod", plan: "F.8", done: 1, total: 1, s: "done" },
     ]},
     { name: "Engineering (graded, non-optional)", rows: [
       { id: "G1", t: "Typed contracts everywhere · migration notes · explicit data authority (open: Zod on the vitals-write payload — route pending)", plan: "A.2, F.7 (+table shipped in W2_ARCHITECTURE §10)", done: 2, total: 3, s: "active" },
@@ -492,7 +492,7 @@ const DATA = {
       { id: "G3", t: "Raw VLM output never bypasses validation (verified in the 2026-07-14 sweep)", plan: "A.4", done: 1, total: 1, s: "done" },
       { id: "G4", t: "Correlation ID through every W2 boundary; trace from ID alone", plan: "C.5", done: 1, total: 2, s: "active" },
       { id: "G5", t: "Structured logs: extraction_field_outcome + retrieval_hit/miss + eval_run_outcome shipped (PDF sweep); searchable + PHI-canary-verified", plan: "C.5, E.4, sweep", done: 2, total: 2, s: "done" },
-      { id: "G6", t: "Dashboard tiles for W2 metrics", plan: "E.4", done: 1, total: 1, s: "active" },
+      { id: "G6", t: "Dashboard tiles for W2 metrics (ops page live-postured 2026-07-14)", plan: "E.4", done: 1, total: 1, s: "done" },
       { id: "G7", t: "CI: audit + security scan on main PRs (semgrep green'd 2026-07-14) · contract tests · extraction goldens in required gate · Dependabot sidecar", plan: "0.2, C.1, D.4, D.6", done: 4, total: 4, s: "done" },
       { id: "G8", t: "Testing strategy documented — §11 layer table verified; open on the per-test failure-mode-naming clause", plan: "P.2 → W2_ARCHITECTURE §11", done: 0, total: 1, s: "active" },
       { id: "G9", t: "Failure-mode runbook (identify in logs + recovery)", plan: "P.2 → W2_ARCHITECTURE §12", done: 1, total: 1, s: "done" },
@@ -501,7 +501,7 @@ const DATA = {
       { id: "G12", t: "One logging convention — W2 components all pino-shaped (verified; W1 bootstrap console lines are the only exception)", plan: "C.5, E.4", done: 1, total: 1, s: "done" },
       { id: "G13", t: "Span hierarchy: worker ⊂ supervisor; sub-calls ⊂ worker", plan: "C.5", done: 0, total: 1, s: "pending" },
       { id: "G14", t: "/ready: doc storage + vector index + reranker, degraded status", plan: "E.6", done: 1, total: 1, s: "done" },
-      { id: "G15", t: "Alerts A4–A6 with response actions", plan: "E.4", done: 1, total: 1, s: "active" },
+      { id: "G15", t: "Alerts A4–A6 with response actions (documented; Langfuse live)", plan: "E.4", done: 1, total: 1, s: "done" },
       { id: "G16", t: "Sidecar OpenAPI 3.0 committed + contract-tested + fresh", plan: "E.7", done: 1, total: 1, s: "done" },
       { id: "G17", t: "Integration tests: fixtures + stubs, no live APIs in CI", plan: "D.3", done: 1, total: 1, s: "done" },
       { id: "G18", t: "Data model/lineage (shipped §10) · PHI audit in CI · backup/recovery + RPO/RTO", plan: "B.5, D.5, F.4", done: 3, total: 3, s: "done" },
