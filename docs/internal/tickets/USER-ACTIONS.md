@@ -21,7 +21,7 @@ land — nothing below blocks a merge. Each item: exact names → where to click
 |---|---|---|
 | 0 | Laptop setup | ✅ done (2026-07-13) |
 | 7 | Branch protection | ✅ done (2026-07-13) — `Run eval suite` REQUIRED on `main` |
-| 5 | OpenEMR document-write | ✅ done + **verified live** (2026-07-14 post-merge: `document_storage: ok` = successful token mint; note — after EHR redeploys, re-sync `OPENEMR_CLIENT_ID` to the enabled client row, id-only auth) |
+| 5 | OpenEMR document-write | ✅ done + **verified live** (2026-07-14: `document_storage: ok`, and it SURVIVED subsequent merge redeploys — EHR data persists; id-only auth, see the note in item 5) |
 | 1 | Cohere | ✅ done + **verified live** (2026-07-14 post-merge: `reranker: ok`) |
 | 3 | Langfuse | ✅ done (2026-07-14) — Cloud keys live, verified against today's deploy; graph spans join post-merge |
 | 6 | Dev-login secret | ✅ done (2026-07-14) — verified against today's deploy |
@@ -263,14 +263,15 @@ old one):
 curl -s https://enchanting-mercy-production-5d32.up.railway.app/ready | jq '.dependencies.document_storage'
 # not_configured → ok   (proves a live token mint against the new client)
 ```
-> ⚠️ **`failed` + `invalid_client: Client authentication failed` after an EHR
-> redeploy:** client registrations live in the EHR's database — if the EHR
-> service redeploys without persistent storage, the registration (and 5c's
-> enable) is wiped and the token mint 401s. Check **Administration → System →
-> API Clients**: if the sidecar entry is missing or you're unsure the id
-> matches Railway's `OPENEMR_CLIENT_ID`, redo **5b → 5c → 5d** (3 minutes,
-> deterministic — the fresh keypair replaces all doubt), then redeploy the
-> sidecar and re-run the verify.
+> ℹ️ **`failed` + `invalid_client: Client authentication failed`** means
+> Railway's `OPENEMR_CLIENT_ID` doesn't match an **enabled** client row in
+> the EHR (password-grant auth is id-only — the key plays no part). Verified
+> 2026-07-14 across two merge redeploys: **the EHR database persists**, so
+> registrations and enables survive deploys — no per-merge ritual. The one
+> live incident was an id mismatch among duplicate identically-named rows
+> from repeated registrations. Fix: open **Administration → System → API
+> Clients**, open any enabled sidecar row, copy its Client ID exactly, paste
+> into Railway's `OPENEMR_CLIENT_ID`, Apply — 60 seconds.
 `null` today is expected: the `document_storage` probe ships with PR #9, so
 the deployed `main` build has no such key. Re-run after merge + redeploy.
 Then upload once via the panel Sources tab (or Bruno `06-documents`) and

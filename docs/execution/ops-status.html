@@ -171,7 +171,8 @@
   </div>
 
   <div class="statgrid">
-    <div class="stat"><div class="k">W2 · Documents ingested (eval)</div><div class="v">6</div><div class="u">fixture runs — static until Langfuse deploy · source: eval-results.md</div></div>
+    <div class="stat"><div class="k">W2 · Documents ingested (eval)</div><div class="v">6</div><div class="u">fixture runs · live traces flow to Langfuse since 2026-07-14 · source: eval-results.md</div></div>
+    <div class="stat"><div class="k">W2 · Dense index</div><div class="v">pgvector · 71</div><div class="u">vectors persisted in corpus_embeddings; reused (0 re-embeds) on restart — prod deploy log 2026-07-14</div></div>
     <div class="stat"><div class="k">W2 · Extraction grounding confidence</div><div class="v">75%</div><div class="u">clean-fixture pass (3 tight / 1 planted-unverified) — static · source: eval-results.md</div></div>
     <div class="stat"><div class="k">W2 · Retrieval goldens</div><div class="v">12/12</div><div class="u">retrieval_grounded category — static · source: eval-results.md</div></div>
     <div class="stat"><div class="k">W2 · Routing decisions</div><div class="v">rule-first</div><div class="u">deterministic short-circuits; model tie-break only on ambiguity — router tests</div></div>
@@ -268,7 +269,7 @@
     <div class="panel">
       <div class="panel-head">
         <h2>Alerts — three, with on-call responses</h2>
-        <span class="pill amber">spec committed · Langfuse config pending (G2)</span>
+        <span class="pill green">LIVE — Langfuse Cloud keyed 2026-07-14; prep traces + W2 graph spans flowing</span>
       </div>
       <p class="muted">Canonical definitions (conditions, thresholds, full on-call runbook):
       <a href="https://github.com/TCA-Trelity/GW1-openemr-base-clean/blob/main/docs/execution/observability.md">observability.md</a> — this table renders it.</p>
@@ -289,7 +290,7 @@
     <div class="panel">
       <div class="panel-head">
         <h2>Dashboard — ten tiles over already-emitted signals</h2>
-        <span class="pill amber">signals live · tiles pending Langfuse deploy (G2)</span>
+        <span class="pill green">signals + Langfuse LIVE (2026-07-14) — tiles configurable in the Cloud project from these definitions</span>
       </div>
       <p class="muted">Every tile maps to data the sidecar already emits (Langfuse traces keyed by correlation ID +
       the <code>llm_calls</code> Postgres ledger + pino request logs) — the dashboard is a view, not new
@@ -329,7 +330,7 @@
         </div>
         <div class="item">
           <div class="t"><a href="https://enchanting-mercy-production-5d32.up.railway.app/ready">/ready</a></div>
-          <div class="d">real checks: OpenEMR · Anthropic · Postgres · Langfuse (configured deps that fail ⇒ 503)</div>
+          <div class="d">real checks: OpenEMR · Anthropic · Postgres · Langfuse · document storage (live token mint) · retriever index (pgvector) · reranker — all <b>ok</b> on the 2026-07-14 deploy (configured deps that fail ⇒ 503; unconfigured report degraded, never binary-down)</div>
         </div>
         <div class="item">
           <div class="t">Bruno probes</div>

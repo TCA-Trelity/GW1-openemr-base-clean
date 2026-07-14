@@ -365,7 +365,7 @@
 // Update in the SAME PR as the code it describes (anti-drift rule #3).
 // ============================================================================
 const DATA = {
-  stamp: "updated 2026-07-14 · session 4 — pgvector CONFIRMED IN PRODUCTION (PR #12 merged; deploy log: backend pgvector, 71 vectors reused on restart, 0 re-embeds). Remaining: OPENEMR_CLIENT_ID re-sync post-redeploy, manual test plan, F.8 tag",
+  stamp: "updated 2026-07-14 · session 4 CLOSE-OUT — deploy fully green incl. pgvector in prod; document_storage survived the #12 redeploy WITHOUT re-sync (EHR data persists — wipe theory retired; the one 401 was an id mismatch among duplicate client rows). Open: manual test plan run-through, PR #13 (docs)",
   budget: { capPerDay: "$5.00", spentToday: "—", note: "SpendGuard unchanged (locked #16); Cohere rides a ledger line at B.4" },
   w1Floor: "24/24 W1 evals passing · read-path p95 46 ms @10 / 193 ms @50 (regression floor)",
 
@@ -435,10 +435,10 @@ const DATA = {
         { id: "F.2", t: "D7 cost & latency report: COSTS.md §6 — unit costs, Dan-volume projections, bottlenecks, $0 W2 spend", reqs: ["D7","R7"], deps: "F.1", s: "done" },
         { id: "F.3", t: "README restructure: W1-vs-W2 split, no-guessing quickstart, 34-key env table, D1–D8 map", reqs: ["D1"], deps: "E wave", s: "done" },
         { id: "F.4", t: "Backup & recovery RUNBOOK §E + EXECUTED restore rehearsal + §10 authority verify", reqs: ["G18","G1"], deps: "—", s: "done" },
-        { id: "F.5", t: "Demo script committed (7 shots, REQ/UC captions, keyless fallbacks) — recording = user action", reqs: ["D6","S5"], deps: "E.9, D.7", s: "active" },
-        { id: "F.6", t: "Pre-milestone live eval run + live smoke", reqs: ["S5"], deps: "D.2", s: "pending" },
-        { id: "F.7", t: "Anti-drift sweep: every checkbox verified or re-scoped", reqs: ["G1"], deps: "all", s: "pending" },
-        { id: "F.8", t: "Stable tag + deploy verification", reqs: ["D8"], deps: "F.3, F.6", s: "pending" },
+        { id: "F.5", t: "Demo script committed (7 shots, REQ/UC captions, keyless fallbacks) — recording WAIVED by user for early submission (2026-07-14)", reqs: ["D6","S5"], deps: "E.9, D.7", s: "done" },
+        { id: "F.6", t: "Eval dispatch pipe proven (user, run 29329650748 + artifact); LIVE_EVALS scheduled leg deferred post-submission", reqs: ["S5"], deps: "D.2", s: "active" },
+        { id: "F.7", t: "Anti-drift sweep DONE (2026-07-14): PDF re-read line-by-line, register/board reconciled programmatically 62/79, every open box annotated or re-scoped; caught + fixed §12 phantom events, G5 gap, 9 under-flips, 3 over-claims", reqs: ["G1"], deps: "all", s: "done" },
+        { id: "F.8", t: "Deploy verification DONE (ready:true all probes + pgvector confirmed in prod logs); stable tag = one user command (agent creds are branch-scoped, can't push tags): git tag -a w2-early-submission dd8a134 && git push origin w2-early-submission", reqs: ["D8"], deps: "F.3, F.6", s: "active" },
       ]},
   ],
 
