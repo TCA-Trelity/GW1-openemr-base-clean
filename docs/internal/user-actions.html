@@ -108,7 +108,7 @@
   A <code>null</code> is <b>expected</b>, not a failed key drop: the variables sit staged on Railway and take
   effect on the post-merge redeploy. Verifies that DO work pre-merge: item 3's <code>langfuse</code> flip + prep
   trace, item 6's dev-login, item 2's laptop <code>verify:pgvector</code> run (your clone is on the W2 branch).
-  <br>Reported done so far: <b>0</b> + <b>7</b> (2026-07-13); <b>5</b>, <b>1</b>, <b>3</b>, <b>6</b> (2026-07-14). Open: <b>2</b> (step-by-step below; laptop run works today) and <b>8</b> (last). <b>4</b> is ON HOLD (user, 2026-07-14). Then PR #9's merge flips every deferred verify live.
+  <br>Reported done so far: <b>0</b> + <b>7</b> (2026-07-13); <b>5</b>, <b>1</b>, <b>3</b>, <b>6</b>, <b>2</b> — pgvector AVAILABLE v0.8.4 (2026-07-14). <b>4</b> is ON HOLD (user, 2026-07-14). Only <b>8</b> remains open. Then PR #9's merge flips every deferred verify live.
 </div>
 
 <main id="items"></main>
@@ -196,7 +196,7 @@ OPENEMR_BASE_URL='https://gw1-openemr-base-clean-production.up.railway.app' npx 
 <pre><button class="copy">copy</button><code>curl -s -X POST https://enchanting-mercy-production-5d32.up.railway.app/api/dev-login -H 'content-type: application/json' -d '{"role":"physician","patient":"margaret-chen"}'</code></pre>
 returns <code>{"access_token":"…"}</code>; a 404 means the secret is absent or too short.</div>`},
 
-{ id:'a2', order:'do 7th', title:'2 · pgvector decision — dense index backend, step by step', sub:'Wave 0.1 — one command from the laptop; both outcomes fully supported', body:`
+{ id:'a2', order:'do 7th', title:'2 · pgvector decision — dense index backend, step by step', sub:'✅ done 2026-07-14 — AVAILABLE (installed now, v0.8.4); RETRIEVER_DENSE_BACKEND stays default pgvector', body:`
 <p>One command from the laptop clone that asks the Railway Postgres whether the <code>pgvector</code> extension exists. Whichever answer it prints, one step later you're done — <b>both outcomes are fully supported</b>.</p>
 <h4>Step 1 — freshen the clone (the branch moves daily)</h4>
 <pre><button class="copy">copy</button><code>cd ~/GW1-openemr-base-clean
@@ -208,8 +208,9 @@ cd sidecar</code></pre>
 <p>On that Postgres card → <b>Variables</b> tab → the row named <code>DATABASE_PUBLIC_URL</code> (⚠️ not <code>DATABASE_URL</code>). Values are masked — click the <b>copy icon</b> at the right end of that row (safer than revealing + hand-selecting). Sanity-check the paste: it must contain <code>proxy.rlwy.net:</code> followed by a port number; if it contains <code>railway.internal</code> you copied the wrong row — that host only resolves inside Railway and hangs from a laptop.</p>
 <h4>Step 4 — run the check (still inside <code>sidecar/</code>)</h4>
 <pre><button class="copy">copy</button><code>DATABASE_URL='PASTE-THE-URL-HERE' npm run verify:pgvector</code></pre>
-<p>Replace <code>PASTE-THE-URL-HERE</code> with the step-3 URL — <b>keep the single quotes</b>, everything on <b>one line</b>, one space before <code>npm</code>. The left-hand name stays <code>DATABASE_URL</code> even though the value came from the <code>DATABASE_PUBLIC_URL</code> row — the script reads the variable <i>named</i> <code>DATABASE_URL</code>; you're handing it the public value. Filled-in example (fake credentials, real shape):</p>
-<pre><button class="copy">copy</button><code>DATABASE_URL='postgresql://postgres:AbC123xYz456@maglev.proxy.rlwy.net:43210/railway' npm run verify:pgvector</code></pre>
+<p>Replace <code>PASTE-THE-URL-HERE</code> with the step-3 URL — <b>keep the single quotes</b>, everything on <b>one line</b>, one space before <code>npm</code>. The left-hand name stays <code>DATABASE_URL</code> even though the value came from the <code>DATABASE_PUBLIC_URL</code> row — the script reads the variable <i>named</i> <code>DATABASE_URL</code>; you're handing it the public value.</p>
+<div class="warnbox"><b>DO NOT RUN the example below — illustration only.</b> The host and credentials are fake (running it prints a <code>query failed:</code> error). It exists to show what the finished command <i>looks like</i>:</div>
+<pre><code>DATABASE_URL='postgresql://postgres:AbC123xYz456@maglev.proxy.rlwy.net:43210/railway' npm run verify:pgvector</code></pre>
 <h4>Step 5 — read the result (exact lines the script prints)</h4>
 <table><tr><th>The output says</th><th>Meaning</th><th>What you do</th></tr>
 <tr><td><code>pgvector AVAILABLE (already installed, version …)</code> or <code>pgvector AVAILABLE (installed now, version …)</code></td><td>best outcome — "installed now" = the script enabled it; that's its job, not an error</td><td><b>nothing</b> — leave <code>RETRIEVER_DENSE_BACKEND</code> unset. Item 2 done.</td></tr>

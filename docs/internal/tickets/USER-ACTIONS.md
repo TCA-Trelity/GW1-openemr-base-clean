@@ -25,7 +25,7 @@ land — nothing below blocks a merge. Each item: exact names → where to click
 | 1 | Cohere | ✅ key staged on the sidecar service (2026-07-14) — `reranker` verify returned `null` as expected pre-merge; re-verify post-merge |
 | 3 | Langfuse | ✅ done (2026-07-14) — Cloud keys live, verified against today's deploy; graph spans join post-merge |
 | 6 | Dev-login secret | ✅ done (2026-07-14) — verified against today's deploy |
-| 2 | pgvector | open — directions rewritten step-by-step (2026-07-14); laptop run works today |
+| 2 | pgvector | ✅ done (2026-07-14) — `AVAILABLE (installed now, version 0.8.4)`; `RETRIEVER_DENSE_BACKEND` stays default `pgvector`; recorded in `W2_ARCHITECTURE.md` §5/§15 + board 0.1 |
 | 4 | LangSmith | ⏸ ON HOLD (user, 2026-07-14) — single-service posture; revisit only if a separate demo service appears |
 | 8 | Eval dispatch | open — save for last |
 
@@ -107,7 +107,7 @@ curl -s -X POST https://enchanting-mercy-production-5d32.up.railway.app/api/evid
   -H 'content-type: application/json' -d '{"q":"hydroxychloroquine screening interval"}' | grep -o '"rerank_applied":[a-z]*'
 ```
 
-## 2. pgvector decision (Wave 0.1 — dense index backend) — step by step
+## 2. pgvector decision (Wave 0.1 — dense index backend) — step by step — ✅ DONE (user, 2026-07-14: AVAILABLE, v0.8.4)
 
 One command, run **from your laptop clone** (item 0), that asks the **Railway
 Postgres** whether the `pgvector` extension exists. Whichever answer it
@@ -143,8 +143,10 @@ DATABASE_URL='PASTE-THE-URL-HERE' npm run verify:pgvector
 - Yes, the left-hand name stays `DATABASE_URL` even though the *value* came
   from the `DATABASE_PUBLIC_URL` row: the script reads the variable *named*
   `DATABASE_URL`; you're handing it the public value.
-- Filled-in example (fake credentials, real shape):
-```bash
+- Filled-in example — **DO NOT RUN THIS; illustration only** (the host and
+  credentials are fake, so running it prints a `query failed:` error). It
+  exists to show what the finished command *looks like*:
+```text
 DATABASE_URL='postgresql://postgres:AbC123xYz456@maglev.proxy.rlwy.net:43210/railway' npm run verify:pgvector
 ```
 

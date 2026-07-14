@@ -136,9 +136,14 @@ char-range variant; attribution block). No extraction schemas yet.
 > with Cohere Rerank or an equivalent reranker, and feed only the top grounded
 > evidence to the answer model."*
 
-**Status:** ❌ missing entirely (grep-verified: no embedding/vector/rerank/BM25
-code). Postgres fact store exists; pgvector availability on Railway Postgres
-**unverified** (Week 1 doc claim only).
+**Status:** ⚠️ shipped behind injectable backends; live backends engage at
+deploy. Hybrid BM25+dense → RRF → rerank, PHI query scrubber + CI canary,
+corpus + chunker, `/api/evidence/search`, retrieval goldens all shipped
+(B waves). pgvector on Railway Postgres **verified AVAILABLE 2026-07-14**
+(user-run `verify:pgvector`: extension enabled, v0.8.4; backend default
+`pgvector` stands). Cohere key staged (USER-ACTIONS 1) — live dense/rerank
+verification is post-merge. *(Original register-time status: missing
+entirely, pgvector unverified doc claim.)*
 
 **Acceptance criteria:**
 - [ ] Corpus: 6–10 authored practice-protocol markdown docs (locked decision)
@@ -154,6 +159,9 @@ code). Postgres fact store exists; pgvector availability on Railway Postgres
   embeddings) run in parallel → reciprocal-rank fusion. If pgvector is
   unavailable on Railway, in-process cosine over the same interface (corpus is
   10²–10³ chunks) — the retriever interface hides the backend.
+  *(pgvector verified AVAILABLE on Railway Postgres 2026-07-14 — extension
+  enabled at v0.8.4 by `verify:pgvector`; the box flips when the live
+  backends are exercised post-merge.)*
 - [x] Rerank: Cohere Rerank on fused candidates (locked decision — the vendor
   the spec names); only top-k (k ≤ 5) chunks reach the answer model.
 - [x] Evidence snippets returned with full source metadata (doc, section,

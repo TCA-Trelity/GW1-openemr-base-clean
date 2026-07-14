@@ -173,7 +173,7 @@ child spans of the supervisor span; extraction/retrieval sub-calls are children
 of their worker spans. One correlation ID reconstructs the full multi-agent
 trace — the spec's test, verbatim.
 
-## 5. Hybrid RAG design (REQ: S2/R3, E5) — [SHIPPED: hybrid BM25+dense → RRF → Cohere rerank behind injectable backends, PHI query scrubber + CI canary, disease-tag filters, coverage floor w/ stopword-hardening, /api/evidence/search, retrieval goldens · TARGET: pgvector/tsvector backends at deploy (0.1)] — answer leg SHIPPED (E.9)
+## 5. Hybrid RAG design (REQ: S2/R3, E5) — [SHIPPED: hybrid BM25+dense → RRF → Cohere rerank behind injectable backends, PHI query scrubber + CI canary, disease-tag filters, coverage floor w/ stopword-hardening, /api/evidence/search, retrieval goldens · TARGET: pgvector/tsvector backends engage at deploy (0.1 RESOLVED 2026-07-14: pgvector verified AVAILABLE on Railway Postgres, v0.8.4 enabled)] — answer leg SHIPPED (E.9)
 
 **Corpus (locked decisions #3, #6).** 6–10 short authored **practice-protocol
 documents** — "agreed clinical practices the office follows" — each grounded
@@ -193,9 +193,12 @@ Clinical text is threshold-dense — this is where generic chunkers fail hardest
 
 **Index.** The Postgres the fact store already runs on: `pgvector` for dense
 (Cohere embeddings) + `tsvector` full-text for keyword. No new infra service.
-pgvector availability on Railway Postgres is **verified on day one**; the
-fallback at this corpus size (10²–10³ chunks) is an in-process cosine scan
-behind the same retriever interface.
+pgvector availability on Railway Postgres was **verified live on 2026-07-14**
+(`verify:pgvector` → `AVAILABLE (installed now, version 0.8.4)`; the script
+enabled the extension, and `RETRIEVER_DENSE_BACKEND` stays default
+`pgvector`). The fallback at this corpus size (10²–10³ chunks) — an
+in-process cosine scan behind the same retriever interface — remains
+available but is no longer expected to be needed.
 
 **Retrieval.** Parallel keyword + dense → reciprocal-rank fusion →
 **Cohere Rerank** → top-k (k ≤ 5) chunks to the answer model. Hybrid is not
@@ -440,7 +443,7 @@ are unchanged; see `ARCHITECTURE.md` §9.)
 
 | Risk | Mitigation (with first-day verification where applicable) |
 |---|---|
-| pgvector not available on Railway Postgres (Week 1 "installed" was a doc claim) | Verify day one; in-process cosine fallback behind the same interface — trivial at 10²–10³ chunks |
+| pgvector not available on Railway Postgres (Week 1 "installed" was a doc claim) | **RESOLVED 2026-07-14** — verified live (user-run `verify:pgvector` against Railway Postgres: `AVAILABLE (installed now, version 0.8.4)` — the script enabled the extension); `RETRIEVER_DENSE_BACKEND` stays default `pgvector`. The in-process cosine fallback remains behind the same interface, now as insurance only |
 | Degraded scans defeat OCR grounding | The ladder degrades visibly (bbox → page → unverified); a degraded-scan eval case pins behavior; wrong facts cannot enter citations by construction |
 | OpenEMR write path friction (`user/document.write` not yet registered; standard API rejects client-credentials) | Register scope + integration-test the password-grant client first (Wave A); vitals payload already exists in `standardApi.ts` |
 | Stubbed PR gate blind to live-model drift | Deliberate split: live suite pre-milestone + verification-rate alert (A-series) in traces |
