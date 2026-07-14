@@ -263,6 +263,14 @@ old one):
 curl -s https://enchanting-mercy-production-5d32.up.railway.app/ready | jq '.dependencies.document_storage'
 # not_configured → ok   (proves a live token mint against the new client)
 ```
+> ⚠️ **`failed` + `invalid_client: Client authentication failed` after an EHR
+> redeploy:** client registrations live in the EHR's database — if the EHR
+> service redeploys without persistent storage, the registration (and 5c's
+> enable) is wiped and the token mint 401s. Check **Administration → System →
+> API Clients**: if the sidecar entry is missing or you're unsure the id
+> matches Railway's `OPENEMR_CLIENT_ID`, redo **5b → 5c → 5d** (3 minutes,
+> deterministic — the fresh keypair replaces all doubt), then redeploy the
+> sidecar and re-run the verify.
 `null` today is expected: the `document_storage` probe ships with PR #9, so
 the deployed `main` build has no such key. Re-run after merge + redeploy.
 Then upload once via the panel Sources tab (or Bruno `06-documents`) and
