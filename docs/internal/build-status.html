@@ -435,7 +435,7 @@ const DATA = {
         { id: "F.2", t: "D7 cost & latency report: COSTS.md §6 — unit costs, Dan-volume projections, bottlenecks, $0 W2 spend", reqs: ["D7","R7"], deps: "F.1", s: "done" },
         { id: "F.3", t: "README restructure: W1-vs-W2 split, no-guessing quickstart, 34-key env table, D1–D8 map", reqs: ["D1"], deps: "E wave", s: "done" },
         { id: "F.4", t: "Backup & recovery RUNBOOK §E + EXECUTED restore rehearsal + §10 authority verify", reqs: ["G18","G1"], deps: "—", s: "done" },
-        { id: "F.5", t: "Demo script committed (7 shots, REQ/UC captions, keyless fallbacks) — recording WAIVED by user for early submission (2026-07-14)", reqs: ["D6","S5"], deps: "E.9, D.7", s: "done" },
+        { id: "F.5", t: "Demo script rewritten chat-first (3:50 cut, W1-vs-W2 delta, dedupe-trap note) — recording IN PROGRESS (user); D6 closes when the link lands in README", reqs: ["D6","S5"], deps: "E.9, D.7", s: "active" },
         { id: "F.6", t: "Eval dispatch pipe proven (user, run 29329650748 + artifact); LIVE_EVALS scheduled leg deferred post-submission", reqs: ["S5"], deps: "D.2", s: "active" },
         { id: "F.7", t: "Anti-drift sweep DONE (2026-07-14): PDF re-read line-by-line, register/board reconciled programmatically 62/79, every open box annotated or re-scoped; caught + fixed §12 phantom events, G5 gap, 9 under-flips, 3 over-claims", reqs: ["G1"], deps: "all", s: "done" },
         { id: "F.8", t: "Deploy verification DONE (ready:true all probes + pgvector confirmed in prod logs); stable tag = one user command (agent creds are branch-scoped, can't push tags): git tag -a w2-early-submission dd8a134 && git push origin w2-early-submission", reqs: ["D8"], deps: "F.3, F.6", s: "active" },
@@ -445,7 +445,7 @@ const DATA = {
   bands: [
     { name: "Band 1 — MVP expectation", waves: ["0","A","B","C","D"], note: "two doc types + hybrid RAG + supervisor/2 workers + 50-case PR-blocking gate, demoable" },
     { name: "Band 2 — Early Submission expectation", waves: ["E"], note: "full UI + observability + engineering spine" },
-    { name: "Band 3 — Final expectation", waves: ["F"], note: "reports, hardening, rehearsal evidence shipped · OPEN: video (user-waived), live-eval leg, tag one-liner" },
+    { name: "Band 3 — Final expectation", waves: ["F"], note: "reports, hardening, rehearsal evidence shipped · OPEN: video (recording, script ready), live-eval leg, tag one-liner" },
   ],
 
   criticalPath: [
@@ -482,7 +482,7 @@ const DATA = {
       { id: "D3", t: "Schemas + validation tests", plan: "A.1", done: 1, total: 1, s: "done" },
       { id: "D4", t: "Eval dataset: 58 committed cases, boolean rubrics, deterministic judge config, results auto-regenerated", plan: "D.2", done: 1, total: 1, s: "done" },
       { id: "D5", t: "CI evidence: pre-push hook + REQUIRED check on main + executed 3-fault gate rehearsal", plan: "D.4, D.7", done: 1, total: 1, s: "done" },
-      { id: "D6", t: "Demo video 3–5 min — WAIVED by user for early submission (script + shot list committed: docs/w2/demo-script.md)", plan: "F.5", done: 0, total: 1, s: "pending" },
+      { id: "D6", t: "Demo video 3–5 min — recording in progress (chat-first 3:50 script committed: docs/w2/demo-script.md); done when the link lands in README", plan: "F.5", done: 0, total: 1, s: "active" },
       { id: "D7", t: "Cost & latency report: COSTS.md §6 (unit costs, projections, bottlenecks; Cohere pricing cells await verified rates)", plan: "F.2", done: 1, total: 1, s: "done" },
       { id: "D8", t: "Deployed app, W2 flow public — ready:true, all probes ok, pgvector confirmed in prod", plan: "F.8", done: 1, total: 1, s: "done" },
     ]},
