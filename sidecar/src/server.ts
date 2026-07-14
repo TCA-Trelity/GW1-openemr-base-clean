@@ -43,7 +43,7 @@ import { IngestionService, MemoryIngestionRecordStore } from './ingest/service.j
 import { VlmExtractor } from './ingest/extractor.js';
 import { CohereEmbeddings, HashEmbeddings } from './retrieval/embeddings.js';
 import { CohereReranker, PassthroughReranker } from './retrieval/rerank.js';
-import { HybridRetriever, loadCorpusChunks } from './retrieval/retriever.js';
+import { HybridRetriever, loadCorpusChunks, type RetrievalLogger } from './retrieval/retriever.js';
 import { OpenEmrPasswordAuthClient } from './openemr/auth.js';
 import { StandardApiClient } from './openemr/standardApi.js';
 
@@ -368,7 +368,7 @@ export function buildServer(config: Config, deps?: AppDeps): FastifyInstance {
 
 /** Week 2 (B.3/B.4): build the guideline retriever. Cohere when keyed; deterministic
  *  offline backends otherwise — retrieval never hard-depends on a vendor being up. */
-export async function buildEvidenceDeps(config: Config): Promise<EvidenceRouteDeps | undefined> {
+export async function buildEvidenceDeps(config: Config, logger?: RetrievalLogger): Promise<EvidenceRouteDeps | undefined> {
     const corpusDir = fileURLToPath(new URL('../corpus/', import.meta.url));
     if (!existsSync(corpusDir)) {
         return undefined;
@@ -382,7 +382,7 @@ export async function buildEvidenceDeps(config: Config): Promise<EvidenceRouteDe
         config.COHERE_API_KEY !== undefined
             ? new CohereReranker({ apiKey: config.COHERE_API_KEY, model: config.COHERE_RERANK_MODEL })
             : new PassthroughReranker();
-    return { retriever: await HybridRetriever.build(chunks, { embeddings, reranker }) };
+    return { retriever: await HybridRetriever.build(chunks, { embeddings, reranker, ...(logger === undefined ? {} : { logger }) }) };
 }
 
 // Boot only when executed directly (tests import buildServer instead).
@@ -391,7 +391,11 @@ if (process.argv[1]?.endsWith('server.js') || process.argv[1]?.endsWith('server.
     const deps = buildDeps(config);
     // Evidence retriever builds before the server so its routes register at startup;
     // corpus embedding is a one-time boot cost (seconds, offline-free with HashEmbeddings).
-    const evidence = await buildEvidenceDeps(loadConfig());
+    // Same structured-JSON shape as the app logger so retrieval_hit/miss events (G5)
+    // stay one grep away from the pino stream.
+    const evidence = await buildEvidenceDeps(loadConfig(), {
+        info: (obj: Record<string, unknown>, msg: string) => console.log(JSON.stringify({ level: 'info', msg, ...obj })),
+    });
     if (deps !== undefined && evidence !== undefined) {
         deps.evidence = evidence;
         // E.9: assemble the chat evidence lane — router tie-break + LLM composer over

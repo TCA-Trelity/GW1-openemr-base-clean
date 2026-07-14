@@ -398,8 +398,11 @@ when PR #9's build deploys. LangSmith fenced to the demo env (E.5); no OTEL.
   gate lands with the dedicated vitals route. Panel maps 401/403 to friendly
   role guidance.)*
 - [ ] Traces of the demo flow captured and linkable (Langfuse demo project).
-- [ ] Every capability maps to a UC in `USERS.md` (defense-outline slide 1
+- [x] Every capability maps to a UC in `USERS.md` (defense-outline slide 1
   carries the mapping).
+  *(Verified 2026-07-14: slide 1 maps ingestion→UC-3/UC-7 and the renal
+  re-tier→UC-4; the RAG slide maps guideline evidence→UC-9 — every shipped
+  W2 capability lands on a named UC.)*
 
 ---
 
@@ -468,10 +471,14 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
   or documented equivalent fallback — no silent hammering).
 
 ### G3 — Schemas are canonical
-- [ ] Raw VLM output never bypasses validation: the only path from model
+- [x] Raw VLM output never bypasses validation: the only path from model
   output to persistence is through the R2 Zod parse; failures are
   logged + retried with validation feedback, then surfaced as ingestion
   failure — never stored partially.
+  *(Shipped A.4 and re-verified in the 2026-07-14 sweep: extractor output
+  reaches persistence only via the Zod parse; one validation-feedback retry,
+  then `failed_validation` with nothing persisted — pinned by ingest tests
+  and the schema_valid eval category.)*
 
 ### G4 — Correlation ID propagation
 - [ ] The Week 1 correlation ID propagates into: upload request → OpenEMR
@@ -483,11 +490,22 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
   from a real run, both tiers; Langfuse trace link joins at E.4.)*
 
 ### G5 — Structured logs, searchable
-- [ ] New W2 event types extend the Week 1 pino schema (no parallel
+- [x] New W2 event types extend the Week 1 pino schema (no parallel
   convention — G12): `ingestion_started/completed/failed`,
   `extraction_field_outcome`, `retrieval_hit/miss`, `worker_handoff`,
   `eval_run_outcome`.
-- [ ] Logs searchable by case ID, event ID, correlation ID; PHI-free (R7).
+  *(Closed in the 2026-07-14 PDF sweep: ingestion stage changes log as
+  `ingestion_<stage>` (incl. the three `failed_*` stages);
+  `extraction_field_outcome` — one per field, positional labels, no values;
+  `retrieval_hit`/`retrieval_miss` — query-hash + chunk_ids from every
+  caller; `worker_handoff` (C wave); `eval_run_outcome` — structured JSON
+  line per gate run. All exercised by tests + the PHI canary sweep.)*
+- [x] Logs searchable by case ID, event ID, correlation ID; PHI-free (R7).
+  *(Structured JSON throughout: every event carries `correlation_id` (+
+  `ingestion_id` where applicable) and a stable event name as `msg` —
+  greppable in Railway log search; eval case ids live in the committed
+  results + `eval_run_outcome` categories. PHI-freedom is CI-verified by
+  the `no_phi_in_logs` canary sweep, which captures these same streams.)*
 
 ### G6 — Dashboards
 - [x] Dashboard (Langfuse + ops-status page) adds W2 tiles: document ingestion
@@ -562,8 +580,13 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
   documented); live-backend numbers await the key drop.)*
 
 ### G12 — Consistent structured logging
-- [ ] No plain-text log output from W2 components; same pino schema/format;
+- [x] No plain-text log output from W2 components; same pino schema/format;
   extended event vocabulary only (see G5).
+  *(Verified 2026-07-14: every W2 module (ingest/, retrieval/, graph/, obs/,
+  W2 routes) logs via the injected pino-shaped logger. The only console.*
+  sites in src/ are Week 1-era bootstrap paths — config parse before the
+  logger exists, migrate CLI — plus two structured-JSON wrappers; none are
+  W2 components.)*
 
 ### G13 — Distributed tracing hierarchy
 - [ ] Worker invocations are child spans of the supervisor span; extraction

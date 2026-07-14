@@ -20,9 +20,18 @@ export interface GroundingSummary {
     confidence: number;
 }
 
+/** Per-field grounding outcome (G5 `extraction_field_outcome`). Labels are positional
+ *  (`results[2]`, `allergies[0]`) — never extracted strings, so the event is PHI-free
+ *  by construction and safe for the log stream. */
+export interface GroundedFieldOutcome {
+    field: string;
+    outcome: 'word_box' | 'page' | 'unverified';
+}
+
 export interface GroundedExtraction {
     extraction: ExtractionResult;
     summary: GroundingSummary;
+    fields: readonly GroundedFieldOutcome[];
 }
 
 const normalizeToken = (token: string): string => token.toLowerCase().replace(/[^a-z0-9%./]/g, '');
@@ -85,13 +94,15 @@ export function groundCitation(citation: ExtractionCitation, pdf: PdfWords): Ext
 /** Ground every citation in an extraction result; returns the rewritten result + summary. */
 export function groundExtraction(extraction: ExtractionResult, pdf: PdfWords): GroundedExtraction {
     const counts = { word_box: 0, page: 0, unverified: 0 };
-    const ground = (citation: ExtractionCitation): ExtractionCitation => {
+    const fields: GroundedFieldOutcome[] = [];
+    const ground = (field: string, citation: ExtractionCitation): ExtractionCitation => {
         const grounded = groundCitation(citation, pdf);
         counts[grounded.grounding] += 1;
+        fields.push({ field, outcome: grounded.grounding });
         return grounded;
     };
-    const groundNullable = (citation: ExtractionCitation | null): ExtractionCitation | null =>
-        citation === null ? null : ground(citation);
+    const groundNullable = (field: string, citation: ExtractionCitation | null): ExtractionCitation | null =>
+        citation === null ? null : ground(field, citation);
 
     let rewritten: ExtractionResult;
     if (extraction.doc_type === 'lab_pdf') {
@@ -100,23 +111,23 @@ export function groundExtraction(extraction: ExtractionResult, pdf: PdfWords): G
             document_patient:
                 extraction.document_patient === null
                     ? null
-                    : { ...extraction.document_patient, citation: groundNullable(extraction.document_patient.citation) },
-            collection_date_citation: groundNullable(extraction.collection_date_citation),
-            results: extraction.results.map((result) => ({ ...result, citation: ground(result.citation) })),
+                    : { ...extraction.document_patient, citation: groundNullable('document_patient', extraction.document_patient.citation) },
+            collection_date_citation: groundNullable('collection_date', extraction.collection_date_citation),
+            results: extraction.results.map((result, index) => ({ ...result, citation: ground(`results[${index}]`, result.citation) })),
         };
     } else {
         rewritten = {
             ...extraction,
-            demographics: { ...extraction.demographics, citation: groundNullable(extraction.demographics.citation) },
-            chief_concern: { ...extraction.chief_concern, citation: groundNullable(extraction.chief_concern.citation) },
-            current_medications: extraction.current_medications.map((med) => ({ ...med, citation: ground(med.citation) })),
-            allergies: extraction.allergies.map((allergy) => ({ ...allergy, citation: ground(allergy.citation) })),
-            family_history: extraction.family_history.map((entry) => ({ ...entry, citation: ground(entry.citation) })),
-            patient_goals: { ...extraction.patient_goals, citation: groundNullable(extraction.patient_goals.citation) },
+            demographics: { ...extraction.demographics, citation: groundNullable('demographics', extraction.demographics.citation) },
+            chief_concern: { ...extraction.chief_concern, citation: groundNullable('chief_concern', extraction.chief_concern.citation) },
+            current_medications: extraction.current_medications.map((med, index) => ({ ...med, citation: ground(`current_medications[${index}]`, med.citation) })),
+            allergies: extraction.allergies.map((allergy, index) => ({ ...allergy, citation: ground(`allergies[${index}]`, allergy.citation) })),
+            family_history: extraction.family_history.map((entry, index) => ({ ...entry, citation: ground(`family_history[${index}]`, entry.citation) })),
+            patient_goals: { ...extraction.patient_goals, citation: groundNullable('patient_goals', extraction.patient_goals.citation) },
             vitals:
                 extraction.vitals === null
                     ? null
-                    : { ...extraction.vitals, citation: groundNullable(extraction.vitals.citation) },
+                    : { ...extraction.vitals, citation: groundNullable('vitals', extraction.vitals.citation) },
         };
     }
     const total = counts.word_box + counts.page + counts.unverified;
@@ -127,5 +138,6 @@ export function groundExtraction(extraction: ExtractionResult, pdf: PdfWords): G
             ...counts,
             confidence: total === 0 ? 0 : (counts.word_box + counts.page) / total,
         },
+        fields,
     };
 }

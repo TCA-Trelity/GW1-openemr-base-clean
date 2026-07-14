@@ -114,6 +114,34 @@ describe('HybridRetriever over the real corpus (offline backends)', () => {
             expect(snippet.disease_tags).toContain('hydroxychloroquine-retinopathy');
         }
     });
+
+    it('emits retrieval_hit / retrieval_miss structured events with chunk ids, never text (G5)', async () => {
+        const events: Array<{ obj: Record<string, unknown>; msg: string }> = [];
+        const retriever = await HybridRetriever.build(loadCorpusChunks(CORPUS_DIR), {
+            embeddings: new HashEmbeddings(),
+            reranker: new PassthroughReranker(),
+            logger: { info: (obj, msg) => events.push({ obj, msg }) },
+        });
+
+        const hit = await retriever.search('hydroxychloroquine daily dose threshold real body weight screening', {
+            correlationId: 'corr-g5-hit',
+        });
+        expect(hit.empty).toBe(false);
+        const hitEvent = events.find((event) => event.msg === 'retrieval_hit');
+        expect(hitEvent?.obj['correlation_id']).toBe('corr-g5-hit');
+        expect(hitEvent?.obj['hits']).toBe(hit.snippets.length);
+        expect(hitEvent?.obj['chunk_ids']).toEqual(hit.snippets.map((snippet) => snippet.chunk_id));
+        expect(hitEvent?.obj['query_hash']).toMatch(/^[0-9a-f]{16}$/);
+        expect(hitEvent?.obj['rerank_applied']).toBe(false);
+
+        await retriever.search('knee replacement rehabilitation weight bearing protocol', {
+            correlationId: 'corr-g5-miss',
+        });
+        const missEvent = events.find((event) => event.msg === 'retrieval_miss');
+        expect(missEvent?.obj['correlation_id']).toBe('corr-g5-miss');
+        expect(missEvent?.obj['hits']).toBe(0);
+        expect(missEvent?.obj['chunk_ids']).toEqual([]);
+    });
 });
 
 describe('Cohere providers (mocked fetch — contract, timeout, retry)', () => {
