@@ -173,7 +173,7 @@ child spans of the supervisor span; extraction/retrieval sub-calls are children
 of their worker spans. One correlation ID reconstructs the full multi-agent
 trace — the spec's test, verbatim.
 
-## 5. Hybrid RAG design (REQ: S2/R3, E5) — [SHIPPED: hybrid BM25+dense → RRF → Cohere rerank behind injectable backends, PHI query scrubber + CI canary, disease-tag filters, coverage floor w/ stopword-hardening, /api/evidence/search, retrieval goldens · TARGET: pgvector/tsvector backends engage at deploy (0.1 RESOLVED 2026-07-14: pgvector verified AVAILABLE on Railway Postgres, v0.8.4 enabled)] — answer leg SHIPPED (E.9)
+## 5. Hybrid RAG design (REQ: S2/R3, E5) — [SHIPPED: hybrid BM25+dense → RRF → Cohere rerank behind injectable backends, PHI query scrubber + CI canary, disease-tag filters, coverage floor w/ stopword-hardening, /api/evidence/search, retrieval goldens · pgvector-PERSISTED dense index SHIPPED (migration 005 + content-hash sync + corpus:index CLI + in-memory fallback proven on an extensionless Postgres) · TARGET: post-merge live confirmation (boot log denseBackend:pgvector + corpus_index_synced counts)] — answer leg SHIPPED (E.9)
 
 **Corpus (locked decisions #3, #6).** 6–10 short authored **practice-protocol
 documents** — "agreed clinical practices the office follows" — each grounded
@@ -191,14 +191,20 @@ rides every citation.
 qualifying text); section headers prefix chunk text; stable `chunk_id`s.
 Clinical text is threshold-dense — this is where generic chunkers fail hardest.
 
-**Index.** The Postgres the fact store already runs on: `pgvector` for dense
-(Cohere embeddings) + `tsvector` full-text for keyword. No new infra service.
-pgvector availability on Railway Postgres was **verified live on 2026-07-14**
-(`verify:pgvector` → `AVAILABLE (installed now, version 0.8.4)`; the script
-enabled the extension, and `RETRIEVER_DENSE_BACKEND` stays default
-`pgvector`). The fallback at this corpus size (10²–10³ chunks) — an
-in-process cosine scan behind the same retriever interface — remains
-available but is no longer expected to be needed.
+**Index.** The Postgres the fact store already runs on — no new infra
+service. Dense vectors **persist** in `corpus_embeddings` (pgvector,
+migration 005), synced at boot with per-chunk content hashes: an unchanged
+corpus re-embeds nothing (zero Cohere calls), a changed chunk re-embeds
+alone, and `npm run corpus:index` (`--rebuild` to wipe first) reconstructs
+the whole index from the repo — the G18 recovery primitive. Queries search
+with the SQL `<=>` cosine operator (exact scan; ANN indexing is deliberately
+skipped at 10² chunks). The keyword leg is in-process BM25 over the same
+chunks (re-scoped from tsvector — same sparse contract, better-controlled
+ranking at this scale). pgvector availability was verified live 2026-07-14
+(v0.8.4); on an extensionless Postgres the guarded migration skips table
+creation and the retriever falls back to the in-process dense scan —
+**proven against a real extensionless instance**, logged loudly, never
+fatal.
 
 **Retrieval.** Parallel keyword + dense → reciprocal-rank fusion →
 **Cohere Rerank** → top-k (k ≤ 5) chunks to the answer model. Hybrid is not
@@ -366,6 +372,43 @@ deterministic IDs + wipe-and-rewrite on re-processing (the shipped
 `ehrSync.ts` pattern); OpenEMR documents are append-only with caller-side
 hash dedupe. Schema changes from Week 1 carry migration notes — the first is
 citation v2 (§6).
+
+### Storage & lifecycle matrix — what persists, what's ephemeral, and why
+
+Every input and every inference output has an explicit storage decision. The
+governing rule: **anything citation-bearing persists as full text** — the
+deterministic gate verifies quotes against stored text verbatim, so a summary
+can never substitute for provenance. Summaries exist only as *additional*
+derived artifacts (the brief), never as the stored source of anything.
+
+| Data | Persisted? | Where | Full text or summary | Why this choice |
+|---|---|---|---|---|
+| Guideline corpus (text) | ✅ durable | **Repo** (`sidecar/corpus/*.md`, versioned metadata) | full text | git IS the authority + audit trail; wipe-and-rebuild recovery primitive (G18) |
+| Corpus embedding vectors | ✅ durable | **Postgres `corpus_embeddings`** (pgvector, migration 005) — content-hashed per chunk, re-embedded only on change | n/a (vectors + model id + hash) | survives restarts; zero-cost boots on unchanged corpus; queryable with SQL `<=>`; falls back to in-process on extensionless Postgres |
+| Uploaded source documents (PDF bytes) | ✅ durable | **OpenEMR Documents** (system of record) | full bytes | the EHR owns patient artifacts; sidecar keeps only ids + a capped in-memory preview cache |
+| Document text layer | ✅ durable | Fact store `source_documents.content` | full text | the citation gate's verification substrate — quotes must match stored text exactly |
+| Extracted facts | ✅ durable | Fact store `patient_facts` (+ per-field citation records) | full values with citations | structured, typed, patient-scoped; never summarized — a summarized lab value is a corrupted lab value |
+| Prep briefs (inference output) | ✅ durable | Fact store `briefs` | full composed text + claims JSON | the physician-facing artifact must be reconstructable and auditable against its citations |
+| Chat turns incl. evidence answers (inference output) | ✅ durable | Fact store `chat_messages` | full text | conversational continuity + audit; citations ride the message record |
+| LLM/retrieval usage | ✅ durable | `llm_calls` ledger (Anthropic priced; Cohere unit-counted) | metadata only — never content | cost governance (R7); content lives in the stores above |
+| Traces/spans | ✅ durable (external) | Langfuse Cloud | ids, hashes, counts, durations — **never PHI/content** | debugging without exposure (P5); the PHI canary sweep enforces it |
+| Embedding of query strings | ❌ ephemeral | computed per search | n/a | queries are PHI-scrubbed then embedded; caching them buys nothing at this volume |
+| Pinned evidence (per-patient graph hint) | ❌ ephemeral (in-process) | `MemoryPinnedEvidenceStore` | n/a | a freshness hint, not a record — safe to lose on restart; re-pinned on next ingestion; persisting it would create a second source of truth to keep consistent |
+| Upload preview cache | ❌ ephemeral (in-process, FIFO 24) | `MemoryUploadFileStore` | n/a | pure render cache; OpenEMR holds the real bytes |
+| Graph/agent state | ❌ ephemeral (per request) | LangGraph state object | n/a | deliberately disposable (§12) — no cleanup surface, no state drift; everything worth keeping lands in the stores above before the turn ends |
+| Eval ledger/results | ✅ durable | repo (`eval/baseline.json`, committed reports) | full case records | the gate's baseline must be reviewable diff-by-diff |
+
+**Deliberately NOT vectorized: patient-record inputs.** Extracted facts and
+patient documents are structured, typed, patient-scoped rows — retrieval by
+semantic similarity over one patient's few-dozen facts adds recall noise where
+the clinical bar demands exact, cited values (a similarity match on the wrong
+lab row is a safety bug, not a convenience). The W1 locked decision (whole
+record in context) still holds at this scale; similarity search earns its keep
+on the *practice-scoped* corpus, where the question is "which protocol
+applies", not "what is her eGFR". The seam if this changes at scale (per-doc
+embedding of uploaded documents into the same pgvector store, keyed by
+`source_document_id`) is §17's declared extension point — a product decision,
+not an afternoon's refactor.
 
 ## 11. Testing strategy (REQ: G8) — [SHIPPED: layer table verified vs the shipped suites 2026-07-14 · TARGET: per-test failure-mode naming (G8's strict clause)]
 

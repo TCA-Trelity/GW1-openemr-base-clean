@@ -27,6 +27,8 @@ export interface CohereRerankerOptions {
     fetchImpl?: FetchLike;
     timeoutMs?: number;
     baseUrl?: string;
+    /** Ledger hook (R7): called once per successful rerank with the candidate count. */
+    onUsage?: (units: number, correlationId: string) => void;
 }
 
 export class CohereReranker implements Reranker {
@@ -76,6 +78,7 @@ export class CohereReranker implements Reranker {
                     ? []
                     : [{ id: candidate.id, score: typeof result.relevance_score === 'number' ? result.relevance_score : 0 }];
             });
+            this.options.onUsage?.(candidates.length, correlationId);
             return { order, rerankApplied: true };
         });
     }

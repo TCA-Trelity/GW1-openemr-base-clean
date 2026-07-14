@@ -115,6 +115,26 @@ describe('HybridRetriever over the real corpus (offline backends)', () => {
         }
     });
 
+    it('consults an injected DenseIndex (pgvector seam) for the dense leg', async () => {
+        const consulted: string[] = [];
+        const retriever = await HybridRetriever.build(loadCorpusChunks(CORPUS_DIR), {
+            embeddings: new HashEmbeddings(),
+            reranker: new PassthroughReranker(),
+            denseIndex: {
+                backend: 'pgvector',
+                search: async (_vector, _k, correlationId) => {
+                    consulted.push(correlationId);
+                    return [];
+                },
+            },
+        });
+        expect(retriever.denseBackend).toBe('pgvector');
+        await retriever.search('hydroxychloroquine daily dose threshold real body weight screening', {
+            correlationId: 'corr-pg-seam',
+        });
+        expect(consulted).toEqual(['corr-pg-seam']);
+    });
+
     it('emits retrieval_hit / retrieval_miss structured events with chunk ids, never text (G5)', async () => {
         const events: Array<{ obj: Record<string, unknown>; msg: string }> = [];
         const retriever = await HybridRetriever.build(loadCorpusChunks(CORPUS_DIR), {

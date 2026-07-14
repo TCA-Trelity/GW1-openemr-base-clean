@@ -365,7 +365,7 @@
 // Update in the SAME PR as the code it describes (anti-drift rule #3).
 // ============================================================================
 const DATA = {
-  stamp: "updated 2026-07-14 · session 4 — PR #9 MERGED to main (18175a2); PDF re-sweep closed G3/G5/G12/S5-UC: extraction_field_outcome + retrieval_hit/miss + eval_run_outcome events shipped; register 59/79",
+  stamp: "updated 2026-07-14 · session 4 — EXECUTION SWEEP: pgvector dense index now PERSISTED (migration 005 + hash-sync + corpus:index CLI, fallback proven on extensionless pg); Cohere in the ledger; storage/lifecycle matrix in W2_ARCHITECTURE §10; S2/R3 9/9. On branch/PR #12 — merge after manual testing",
   budget: { capPerDay: "$5.00", spentToday: "—", note: "SpendGuard unchanged (locked #16); Cohere rides a ledger line at B.4" },
   w1Floor: "24/24 W1 evals passing · read-path p95 46 ms @10 / 193 ms @50 (regression floor)",
 
@@ -380,7 +380,7 @@ const DATA = {
       ]},
     { id: "0", title: "Wave 0 — Preflight", band: "Band 1 · MVP", tickets: [
         { id: "0.1", t: "pgvector VERIFIED on Railway Postgres (user, 2026-07-14): AVAILABLE, extension enabled v0.8.4 — RETRIEVER_DENSE_BACKEND stays default pgvector", reqs: ["S2/R3"], deps: "—", s: "done" },
-        { id: "0.2", t: "document.write scope + upload client shipped; OAuth re-registered + 4 creds on Railway (user, 2026-07-14); live POST awaits PR #9 merge→redeploy", reqs: ["S1/R1","G7"], deps: "PR #9 merge", s: "active" },
+        { id: "0.2", t: "document.write enablement VERIFIED LIVE (2026-07-14: document_storage ok = real token mint; id-only auth — re-sync OPENEMR_CLIENT_ID after EHR redeploys); live upload POST = test plan A1/A2", reqs: ["S1/R1","G7"], deps: "—", s: "done" },
         { id: "0.3", t: "Langfuse activated: Cloud keys live + prep trace verified (user, 2026-07-14); graph spans join post-merge", reqs: ["R7"], deps: "—", s: "done" },
         { id: "0.4", t: "Cohere/LangSmith keys in boot-crash-proof config", reqs: ["S2/R3","R7","G2"], deps: "—", s: "done" },
         { id: "0.5", t: "Branch protection FLIPPED: Run eval suite is a required check on main (user, 2026-07-13)", reqs: ["S4/R6","D5"], deps: "—", s: "done" },
@@ -462,11 +462,11 @@ const DATA = {
     { name: "Core (MVP stages + agent requirements)", rows: [
       { id: "S1/R1", t: "Document ingestion & extraction (attach_and_extract, OpenEMR round-trip, no dupes)", plan: "A.3–A.7, E.1", done: 5, total: 7, s: "active" },
       { id: "R2", t: "Strict Zod schemas (lab_pdf 7 fields · intake 6+goals)", plan: "A.1", done: 4, total: 5, s: "active" },
-      { id: "S2/R3", t: "Hybrid RAG + rerank (corpus, pgvector+tsvector, RRF, Cohere, PHI-free queries)", plan: "0.1, 0.4, B.1–B.6", done: 7, total: 9, s: "active" },
+      { id: "S2/R3", t: "Hybrid RAG + rerank — COMPLETE incl. pgvector-PERSISTED dense index (migration 005, content-hash sync, corpus:index CLI, fallback proven); keyword re-scoped to in-process BM25", plan: "0.1, 0.4, B.1–B.6, B.3-live", done: 9, total: 9, s: "done" },
       { id: "S3/R4", t: "Supervisor + intake-extractor + evidence-retriever (LangGraph, logged handoffs)", plan: "C.1–C.6", done: 4, total: 7, s: "active" },
       { id: "R5", t: "Citation contract v2 + required PDF bbox overlay", plan: "A.2, A.5, E.2", done: 4, total: 5, s: "active" },
       { id: "S4/R6", t: "Eval gate COMPLETE: 58 cases, 6 categories baselined, rehearsal proven, required check live", plan: "0.5, D.1–D.7", done: 7, total: 7, s: "done" },
-      { id: "R7", t: "Observability + cost per encounter (PHI-free)", plan: "0.3, E.4, E.5", done: 2, total: 5, s: "active" },
+      { id: "R7", t: "Observability + cost per encounter (PHI-free) — Cohere embed/rerank now unit-counted in llm_calls", plan: "0.3, E.4, E.5", done: 3, total: 5, s: "active" },
       { id: "S5", t: "Integrate, deploy, defend (upload UI, demo auth, traces, UC mapping) — merged to main; deployed-flow + trace boxes close on post-deploy verify", plan: "E.1, E.3, E.9, F.5, F.8", done: 3, total: 5, s: "active" },
     ]},
     { name: "Extensions", rows: [

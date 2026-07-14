@@ -61,13 +61,15 @@ export interface CohereEmbeddingsOptions {
     fetchImpl?: FetchLike;
     timeoutMs?: number;
     baseUrl?: string;
+    /** Ledger hook (R7): called once per successful API call with the unit count (texts embedded). */
+    onUsage?: (units: number, correlationId: string) => void;
 }
 
 export class CohereEmbeddings implements EmbeddingsProvider {
     readonly id: string;
     readonly dims = 1024; // embed-english-v3.0 float dims
     private readonly options: Required<Pick<CohereEmbeddingsOptions, 'apiKey' | 'model'>> &
-        Pick<CohereEmbeddingsOptions, 'fetchImpl' | 'timeoutMs' | 'baseUrl'>;
+        Pick<CohereEmbeddingsOptions, 'fetchImpl' | 'timeoutMs' | 'baseUrl' | 'onUsage'>;
 
     constructor(options: CohereEmbeddingsOptions) {
         this.options = options;
@@ -104,6 +106,7 @@ export class CohereEmbeddings implements EmbeddingsProvider {
             if (!Array.isArray(vectors) || vectors.length !== texts.length) {
                 throw new RetrievalProviderError('cohere', 'embed', 200, 'malformed embeddings payload');
             }
+            this.options.onUsage?.(texts.length, correlationId);
             return vectors;
         });
     }
