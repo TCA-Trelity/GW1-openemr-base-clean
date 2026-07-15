@@ -310,10 +310,12 @@ all six categories measured and baselined** (`eval/baseline.json`); rehearsal
 proves the gate catches injected regressions (`docs/w2/gate-rehearsal.md`);
 **`Run eval suite` is a required check on `main`** (branch protection flipped
 2026-07-13). Remaining: the scheduled live-model suite (F.6, post key-drop).
-Known blind spot (H.4a→H.4b, 2026-07-15): graph-path evals stub the composer
-with exact quotes, so live-composer paraphrase drift was invisible to the
-58-case gate — covered by composer unit tests since H.4b; the scheduled
-live-model leg (F.6) is the durable catch-net.
+Known blind spot (H.4a→H.4b/H.4c, 2026-07-15): the stub-backed evals quote
+verbatim by construction (graph-path stubs the composer; extraction evals
+use authored corpus facts), so live-model paraphrase drift was invisible to
+the 58-case gate in BOTH the composer and prep extraction — covered by
+composer unit tests since H.4b and extraction unit tests since H.4c; the
+scheduled live-model leg (F.6) is the durable catch-net.
 
 **Acceptance criteria:**
 - [x] 50 committed golden cases, extraction-weighted (locked): ~20 extraction
@@ -522,7 +524,11 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
 - [x] Raw VLM output never bypasses validation: the only path from model
   output to persistence is through the R2 Zod parse; failures are
   logged + retried with validation feedback, then surfaced as ingestion
-  failure — never stored partially.
+  failure — never stored partially. H.4c (2026-07-15) extends the same
+  discipline to prep extraction: excerpt verbatim-ness is now enforced
+  pre-gate by the gate's own `checkCitation` ladder, failures feeding the
+  existing single feedback retry (model sees the failing excerpts; logs
+  see redacted ids only).
   *(Shipped A.4 and re-verified in the 2026-07-14 sweep: extractor output
   reaches persistence only via the Zod parse; one validation-feedback retry,
   then `failed_validation` with nothing persisted — pinned by ingest tests
