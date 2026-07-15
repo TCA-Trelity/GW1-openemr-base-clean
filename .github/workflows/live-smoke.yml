@@ -150,8 +150,9 @@ jobs:
           [ "$code" = "200" ] || { echo "brief never appeared"; exit 1; }
 
           echo "== Brief assertions =="
+          gatefail=0
           jq -e '.content.gate_metrics.citationsFailed == 0' /tmp/brief.json >/dev/null \
-            && echo "gate: 0 failed citations OK" || { echo "gate metrics FAILED"; jq '.content.gate_metrics' /tmp/brief.json; exit 1; }
+            && echo "gate: 0 failed citations OK" || { echo "gate metrics FAILED (diagnostics below; step fails at the end)"; jq '.content.gate_metrics' /tmp/brief.json; gatefail=1; }
           jq -e '.content.medication_risk_flags | length > 0' /tmp/brief.json >/dev/null \
             && echo "med-risk flags present OK" || { echo "med-risk flags MISSING"; exit 1; }
           jq -e '.content.imaging.hcq_progression.alert_level != null' /tmp/brief.json >/dev/null \
@@ -162,8 +163,21 @@ jobs:
           echo "== Brief summary =="
           jq '{prepared_at: .prepared_at, urgency: .content.urgency, discussion_points: (.content.key_discussion_points | length), facts: (.content.facts_by_type | to_entries | map({(.key): (.value | length)}) | add), gate: .content.gate_metrics}' /tmp/brief.json
 
+          if [ "$gatefail" = "1" ]; then
+            echo "############################################################"
+            echo "## GATE-METRICS DIAGNOSTICS (blocked claims on a LIVE prep)"
+            echo "## Reasons live in the sidecar server logs, not the API:"
+            echo "## Railway -> sidecar service -> Deployments -> View logs,"
+            echo "## search 'blockedFacts' near this prep's correlation id:"
+            curl -s --max-time 30 "${AUTH[@]}" "$SIDECAR_URL/api/prep-runs/margaret-chen" | jq -r '.runs[0] | "##   correlation_id: \(.correlation_id)  (started \(.started_at))"' || true
+            echo "## Known historical pattern: '5 blocked claims per prep, all"
+            echo "## from the ehr_import snapshot' (see sidecar/src/prep/sources.ts:60)."
+            echo "############################################################"
+            exit 1
+          fi
+
       - name: W2 document flow — upload, extraction, grounding, cited evidence turn (H.4)
-        if: ${{ env.SIDECAR_URL != '' }}
+        if: ${{ !cancelled() && env.SIDECAR_URL != '' }}
         run: |
           set -uo pipefail
           FIXTURE=sidecar/eval/fixtures/documents/renal-panel-clean.pdf
