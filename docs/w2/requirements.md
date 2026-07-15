@@ -417,8 +417,15 @@ when PR #9's build deploys. LangSmith fenced to the demo env (E.5); no OTEL.
 `/health` + `/ready` with real dependency probes).
 
 **Acceptance criteria:**
-- [ ] Deployed Railway app serves the full W2 flow: panel upload → extraction
+- [x] Deployed Railway app serves the full W2 flow: panel upload → extraction
   status → brief/chat with document + guideline citations → bbox overlay.
+  *(Verified live 2026-07-15 post-merge of PR #16: upload/dedupe/grounding/
+  stored-PDF via live-smoke runs #29–#30 (fresh intake path proves the
+  write fix); evidence chat turn returns 3 verbatim guideline citations,
+  0 unverified (corr 589949a0…, H.4b); fresh prep 149/149 verified,
+  0 blocked (corr a9722fb9…, H.4c). Overlay geometry payload verified via
+  the stored-file + word_box assertions; in-browser bbox eyeball remains
+  a manual test-plan item.)*
 - [x] Upload UI: panel drag-drop with front-desk persona via existing role
   switcher (locked decision); extraction status + document preview in the
   Sources tab.
