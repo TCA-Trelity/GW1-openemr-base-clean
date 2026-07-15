@@ -160,12 +160,16 @@ export class IngestionService {
                         ? this.deps.ehr.openemrPatientId
                         : await this.deps.ehr.openemrPatientId(input.patientId);
                 if (pid !== null) {
+                    // H.8 (G4): the ingestion's correlation id rides every hop of the EHR
+                    // write — without it the client stamps its per-instance boot id and the
+                    // upload leg falls out of the request's trace.
                     const uploaded = await this.deps.ehr.client.uploadPatientDocumentDeduped(
                         pid,
                         EHR_CATEGORY[input.docType],
                         input.filename,
                         input.bytes,
                         input.mimeType,
+                        correlationId,
                     );
                     record.openemr_document_id = uploaded.documentId;
                     stage('stored_ehr', uploaded.deduped ? 'deduped: byte-identical document already filed' : `document ${uploaded.documentId ?? '?'}`);

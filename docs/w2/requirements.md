@@ -523,9 +523,13 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
   and the schema_valid eval category.)*
 
 ### G4 — Correlation ID propagation
-- [ ] The Week 1 correlation ID propagates into: upload request → OpenEMR
+- [x] The Week 1 correlation ID propagates into: upload request → OpenEMR
   document write → extraction job + VLM calls → graph supervisor + both
   workers → retrieval (embed/rerank) calls → vitals write → answer + citations.
+  *(Walked + fixed H.8: OpenEMR document writes now carry the per-request id
+  (was per-client-instance); production ingestion stage logging wired (H.7);
+  vitals leg = contract-carried on the vitalsWriter seam, server wiring
+  pending per §10. Audit table: docs/w2/trace-example.md.)*
 - [x] *"A full multi-agent trace must be reconstructable from the correlation
   ID alone"* — demonstrated in docs with one worked example (log query +
   Langfuse trace link). *(`docs/w2/trace-example.md`: verbatim handoff lines

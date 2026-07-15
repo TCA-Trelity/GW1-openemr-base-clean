@@ -2,6 +2,16 @@
 
 REQ: G4 (+G5) · Depends on: — (coordinate with H.7 on the ingestion-logger wiring, step 4) · Band: merged-plan Track 1 · Priority: P1 (per merged-plan.md)
 
+> **Drift note (2026-07-15, recorded at execution):** H.7 landed first and already
+> wired the structured-JSON `ingestionLogger` into `buildDeps`' `IngestionService`
+> (`server.ts:204-214` — `logger: ingestionLogger`). Step 4 below is therefore DONE
+> upstream: H.8 verified the wiring instead of re-implementing it, and touched
+> `server.ts` not at all. H.5 (clients wrapped in `withTimeoutAndRetry`), H.9
+> (`attach_and_extract` graph tool threads the graph `correlationId` via
+> `GraphToolContext`), and H.11 (Zod schemas single-homed in `src/schemas/`) also
+> landed since this spec was written — line anchors below drifted accordingly; the
+> code was trusted over the anchors, per step 3.
+
 ## Why
 
 G4's open box: the Week 1 correlation ID must propagate through upload →
@@ -11,7 +21,8 @@ workers → retrieval (embed/rerank) calls → vitals write → answer + citatio
 code leg by leg and fixes the drops. Two are already verified (do not rediscover
 them, fix them): the OpenEMR standard-API client stamps a **per-instance** id
 instead of the request's id, and the production `IngestionService` is built
-**without a logger**, so its stage events never reach production logs at all —
+**without a logger**, so its stage events never reach production logs at all
+*(the second was fixed by H.7 in the interim — see drift note)* —
 both break "reconstructable from the correlation ID alone" for exactly the flow
 a grader exercises (upload → cited answer).
 
@@ -22,7 +33,7 @@ a grader exercises (upload → cited answer).
 - `src/openemr/standardApi.ts:StandardApiClientOptions.correlationId?: string` — doc comment: *"Stamped on every request as x-correlation-id; defaults to one id per client instance"*. **This is the break** (re-verified after H.5 landed — still present): `uploadPatientDocumentDeduped(pidOrUuid, categoryPath, filename, bytes, mimeType)` (:592) and `listPatientDocuments(pidOrUuid, categoryPath)` (:545) have no per-call id; the headers built in `private async request(...)` (:441, inside H.5's `withTimeoutAndRetry` wrapper now) and in the multipart POST both send `this.correlationId`.
 - `src/openemr/fhir.ts:97` — `private async request(path: string, correlationId: string)` — the per-call convention to copy (FhirClient already does this correctly; `ehrSync.ts:313` threads it through `sync(patientId, correlationId)`).
 - `src/ingest/service.ts:137` — `attachAndExtract(input: AttachAndExtractInput): Promise<IngestionRecord>`: stamps `record.correlation_id` (:155), logs every stage as `ingestion_<stage>` with `correlation_id` (:166-173), passes it to the extractor (:210-215) which passes it to `AnthropicClient.complete` (`ingest/extractor.ts:96-120`). Code-side correct; the EHR upload call at :184 is where the id fails to cross.
-- `src/server.ts:198-211` — `new IngestionService({ extractor, records, factSink: store, ...ehr })` — **no `logger:` key** — the production wiring gap. Structured-JSON console logger precedents: `retrievalBootLogger` (:480) and `graphLogBase` (:516-519).
+- `src/server.ts:198-211` — `new IngestionService({ extractor, records, factSink: store, ...ehr })` — **no `logger:` key** — the production wiring gap. Structured-JSON console logger precedents: `retrievalBootLogger` (:480) and `graphLogBase` (:516-519). *(RESOLVED by H.7 before H.8 ran: `ingestionLogger` at server.ts:204-214 — verified, not re-implemented.)*
 - `src/graph/graph.ts` — supervisor/worker legs verified green: `worker_handoff` events carry `correlation_id`; `evidence_retriever` passes `correlationId` into `retriever.search` (:151); Cohere legs stamp `x-correlation-id` per call (`retrieval/embeddings.ts:91`, `retrieval/rerank.ts:57`); `retrieval_hit|miss` logs carry it (`retriever.ts:230-242`).
 - `src/routes/chat.ts` — answer leg verified green: SSE response header `x-correlation-id` (:194), both persisted chat messages carry `correlation_id: String(request.id)` (:217-230), graph invoked with `String(request.id)` (:210-214).
 - Vitals leg: `IngestionServiceDeps.vitalsWriter?: (patientId: string, payload: EhrVitalPayload, correlationId: string) => Promise<boolean>` (`service.ts:116`, invoked :293) — the contract carries the id; the writer itself is not yet wired in server.ts (out of scope here — §10 TARGET).
@@ -32,7 +43,7 @@ a grader exercises (upload → cited answer).
 
 - **Modify** `sidecar/src/openemr/standardApi.ts` — per-call correlation id on the document methods.
 - **Modify** `sidecar/src/ingest/service.ts` — pass the ingestion's correlation id into the EHR upload call.
-- **Modify** `sidecar/src/server.ts` — inject a structured logger into the `IngestionService` (skip if H.7 already did — check first).
+- **Modify** `sidecar/src/server.ts` — inject a structured logger into the `IngestionService` (skip if H.7 already did — check first). *(Checked: H.7 did — skipped, server.ts untouched by H.8.)*
 - **Modify** `sidecar/test/openemr-documents.test.ts`, `sidecar/test/ingest.test.ts` — pinning tests.
 - **Modify** `docs/w2/trace-example.md` — append the boundary-audit table.
 - Trackers: `docs/w2/requirements.md`, `docs/internal/build-status.html`, `W2_ARCHITECTURE.md` §8.
@@ -42,7 +53,7 @@ a grader exercises (upload → cited answer).
 1. **Per-call id on the OpenEMR document surface** (`standardApi.ts`): add an optional trailing `correlationId?: string` parameter to `uploadPatientDocumentDeduped` and `listPatientDocuments` (and thread it through `resolveNumericPid` / the private `request` — give `request` an optional `correlationId?: string` last param). Header value: `correlationId ?? this.correlationId` (instance id remains the fallback so seed scripts and existing callers are untouched). Both fetch sites (:434 generic, :597 multipart) use it.
 2. **Thread it from ingestion** (`service.ts:184`): `uploadPatientDocumentDeduped(pid, EHR_CATEGORY[input.docType], input.filename, input.bytes, input.mimeType, correlationId)` — the local `correlationId` already in scope (:139).
 3. **Walk every other leg against trace-example.md and the list above** — expected result: no further code change (they were verified 2026-07-15 as listed in the seams). If the walk finds another drop (line numbers drift), fix it at the source and add it to the audit table; trust the code over this spec.
-4. **Production ingestion logger** (`server.ts` `buildDeps`): unless H.7 already wired it (grep first), add `logger: { info: (obj, msg) => console.log(JSON.stringify({ level: 'info', msg, ...(obj as Record<string, unknown>) })), warn: (…same with 'warn'…) }` to the `new IngestionService({...})` at :198 — the same structured-JSON shape as `graphLogBase`, so `ingestion_<stage>` / `extraction_field_outcome` events land in Railway's log stream greppable by `correlation_id`. (buildDeps runs before the Fastify app exists, so the console-JSON wrapper is the right tool — the `retrievalBootLogger` precedent.)
+4. **Production ingestion logger** (`server.ts` `buildDeps`): *(DONE upstream — H.7 wired exactly this; see drift note.)* unless H.7 already wired it (grep first), add `logger: { info: (obj, msg) => console.log(JSON.stringify({ level: 'info', msg, ...(obj as Record<string, unknown>) })), warn: (…same with 'warn'…) }` to the `new IngestionService({...})` at :198 — the same structured-JSON shape as `graphLogBase`, so `ingestion_<stage>` / `extraction_field_outcome` events land in Railway's log stream greppable by `correlation_id`. (buildDeps runs before the Fastify app exists, so the console-JSON wrapper is the right tool — the `retrievalBootLogger` precedent.)
 5. **Audit table** (append a new section to `docs/w2/trace-example.md`, e.g. `## Boundary audit (H.8, 2026-07-…)`) — one row per spec boundary: | # | Boundary | Carrier | File:symbol |, covering: (1) upload request → `genReqId` + 202 body; (2) OpenEMR document write → per-call `x-correlation-id` (fixed here); (3) extraction job + VLM → `record.correlation_id` + `extractor.extract({correlationId})`; (4) graph supervisor/workers → `worker_handoff` events; (5) retrieval embed/rerank → `search options.correlationId` → Cohere headers + `retrieval_hit|miss`; (6) vitals write → `vitalsWriter(…, correlationId)` contract (server wiring pending, §10 TARGET — say so); (7) answer + citations → SSE header + persisted `chat_messages.correlation_id`.
 6. Tests, trackers, ship.
 

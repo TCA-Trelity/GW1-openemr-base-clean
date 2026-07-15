@@ -294,7 +294,7 @@ documented and repeatable (REQ: D5 evidence).
 
 ## 8. Observability & cost (REQ: R7, G4–G6, G13, G15) — [SHIPPED: graph→Langfuse span adapter over the handoff event stream (guarded, keyed-off — src/obs/graphTracer.ts), alerts A4–A6 w/ response actions, W2 ops tiles (static until deploy), correlation-ID trace worked example, nested worker⊂supervisor span tree (H.7) · TARGET: Langfuse/LangSmith key activation (USER-ACTIONS), live tile feeds, cost report (F.2)]
 
-**Shipped spine:** correlation IDs end-to-end (`server.ts`), pino structured
+**Shipped spine:** correlation IDs end-to-end (`server.ts`) (re-walked H.8: OpenEMR write leg now per-request; ingestion stage events live in production logs), pino structured
 logs, `llm_calls` cost ledger + `SpendGuard` ($5/day, unchanged — locked #16)
 + `GET /api/usage`, `prep_runs` stage tracking, Langfuse client wired into
 prep (emit-side) but **not deployed**.

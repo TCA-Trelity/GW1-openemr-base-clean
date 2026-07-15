@@ -96,3 +96,29 @@ trace stays USER-ACTIONS item 10.
 PHI note (G5): events carry IDs (`patient_id`, `ingestion_id`, chunk ids) and counts —
 never document text, extracted values, or names from documents. The log-capture PHI
 sweep (D.5) asserts this over captured runs.
+
+## Boundary audit (H.8, 2026-07-15)
+
+Leg-by-leg walk of G4's propagation chain against the code (not the docs). One drop
+found and fixed: the OpenEMR standard-API client stamped a **per-client-instance**
+`x-correlation-id` on document reads/writes, so the EHR leg of an upload fell out of
+the request's trace. The document methods now take a per-call `correlationId`
+(instance id stays the fallback for seed scripts), and `IngestionService` threads the
+ingestion's id through every hop of the write. Pinned by
+`test/openemr-documents.test.ts` ("per-call correlation id") and `test/ingest.test.ts`
+("threads the ingestion correlation id").
+
+| # | Boundary | Carrier | File:symbol | Walk result |
+|---|----------|---------|-------------|-------------|
+| 1 | Upload request → 202 | `genReqId` adopts inbound `x-correlation-id` (else mints); route threads `correlationId: request.id`; 202 body echoes `correlation_id`; response header via `onSend` | `server.ts:genReqId` (:312) + `onSend` (:315); `routes/ingest.ts` POST documents (:111, :127) | carried (already ok) |
+| 2 | OpenEMR document write | Per-call `correlationId` on all four hops: pid resolve, dedupe listing, multipart POST, post-write verification listing — header `correlationId ?? this.correlationId` | `ingest/service.ts:attachAndExtract` (:166-173) → `openemr/standardApi.ts:uploadPatientDocumentDeduped` (:608), `listPatientDocuments` (:557), `resolveNumericPid` (:515), `request` (:452) | **fixed here** (was per-client-instance id) |
+| 3 | Extraction job + VLM calls | `record.correlation_id`; every stage event logs `correlation_id`; `extractor.extract({correlationId})` → `x-correlation-id` on each Anthropic call | `ingest/service.ts` (:134, :149, :197); `ingest/extractor.ts:extract` (:96-120); `prep/anthropic.ts:complete` (:192) | carried (already ok) |
+| 4 | Graph supervisor + both workers | `correlationId` in graph state; `worker_handoff` events carry `correlation_id` on every transition; `attach_and_extract` tool ctx (H.9); composer gets it per run | `graph/graph.ts` state annotation (:94), `handoff` (:109), tool ctx (:143-144), `composer.compose` (:221); `graph/tools.ts:run` (:85) | carried (already ok) |
+| 5 | Retrieval (embed/rerank) calls | `search(options.correlationId)` → Cohere `x-correlation-id` per call on embed + rerank; `retrieval_hit\|miss` logs carry it | `graph/graph.ts` (:156) and `routes/ingest.ts` evidence search (:182) → `retrieval/retriever.ts:search` (:129, :215-222); `retrieval/embeddings.ts` (:69); `retrieval/rerank.ts` (:96) | carried (already ok) |
+| 6 | Vitals write | `vitalsWriter(patientId, payload, correlationId)` — the id is in the seam's signature and the invocation; `vitals_written`/`vitals_failed` stages + warn log carry it | `ingest/service.ts:IngestionServiceDeps.vitalsWriter` (:95), invocation (:276) | contract-carried; server wiring of the writer itself is pending (§10 TARGET, noted by H.13) — the seam cannot drop the id when wired |
+| 7 | Answer + citations | SSE response header `x-correlation-id`; both persisted chat messages carry `correlation_id`; graph invoked with `String(request.id)` | `routes/chat.ts` SSE head (:194), `saveChatMessage` (:183, :222, :229), `runClinicalGraph` call (:213) | carried (already ok) |
+
+Production visibility note: the ingestion stage events in row 3 reach the production
+log stream via the structured-JSON `ingestionLogger` wired into `IngestionService` in
+`server.ts:buildDeps` (:204-214, shipped with H.7) — before that wiring, the events
+only existed when a caller injected a logger, i.e. in tests.

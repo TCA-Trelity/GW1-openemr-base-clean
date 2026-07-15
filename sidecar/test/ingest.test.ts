@@ -20,6 +20,7 @@ import {
     type IngestionRecord,
     type IngestionRecordStore,
 } from '../src/ingest/service.js';
+import { sha3_512Hex, StandardApiClient } from '../src/openemr/standardApi.js';
 import type { AnthropicCompletion } from '../src/prep/anthropic.js';
 import type { ExtractionResult } from '../src/schemas/extraction.js';
 import { IngestionRecordSchema } from '../src/schemas/ingestion.js';
@@ -199,6 +200,59 @@ describe('IngestionService end-to-end (A.3/A.6, stubbed VLM over the real fixtur
             // Positional labels only — the event payload never carries extracted values.
             expect(event.obj['field']).toMatch(/^[a-z_]+(\[\d+\])?$/);
             expect(JSON.stringify(event.obj)).not.toMatch(/eGFR|creatinine/i);
+        }
+    });
+
+    it('threads the ingestion correlation id into the OpenEMR document-write requests (H.8, G4)', async () => {
+        // Real StandardApiClient over a recording fetch (the openemr-documents.test.ts
+        // harness): every /document hop of the EHR write must carry the ingestion's id,
+        // not the client's per-instance boot id — the exact drop H.8 fixed.
+        const hash = sha3_512Hex(cleanRenal);
+        const seen: Array<{ url: string; correlationId: string }> = [];
+        const fetchImpl = vi.fn(async (url: string, init?: RequestInit) => {
+            seen.push({ url, correlationId: (init?.headers as Record<string, string>)['x-correlation-id'] ?? '(missing)' });
+            if ((init?.method ?? 'GET') === 'GET') {
+                // First GET = dedupe listing: empty category (404). Second = verification
+                // listing: our row. (pid '3' is numeric, so there is no resolve hop.)
+                return seen.length <= 1
+                    ? new Response('', { status: 404 })
+                    : new Response(JSON.stringify([{ id: 91, filename: 'renal-panel-clean.pdf', hash }]), {
+                          status: 200,
+                          headers: { 'content-type': 'application/json' },
+                      });
+            }
+            return new Response(JSON.stringify(true), { status: 200, headers: { 'content-type': 'application/json' } });
+        });
+        const ehrClient = new StandardApiClient({
+            baseUrl: 'https://emr.example.test/',
+            tokenProvider: { getAccessToken: async () => 'user-token-abc' },
+            fetchImpl,
+            correlationId: 'corr-boot-instance', // the id that must NOT appear on these requests
+        });
+        const service = new IngestionService({
+            extractor: new VlmExtractor(vlmReturning(RENAL_JSON)),
+            records: new MemoryIngestionRecordStore(),
+            factSink: makeSink(),
+            ehr: { client: ehrClient, openemrPatientId: '3' },
+        });
+        const record = await service.attachAndExtract({
+            patientId: 'margaret-chen',
+            docType: 'lab_pdf',
+            filename: 'renal-panel-clean.pdf',
+            mimeType: 'application/pdf',
+            bytes: cleanRenal,
+            correlationId: 'corr-ing-7',
+            expectedPatient: { name: 'Margaret L. Chen' },
+        });
+        expect(record.status).toBe('complete');
+        expect(record.openemr_document_id).toBe('91');
+        expect(record.stages.map((stage) => stage.stage)).toContain('stored_ehr');
+        // All three hops (dedupe listing, multipart POST, verification listing) carried
+        // the ingestion's id — the per-instance fallback never leaked in.
+        expect(seen.length).toBe(3);
+        for (const call of seen) {
+            expect(call.url).toContain('/patient/3/document?path=Lab_Report');
+            expect(call.correlationId).toBe('corr-ing-7');
         }
     });
 

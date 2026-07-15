@@ -191,7 +191,9 @@ export interface StandardApiClientOptions {
     baseUrl: string;
     tokenProvider: TokenProvider;
     fetchImpl?: FetchLike;
-    /** Stamped on every request as x-correlation-id; defaults to one id per client instance. */
+    /** Stamped on every request as x-correlation-id; defaults to one id per client instance.
+     *  The document methods take a per-call override so the caller's request id rides its
+     *  EHR writes (G4/H.8) — this instance id is only the fallback (seed scripts, boot probes). */
     correlationId?: string;
     /** Per-attempt ceiling for the JSON routes; tests shorten it (same shape as rerank's options.timeoutMs). */
     timeoutMs?: number;
@@ -445,14 +447,16 @@ export class StandardApiClient {
         return Array.isArray(rows) ? titlesOf(rows) : [];
     }
 
-    private async request(method: 'GET' | 'POST' | 'PUT', path: string, payload?: unknown): Promise<unknown> {
+    // correlationId: per-call override (H.8, G4) — the caller's request id, when it has one,
+    // must ride every hop of its EHR write; the instance id is only the no-request fallback.
+    private async request(method: 'GET' | 'POST' | 'PUT', path: string, payload?: unknown, correlationId?: string): Promise<unknown> {
         const token = await this.tokenProvider.getAccessToken();
         const init: RequestInit = {
             method,
             headers: {
                 authorization: `Bearer ${token}`,
                 accept: 'application/json',
-                'x-correlation-id': this.correlationId,
+                'x-correlation-id': correlationId ?? this.correlationId,
                 ...(payload === undefined ? {} : { 'content-type': 'application/json' }),
             },
         };
@@ -508,7 +512,7 @@ export class StandardApiClient {
     /** uuid → numeric pid cache; a chart's pid never changes, so one lookup per client. */
     private readonly pidByUuid = new Map<string, string>();
 
-    private async resolveNumericPid(pidOrUuid: number | string): Promise<string> {
+    private async resolveNumericPid(pidOrUuid: number | string, correlationId?: string): Promise<string> {
         const raw = String(pidOrUuid).trim();
         if (/^[1-9]\d*$/.test(raw)) {
             return raw;
@@ -525,7 +529,7 @@ export class StandardApiClient {
             return cached;
         }
         const path = `/patient/${encodeURIComponent(raw)}`;
-        const body = await this.request('GET', path);
+        const body = await this.request('GET', path, undefined, correlationId);
         const pid = asRecord(envelopeData(body, path))?.['pid'];
         const numeric = typeof pid === 'number' || typeof pid === 'string' ? String(pid) : '';
         if (!/^[1-9]\d*$/.test(numeric)) {
@@ -547,14 +551,15 @@ export class StandardApiClient {
     /**
      * List the patient's documents filed under a category (e.g. 'Lab Report'). A 404 is
      * "no documents in this category yet" — OpenEMR 404s empty listings by design — so
-     * first-use categories return [] instead of failing the caller.
+     * first-use categories return [] instead of failing the caller. `correlationId`
+     * overrides the instance id per call (H.8, G4).
      */
-    async listPatientDocuments(pidOrUuid: number | string, categoryPath: string): Promise<EhrDocumentRow[]> {
-        const pid = await this.resolveNumericPid(pidOrUuid);
+    async listPatientDocuments(pidOrUuid: number | string, categoryPath: string, correlationId?: string): Promise<EhrDocumentRow[]> {
+        const pid = await this.resolveNumericPid(pidOrUuid, correlationId);
         const path = `/patient/${pid}/document?path=${encodeURIComponent(this.wireCategoryPath(categoryPath))}`;
         let body: unknown;
         try {
-            body = await this.request('GET', path);
+            body = await this.request('GET', path, undefined, correlationId);
         } catch (error) {
             if (error instanceof StandardApiError && error.status === 404) {
                 return [];
@@ -595,6 +600,10 @@ export class StandardApiClient {
      * write this method re-lists the category and requires our hash to appear, returning
      * the listed row's real id. Absence throws instead of reporting a half-ingested
      * upload (W2_ARCHITECTURE §12: uploads land failed-visible, never half-ingested).
+     *
+     * `correlationId` (H.8, G4): the caller's request id — stamped on EVERY hop of this
+     * write (pid resolve, dedupe listing, POST, verification listing) so the upload is
+     * grep-reconstructable from the one id. Omitted → the per-instance fallback.
      */
     async uploadPatientDocumentDeduped(
         pidOrUuid: number | string,
@@ -602,10 +611,11 @@ export class StandardApiClient {
         filename: string,
         bytes: Uint8Array,
         mimeType: string,
+        correlationId?: string,
     ): Promise<EhrDocumentUploadResult> {
-        const pid = await this.resolveNumericPid(pidOrUuid);
+        const pid = await this.resolveNumericPid(pidOrUuid, correlationId);
         const hash = sha3_512Hex(bytes);
-        const existing = await this.listPatientDocuments(pid, categoryPath);
+        const existing = await this.listPatientDocuments(pid, categoryPath, correlationId);
         const match = existing.find((row) => row.hash === hash);
         if (match !== undefined) {
             return { documentId: match.id, hash, deduped: true };
@@ -626,7 +636,7 @@ export class StandardApiClient {
                 headers: {
                     authorization: `Bearer ${token}`,
                     accept: 'application/json',
-                    'x-correlation-id': this.correlationId,
+                    'x-correlation-id': correlationId ?? this.correlationId,
                 },
                 body: form,
                 signal,
@@ -644,7 +654,7 @@ export class StandardApiClient {
         // under the category with our hash (REQ G1 "no untraceable records") — this is
         // what catches the silent category-orphan mode, and it is also the only way to
         // learn the new document's id (the POST body is literal `true`).
-        const filed = (await this.listPatientDocuments(pid, categoryPath)).find((row) => row.hash === hash);
+        const filed = (await this.listPatientDocuments(pid, categoryPath, correlationId)).find((row) => row.hash === hash);
         if (filed === undefined) {
             throw new StandardApiError(
                 path,
