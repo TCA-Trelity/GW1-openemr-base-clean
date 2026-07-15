@@ -14,6 +14,9 @@
 //   granted includes it but GET+POST both 401   -> EHR-side ACL (patients/docs) for the
 //     API user — check the user's group/ACL in OpenEMR.
 //   GET 200 but POST 401                        -> ACL write/addonly specifically.
+//   GET 404                                     -> normal for an EMPTY category (OpenEMR
+//     404s empty listings); only the POST + verification verdict below is authoritative.
+import { createHash } from 'node:crypto';
 import { STANDARD_API_SEED_SCOPES } from '../openemr/auth.js';
 
 const base = process.env['OPENEMR_BASE_URL']?.replace(/\/+$/, '');
@@ -89,14 +92,45 @@ if (!/^[1-9]\d*$/.test(pid)) {
     pid = resolved;
 }
 
-const get = await fetch(`${base}/apis/default/api/patient/${pid}/document?path=${encodeURIComponent('Lab Report')}`, { headers });
-console.log(`\ndocument READ  (GET  …/document?path=Lab Report): ${get.status}${get.ok ? ' — ACL patients/docs read OK' : ` — ${JSON.stringify(await get.json().catch(() => ({})))}`}`);
+// Category wire format: the route matches space-stripped names against an input that only
+// has UNDERSCORES stripped (DocumentService.php:52-94), so 'Lab_Report' works and
+// 'Lab Report' silently resolves a null category (documents get orphaned). Responses are
+// RAW (rows array / literal true), and an EMPTY category is a 404 by design
+// (RestControllerHelper::responseHandler treats [] as falsy).
+const docUrl = `${base}/apis/default/api/patient/${pid}/document?path=Lab_Report`;
+const listDocs = async (): Promise<Record<string, unknown>[]> => {
+    const response = await fetch(docUrl, { headers });
+    if (response.status === 404) {
+        return [];
+    }
+    const body = (await response.json().catch(() => undefined)) as unknown;
+    return Array.isArray(body) ? (body.filter((row) => typeof row === 'object' && row !== null) as Record<string, unknown>[]) : [];
+};
 
+const get = await fetch(docUrl, { headers });
+const getVerdict =
+    get.ok
+        ? ' — ACL patients/docs read OK'
+        : get.status === 404
+          ? ' — empty category (normal before the first upload; OpenEMR 404s empty listings)'
+          : ` — ${JSON.stringify(await get.json().catch(() => ({})))}`;
+console.log(`\ndocument READ  (GET  …/document?path=Lab_Report): ${get.status}${getVerdict}`);
+
+const probeBytes = new TextEncoder().encode('%PDF-1.4 probe');
+const probeHash = createHash('sha3-512').update(probeBytes).digest('hex');
 const form = new FormData();
-form.set('document', new Blob([new TextEncoder().encode('%PDF-1.4 probe')], { type: 'application/pdf' }), 'probe.pdf');
-const post = await fetch(`${base}/apis/default/api/patient/${pid}/document?path=${encodeURIComponent('Lab Report')}`, {
-    method: 'POST',
-    headers,
-    body: form,
-});
-console.log(`document WRITE (POST …/document?path=Lab Report): ${post.status}${post.ok ? ' — write path fully working (a tiny probe.pdf is now in that chart; delete it via the EHR UI)' : ` — ${JSON.stringify(await post.json().catch(() => ({})))}`}`);
+form.set('document', new Blob([probeBytes], { type: 'application/pdf' }), 'probe.pdf');
+const post = await fetch(docUrl, { method: 'POST', headers, body: form });
+console.log(`document WRITE (POST …/document?path=Lab_Report): ${post.status}${post.ok ? '' : ` — ${JSON.stringify(await post.json().catch(() => ({})))}`}`);
+
+if (post.ok) {
+    // A 200 alone proves nothing (a mis-resolved category still 200s and orphans the
+    // document) — verify the write by finding our hash in the category listing.
+    const filed = (await listDocs()).find((row) => row['hash'] === probeHash);
+    if (filed !== undefined) {
+        console.log(`verification: probe.pdf is FILED under Lab Report as document id ${String(filed['id'])} — write path fully verified (delete it via the EHR UI when done)`);
+    } else {
+        console.error('verification: POST returned 200 but probe.pdf is NOT listed under the category — ORPHANED write (category mis-resolution); do not trust this write path');
+        process.exit(1);
+    }
+}

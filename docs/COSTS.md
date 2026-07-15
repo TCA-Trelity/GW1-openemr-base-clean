@@ -18,7 +18,10 @@ record.*
 | Chat turn | ~3–6K / ≤1K | **< $0.01 / turn** | The 1,024-token output ceiling caps the worst case |
 
 The $2.00 line is the entire measurable spend of the abandoned mega-call
-design; the Haiku rows are the expected steady state.
+design; the Haiku rows are the expected steady state. **The failed-attempt
+row is kept deliberately** — it is the cost evidence behind the per-document
+redesign (postmortem in `DECISIONS.md`), not an accounting leftover; removing
+it would hide the decision's justification.
 
 ## 2. Unit economics per patient-visit
 

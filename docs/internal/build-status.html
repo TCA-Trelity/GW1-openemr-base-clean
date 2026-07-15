@@ -242,14 +242,14 @@
       <div class="head"><span class="t">A · Document upload &amp; ingestion</span><span class="band">Sources tab · fixtures: renal-panel-clean / -lowdpi / intake-update-clean</span></div>
       <div class="trow" data-t="ta1"><input type="checkbox"><span class="tid">A1</span><div class="tbody2">
         <div class="tname">Happy-path lab upload runs the full staged pipeline</div>
-        <p class="tdo">Sources tab → drag <code>renal-panel-clean.pdf</code> onto the upload card (also try the click-to-browse path once).</p>
+        <p class="tdo"><b>Precondition: deploy includes the 07-15 document-storage fix</b> (category wire format + verification — evaluator hit 404s here on the earlier build). Sources tab → drag <code>renal-panel-clean.pdf</code> onto the upload card (also try the click-to-browse path once).</p>
         <p class="texp"><b>Expect:</b> visible stage progression (received → stored in EHR → extracting → grounding → persisting → <b>complete</b>) without a hang; well under the 90 s SLO. Extracted lab facts (eGFR, creatinine…) appear with citation markers.</p>
         <p class="tui"><b>UI:</b> progress states are readable words, not spinner-only; the card disables re-submit while in flight; completion state is unambiguous.</p>
       </div></div>
       <div class="trow" data-t="ta2"><input type="checkbox"><span class="tid">A2</span><div class="tbody2">
         <div class="tname">The source PDF round-trips into OpenEMR</div>
         <p class="tdo">Log into the EHR (<code>admin</code>/<code>pass</code>) → Margaret Chen’s chart → Documents.</p>
-        <p class="texp"><b>Expect:</b> the uploaded PDF filed exactly once under the patient — S1’s “store the source document in OpenEMR” live, no duplicate/untraceable records.</p>
+        <p class="texp"><b>Expect:</b> the uploaded PDF filed exactly once under the patient, categorized under <b>Lab Report</b> — S1’s “store the source document in OpenEMR” live, no duplicate/untraceable records. (Pre-07-15 builds silently filed to patient 0 and/or no category — if the doc is missing, check the deploy includes the fix before debugging elsewhere.)</p>
       </div></div>
       <div class="trow" data-t="ta3"><input type="checkbox"><span class="tid">A3</span><div class="tbody2">
         <div class="tname">Byte-identical re-upload dedupes</div>
@@ -365,7 +365,7 @@
 // Update in the SAME PR as the code it describes (anti-drift rule #3).
 // ============================================================================
 const DATA = {
-  stamp: "updated 2026-07-14 · deploy green, but NOT all-done — open: manual test plan (0/21), 17 register boxes across 9 groups (see matrix), A.3 round-trip + A.6 vitals route, D6 video (user-waived), F.6 live-eval leg, F.8 tag one-liner, G13 span-hierarchy visual check",
+  stamp: "updated 2026-07-15 · external evaluator run: hard gate VALIDATED (their own injected 4th regression caught; evals.yml confirmed as real branch protection), overlay/dev-login/citations verified, dual-run cost docs read as honesty — one gap: live document uploads 404'd on both patients → root-caused to three client bugs (pid, category wire format, raw/404 responses), all FIXED with post-write verification, pending live re-verify after deploy. Still open: manual test plan (0/21), 17 register boxes, A.6 vitals route, D6 video, F.6 live-eval leg, F.8 tag one-liner, G13 span-hierarchy visual check",
   budget: { capPerDay: "$5.00", spentToday: "—", note: "SpendGuard unchanged (locked #16); Cohere rides a ledger line at B.4" },
   w1Floor: "24/24 W1 evals passing · read-path p95 46 ms @10 / 193 ms @50 (regression floor)",
 
@@ -388,7 +388,7 @@ const DATA = {
     { id: "A", title: "Wave A — Ingestion spine", band: "Band 1 · MVP · ∥ with B", tickets: [
         { id: "A.1", t: "LabPdfExtraction + IntakeFormExtraction Zod schemas + validation tests", reqs: ["R2","D3","G3"], deps: "—", s: "done" },
         { id: "A.2", t: "Citation contract v2 (guideline_evidence, page_bbox) + migration note", reqs: ["R5","G1"], deps: "—", s: "done" },
-        { id: "A.3", t: "Upload endpoint + OpenEMR document write + dedupe + attach_and_extract; FIXED 07-14: document routes take numeric pid — a uuid was silently filed to patient 0 (invisible in the chart despite POST 200); client now resolves uuid→pid via GET /api/patient/:puuid. End-to-end round-trip = test plan A1/A2", reqs: ["S1/R1","G1"], deps: "0.2", s: "active" },
+        { id: "A.3", t: "Upload endpoint + OpenEMR document write + dedupe + attach_and_extract. Evaluator hit live 404s on both patients 07-15 → three stacked client bugs fixed: uuid→numeric pid (07-14, silently filed to patient 0); category wire format 'Lab_Report' not 'Lab Report' (spaced names silently orphan the document); raw responses + 404-on-empty listings (envelope parse killed the dedupe GET on every first upload). Every write now verified by re-listing for the file's sha3-512 — absence throws (never half-ingests). Live re-verify = test plan A1/A2 after deploy", reqs: ["S1/R1","G1"], deps: "0.2", s: "active" },
         { id: "A.4", t: "Extraction job: Claude vision → Zod parse → retry → ingestion states", reqs: ["S1/R1","G3","G2"], deps: "A.1, A.3", s: "done" },
         { id: "A.5", t: "Geometric grounding: word-box bbox / page fallback / unverified (tested on real fixtures)", reqs: ["R5","P2"], deps: "A.2, A.4", s: "done" },
         { id: "A.6", t: "Persistence: facts + provenance + renal→HCQ re-tier shipped; OPEN: native vitals route (seam built, not wired — G1's open box)", reqs: ["S1/R1","G1"], deps: "A.4", s: "active" },
@@ -425,7 +425,7 @@ const DATA = {
         { id: "E.3", t: "Write-path auth: documentsWrite capability, 401/403 on upload regardless of AUTH_MODE", reqs: ["#14"], deps: "A.3", s: "done" },
         { id: "E.4", t: "Graph→Langfuse span adapter (guarded, keyed-off) + ops tiles + alerts A4–A6", reqs: ["R7","G6","G15"], deps: "C.5, 0.3", s: "done" },
         { id: "E.5", t: "LangSmith demo-env fencing: native env vars, boot posture log, RUNBOOK §C2", reqs: ["R7","P5"], deps: "C.3", s: "done" },
-        { id: "E.6", t: "/ready probes: doc storage (token mint), retriever index, reranker — degraded semantics", reqs: ["G14"], deps: "A.3, B.3", s: "done" },
+        { id: "E.6", t: "/ready probes: doc storage (token mint), retriever index, reranker — degraded semantics. Caveat (07-15): the doc-storage probe proves the mint only — it stayed green through the evaluator's write-path 404s; actual write proof is the per-upload post-write verification (A.3)", reqs: ["G14"], deps: "A.3, B.3", s: "done" },
         { id: "E.7", t: "OpenAPI 3.0 spec (21 endpoints) + two-direction drift contract test", reqs: ["G16"], deps: "A.3 stable routes", s: "done" },
         { id: "E.8", t: "Bruno 06-documents: dev-login → upload → status → file → evidence search + full-flow docs", reqs: ["G10"], deps: "E.3, E.6", s: "done" },
         { id: "E.9", t: "Evidence turn LIVE: LLM composer + graph in chat SSE (status event, honest fallback)", reqs: ["G2"], deps: "C.3", s: "done" },
@@ -500,7 +500,7 @@ const DATA = {
       { id: "G11", t: "W2 baselines vs W1 (shared-path regression check)", plan: "F.1", done: 1, total: 1, s: "done" },
       { id: "G12", t: "One logging convention — W2 components all pino-shaped (verified; W1 bootstrap console lines are the only exception)", plan: "C.5, E.4", done: 1, total: 1, s: "done" },
       { id: "G13", t: "Span hierarchy: worker ⊂ supervisor; sub-calls ⊂ worker", plan: "C.5", done: 0, total: 1, s: "pending" },
-      { id: "G14", t: "/ready: doc storage + vector index + reranker, degraded status", plan: "E.6", done: 1, total: 1, s: "done" },
+      { id: "G14", t: "/ready: doc storage + vector index + reranker, degraded status (mint-only probe; write proof = A.3 post-write verification)", plan: "E.6", done: 1, total: 1, s: "done" },
       { id: "G15", t: "Alerts A4–A6 with response actions (documented; Langfuse live)", plan: "E.4", done: 1, total: 1, s: "done" },
       { id: "G16", t: "Sidecar OpenAPI 3.0 committed + contract-tested + fresh", plan: "E.7", done: 1, total: 1, s: "done" },
       { id: "G17", t: "Integration tests: fixtures + stubs, no live APIs in CI", plan: "D.3", done: 1, total: 1, s: "done" },

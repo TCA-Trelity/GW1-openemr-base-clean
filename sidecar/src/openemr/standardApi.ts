@@ -452,16 +452,28 @@ export class StandardApiClient {
     // DocumentRestController::postWithPath → DocumentService::insertAtPath) and
     // GET .../document listing {filename, hash, id, mimetype, docdate} rows
     // (DocumentService::getAllAtPath — the hash is sha3-512 of the file bytes,
-    // Document.class.php:1114). The category must already exist or the upload is rejected.
+    // Document.class.php:1114). Three server behaviors shape this client (all found the
+    // hard way — live 404s on the 2026-07-15 evaluator run):
     //
-    // :pid is the NUMERIC patient id, and the route fails OPEN on anything else:
-    // Document::calculateStoragePath (library/classes/Document.class.php:93-103) validates
-    // the id with validateInt(min: 1) and on failure silently reassigns it to 0, so a
-    // uuid-keyed POST returns 200 while filing the row with foreign_id = 0 — attached to
-    // no patient's chart. The listing side hides the same mistake (MySQL coerces a uuid
-    // to 0 in the foreign_id comparison, matching those very orphans). Sidecar patients
-    // are linked by uuid, so both methods resolve uuid → pid via GET /api/patient/:puuid
-    // and refuse ids that are neither a uuid nor a positive integer.
+    // 1. :pid is the NUMERIC patient id, and the route fails OPEN on anything else:
+    //    Document::calculateStoragePath (library/classes/Document.class.php:93-103)
+    //    silently reassigns a non-numeric id to 0, so a uuid-keyed POST returns 200 while
+    //    filing the row with foreign_id = 0 — no patient's chart. Both methods therefore
+    //    resolve uuid → pid via GET /api/patient/:puuid and refuse anything that is
+    //    neither a uuid nor a positive integer.
+    // 2. The category is matched with asymmetric normalization (DocumentService.php:52-94):
+    //    SQL strips spaces + lowercases the stored name while PHP strips only UNDERSCORES
+    //    from the input — so 'Lab Report' can never match and the wire format is
+    //    'Lab_Report'. An unmatched path is NOT rejected: validation passes vacuously, the
+    //    category id resolves null, and createDocument still persists the row
+    //    (Document.class.php:1122-1128 skips the category link for a non-numeric id) →
+    //    200 with a silently orphaned document. wireCategoryPath() plus the post-write
+    //    verification in uploadPatientDocumentDeduped are the two guards.
+    // 3. Responses are RAW (responseHandler → getResponseForPayload — no {data} envelope):
+    //    GET returns the rows array, POST returns literal true, and an EMPTY category is
+    //    a 404 (responseHandler treats [] as falsy, RestControllerHelper.php:156-169) —
+    //    so the listing tolerates 404 as "no documents yet", the same contract as
+    //    listMedicationTitles above.
 
     /** uuid → numeric pid cache; a chart's pid never changes, so one lookup per client. */
     private readonly pidByUuid = new Map<string, string>();
@@ -493,16 +505,36 @@ export class StandardApiClient {
         return numeric;
     }
 
-    /** List the patient's documents filed under a category path (e.g. 'Lab Report'). */
+    /**
+     * Category name → the route's wire format: spaces become underscores ('Lab Report' →
+     * 'Lab_Report'), which the server maps back against space-stripped category names.
+     * Callers keep the human-readable seeded names (EHR_CATEGORY in ingest/service.ts).
+     */
+    private wireCategoryPath(categoryPath: string): string {
+        return categoryPath.trim().replace(/ /g, '_');
+    }
+
+    /**
+     * List the patient's documents filed under a category (e.g. 'Lab Report'). A 404 is
+     * "no documents in this category yet" — OpenEMR 404s empty listings by design — so
+     * first-use categories return [] instead of failing the caller.
+     */
     async listPatientDocuments(pidOrUuid: number | string, categoryPath: string): Promise<EhrDocumentRow[]> {
         const pid = await this.resolveNumericPid(pidOrUuid);
-        const path = `/patient/${pid}/document?path=${encodeURIComponent(categoryPath)}`;
-        const body = await this.request('GET', path);
-        const rows = envelopeData(body, path);
-        if (!Array.isArray(rows)) {
+        const path = `/patient/${pid}/document?path=${encodeURIComponent(this.wireCategoryPath(categoryPath))}`;
+        let body: unknown;
+        try {
+            body = await this.request('GET', path);
+        } catch (error) {
+            if (error instanceof StandardApiError && error.status === 404) {
+                return [];
+            }
+            throw error;
+        }
+        if (!Array.isArray(body)) {
             return [];
         }
-        return rows.flatMap((row) => {
+        return body.flatMap((row) => {
             const record = asRecord(row);
             const id = record?.['id'];
             const hash = record?.['hash'];
@@ -527,6 +559,12 @@ export class StandardApiClient {
      * does no pre-insert lookup), so a byte-identical re-upload would create a second
      * documents row — the integrity requirement ("no duplicate or untraceable records")
      * is the caller's job. Byte-identical content → the existing document id, no POST.
+     *
+     * The POST body is literal `true` (no document id), and a mis-resolved category
+     * still "succeeds" while orphaning the document (behavior 2 above) — so after every
+     * write this method re-lists the category and requires our hash to appear, returning
+     * the listed row's real id. Absence throws instead of reporting a half-ingested
+     * upload (W2_ARCHITECTURE §12: uploads land failed-visible, never half-ingested).
      */
     async uploadPatientDocumentDeduped(
         pidOrUuid: number | string,
@@ -543,7 +581,7 @@ export class StandardApiClient {
             return { documentId: match.id, hash, deduped: true };
         }
 
-        const path = `/patient/${pid}/document?path=${encodeURIComponent(categoryPath)}`;
+        const path = `/patient/${pid}/document?path=${encodeURIComponent(this.wireCategoryPath(categoryPath))}`;
         const token = await this.tokenProvider.getAccessToken();
         const form = new FormData();
         // Copy into a fresh ArrayBuffer so a Uint8Array view over a larger/shared buffer
@@ -564,13 +602,20 @@ export class StandardApiClient {
         if (!response.ok) {
             throw new StandardApiError(path, response.status, failureDetail(body));
         }
-        const data = asRecord(envelopeData(body, path));
-        const id = data?.['id'];
-        return {
-            documentId: typeof id === 'number' || typeof id === 'string' ? String(id) : null,
-            hash,
-            deduped: false,
-        };
+
+        // Post-write verification: the write is only real if the document is now listed
+        // under the category with our hash (REQ G1 "no untraceable records") — this is
+        // what catches the silent category-orphan mode, and it is also the only way to
+        // learn the new document's id (the POST body is literal `true`).
+        const filed = (await this.listPatientDocuments(pid, categoryPath)).find((row) => row.hash === hash);
+        if (filed === undefined) {
+            throw new StandardApiError(
+                path,
+                502,
+                'write reported success but the document is not filed under the category — refusing to report a half-ingested upload',
+            );
+        }
+        return { documentId: filed.id, hash, deduped: false };
     }
 }
 
@@ -584,8 +629,8 @@ export interface EhrDocumentRow {
 }
 
 export interface EhrDocumentUploadResult {
-    /** OpenEMR documents.id; null only if the server envelope omitted it on create. */
-    documentId: string | null;
+    /** OpenEMR documents.id — from the dedupe match, or the post-write verification listing. */
+    documentId: string;
     /** sha3-512 hex of the uploaded bytes (matches OpenEMR's stored hash). */
     hash: string;
     /** true → byte-identical document already existed; no new row was created. */
