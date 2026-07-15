@@ -3,6 +3,7 @@
 // no-key fallback that keeps the retriever, the eval goldens (B.6), and CI fully offline.
 // PHI note: only PHI-scrubbed queries (queryPolicy.ts) and public corpus text may reach
 // embed() — enforced upstream by the retriever, tested with canaries.
+import { withTimeoutAndRetry } from '../lib/httpRetry.js';
 import type { FetchLike } from '../openemr/auth.js';
 
 export type EmbedInputType = 'search_document' | 'search_query';
@@ -25,34 +26,11 @@ export class RetrievalProviderError extends Error {
     }
 }
 
-const TRANSIENT = new Set([408, 429, 500, 502, 503, 504]);
-
-/** One bounded retry on transient failures; hard timeout per attempt (REQ G2). */
-export async function withTimeoutAndRetry<T>(
-    operation: string,
-    timeoutMs: number,
-    attempt: (signal: AbortSignal) => Promise<T>,
-): Promise<T> {
-    for (let round = 0; ; round += 1) {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), timeoutMs);
-        try {
-            return await attempt(controller.signal);
-        } catch (error) {
-            const transient =
-                (error instanceof RetrievalProviderError && TRANSIENT.has(error.status)) ||
-                (error instanceof Error && error.name === 'AbortError');
-            if (round === 0 && transient) {
-                continue; // one fresh retry
-            }
-            if (error instanceof Error && error.name === 'AbortError') {
-                throw new RetrievalProviderError('retrieval', operation, 408, `timed out after ${timeoutMs}ms`);
-            }
-            throw error;
-        } finally {
-            clearTimeout(timer);
-        }
-    }
+// withTimeoutAndRetry itself lives in lib/httpRetry.ts (moved for H.5 so the OpenEMR clients
+// share it). This onTimeout mapper keeps retrieval timeouts in the retrieval error family,
+// exactly as before the move.
+export function retrievalTimeoutError(operation: string, timeoutMs: number): RetrievalProviderError {
+    return new RetrievalProviderError('retrieval', operation, 408, `timed out after ${timeoutMs}ms`);
 }
 
 export interface CohereEmbeddingsOptions {
@@ -108,7 +86,7 @@ export class CohereEmbeddings implements EmbeddingsProvider {
             }
             this.options.onUsage?.(texts.length, correlationId);
             return vectors;
-        });
+        }, { onTimeout: retrievalTimeoutError });
     }
 }
 

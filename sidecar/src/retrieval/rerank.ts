@@ -2,8 +2,9 @@
 // names); PassthroughReranker preserves fused order when no key is configured — retrieval
 // keeps working, results carry rerank_applied=false so the degradation is visible, never
 // silent (REQ G2 posture).
+import { withTimeoutAndRetry } from '../lib/httpRetry.js';
 import type { FetchLike } from '../openemr/auth.js';
-import { RetrievalProviderError, withTimeoutAndRetry } from './embeddings.js';
+import { RetrievalProviderError, retrievalTimeoutError } from './embeddings.js';
 
 export interface RerankCandidate {
     id: string;
@@ -117,7 +118,7 @@ export class CohereReranker implements Reranker {
             });
             this.options.onUsage?.(candidates.length, correlationId);
             return { order, rerankApplied: true };
-        });
+        }, { onTimeout: retrievalTimeoutError });
     }
 }
 

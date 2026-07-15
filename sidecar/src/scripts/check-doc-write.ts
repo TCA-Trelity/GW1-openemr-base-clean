@@ -19,6 +19,12 @@
 import { createHash } from 'node:crypto';
 import { STANDARD_API_SEED_SCOPES } from '../openemr/auth.js';
 
+// H.5: explicit timeouts so a hung EHR fails the diagnostic instead of hanging it. NO retries
+// on purpose — this script diagnoses first-shot behavior (a hidden retry would mask the very
+// flakiness an operator is hunting), and its POST is the double-file hazard itself.
+const PROBE_TIMEOUT_MS = 10_000;
+const UPLOAD_TIMEOUT_MS = 30_000;
+
 const base = process.env['OPENEMR_BASE_URL']?.replace(/\/+$/, '');
 const clientId = process.env['OPENEMR_CLIENT_ID'];
 const username = process.env['OPENEMR_API_USERNAME'] ?? 'admin';
@@ -41,6 +47,7 @@ const tokenResponse = await fetch(`${base}/oauth2/default/token`, {
         password,
         scope: STANDARD_API_SEED_SCOPES.join(' '),
     }).toString(),
+    signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
 });
 const tokenBody = (await tokenResponse.json().catch(() => ({}))) as Record<string, unknown>;
 if (!tokenResponse.ok || typeof tokenBody['access_token'] !== 'string') {
@@ -76,7 +83,7 @@ const headers = { authorization: `Bearer ${tokenBody['access_token']}` };
 // uuid to the numeric pid first, the same way the sidecar client now does internally.
 let pid = testPid;
 if (!/^[1-9]\d*$/.test(pid)) {
-    const patientResponse = await fetch(`${base}/apis/default/api/patient/${encodeURIComponent(pid)}`, { headers });
+    const patientResponse = await fetch(`${base}/apis/default/api/patient/${encodeURIComponent(pid)}`, { headers, signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
     const patientBody = (await patientResponse.json().catch(() => ({}))) as Record<string, unknown>;
     const dataRaw = patientBody['data'];
     const record = typeof dataRaw === 'object' && dataRaw !== null ? (dataRaw as Record<string, unknown>) : undefined;
@@ -99,7 +106,7 @@ if (!/^[1-9]\d*$/.test(pid)) {
 // (RestControllerHelper::responseHandler treats [] as falsy).
 const docUrl = `${base}/apis/default/api/patient/${pid}/document?path=Lab_Report`;
 const listDocs = async (): Promise<Record<string, unknown>[]> => {
-    const response = await fetch(docUrl, { headers });
+    const response = await fetch(docUrl, { headers, signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
     if (response.status === 404) {
         return [];
     }
@@ -107,7 +114,7 @@ const listDocs = async (): Promise<Record<string, unknown>[]> => {
     return Array.isArray(body) ? (body.filter((row) => typeof row === 'object' && row !== null) as Record<string, unknown>[]) : [];
 };
 
-const get = await fetch(docUrl, { headers });
+const get = await fetch(docUrl, { headers, signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
 const getVerdict =
     get.ok
         ? ' — ACL patients/docs read OK'
@@ -120,7 +127,7 @@ const probeBytes = new TextEncoder().encode('%PDF-1.4 probe');
 const probeHash = createHash('sha3-512').update(probeBytes).digest('hex');
 const form = new FormData();
 form.set('document', new Blob([probeBytes], { type: 'application/pdf' }), 'probe.pdf');
-const post = await fetch(docUrl, { method: 'POST', headers, body: form });
+const post = await fetch(docUrl, { method: 'POST', headers, body: form, signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS) });
 console.log(`document WRITE (POST …/document?path=Lab_Report): ${post.status}${post.ok ? '' : ` — ${JSON.stringify(await post.json().catch(() => ({})))}`}`);
 
 if (post.ok) {

@@ -6,8 +6,14 @@
 // except the medication list routes, which return the raw service result and 404 on an empty list
 // (RestControllerHelper::responseHandler, :156-169).
 import { createHash } from 'node:crypto';
+import { withTimeoutAndRetry } from '../lib/httpRetry.js';
 import type { FetchLike } from './auth.js';
 import type { TokenProvider } from './fhir.js';
+
+// Hard per-attempt ceilings (REQ G2). JSON routes get 10s; the multipart document POST gets
+// 30s because PDF payloads ride it (well inside the ingestion p95 ≤90s/doc SLO budget).
+const STANDARD_API_TIMEOUT_MS = 10_000;
+const DOCUMENT_UPLOAD_TIMEOUT_MS = 30_000;
 
 /** How a failure should be acted on: auth = fix scopes/role/enablement, validation = fix payload. */
 export type StandardApiErrorKind = 'auth' | 'validation' | 'other';
@@ -194,6 +200,10 @@ export interface StandardApiClientOptions {
     fetchImpl?: FetchLike;
     /** Stamped on every request as x-correlation-id; defaults to one id per client instance. */
     correlationId?: string;
+    /** Per-attempt ceiling for the JSON routes; tests shorten it (same shape as rerank's options.timeoutMs). */
+    timeoutMs?: number;
+    /** Per-attempt ceiling for the multipart document POST (larger: PDF payloads). */
+    uploadTimeoutMs?: number;
 }
 
 export class StandardApiClient {
@@ -201,12 +211,16 @@ export class StandardApiClient {
     private readonly tokenProvider: TokenProvider;
     private readonly fetchImpl: FetchLike;
     private readonly correlationId: string;
+    private readonly timeoutMs: number;
+    private readonly uploadTimeoutMs: number;
 
     constructor(options: StandardApiClientOptions) {
         this.apiBase = `${options.baseUrl.replace(/\/+$/, '')}/apis/default/api`;
         this.tokenProvider = options.tokenProvider;
         this.fetchImpl = options.fetchImpl ?? globalThis.fetch;
         this.correlationId = options.correlationId ?? crypto.randomUUID();
+        this.timeoutMs = options.timeoutMs ?? STANDARD_API_TIMEOUT_MS;
+        this.uploadTimeoutMs = options.uploadTimeoutMs ?? DOCUMENT_UPLOAD_TIMEOUT_MS;
     }
 
     // GET /api/patient with fname/lname/DOB, all in PatientRestController::SUPPORTED_SEARCH_FIELDS
@@ -438,12 +452,21 @@ export class StandardApiClient {
         if (payload !== undefined) {
             init.body = JSON.stringify(payload);
         }
-        const response = await this.fetchImpl(`${this.apiBase}${path}`, init);
-        const body = await parseJson(response);
-        if (!response.ok) {
-            throw new StandardApiError(path, response.status, failureDetail(body));
-        }
-        return body;
+        // Method-aware retry policy (REQ G2): a retried write can double-file a document; the A.3 post-write verification re-lists by content hash but guards absence, not duplicates — so only idempotent GETs get the helper's one bounded retry.
+        const retries = method === 'GET' ? 1 : 0;
+        return withTimeoutAndRetry(`standard API ${method} ${path}`, this.timeoutMs, async (signal) => {
+            const response = await this.fetchImpl(`${this.apiBase}${path}`, { ...init, signal });
+            const body = await parseJson(response);
+            if (!response.ok) {
+                throw new StandardApiError(path, response.status, failureDetail(body));
+            }
+            return body;
+        }, {
+            retries,
+            // Timeouts stay in the standard-API error family so callers' instanceof handling
+            // (e.g. ehrSeed's degrade-to-skipped depth sections) keeps working.
+            onTimeout: (operation, timeoutMs) => new StandardApiError(path, 408, `${operation} timed out after ${timeoutMs}ms`),
+        });
     }
 
     // ---- Week 2 documents (Wave 0.2, REQ S1/R1) ----
@@ -589,19 +612,26 @@ export class StandardApiClient {
         const payload = new Uint8Array(bytes);
         form.append('document', new Blob([payload.buffer as ArrayBuffer], { type: mimeType }), filename);
         // No manual content-type: fetch sets the multipart boundary itself.
-        const response = await this.fetchImpl(`${this.apiBase}${path}`, {
-            method: 'POST',
-            headers: {
-                authorization: `Bearer ${token}`,
-                accept: 'application/json',
-                'x-correlation-id': this.correlationId,
-            },
-            body: form,
+        // Non-idempotent write — timeout only, retries: 0: a retried write can double-file a document; the A.3 post-write verification below re-lists by content hash but guards absence, not duplicates.
+        await withTimeoutAndRetry(`standard API POST ${path} (document upload)`, this.uploadTimeoutMs, async (signal) => {
+            const response = await this.fetchImpl(`${this.apiBase}${path}`, {
+                method: 'POST',
+                headers: {
+                    authorization: `Bearer ${token}`,
+                    accept: 'application/json',
+                    'x-correlation-id': this.correlationId,
+                },
+                body: form,
+                signal,
+            });
+            const body = await parseJson(response);
+            if (!response.ok) {
+                throw new StandardApiError(path, response.status, failureDetail(body));
+            }
+        }, {
+            retries: 0,
+            onTimeout: (operation, timeoutMs) => new StandardApiError(path, 408, `${operation} timed out after ${timeoutMs}ms`),
         });
-        const body = await parseJson(response);
-        if (!response.ok) {
-            throw new StandardApiError(path, response.status, failureDetail(body));
-        }
 
         // Post-write verification: the write is only real if the document is now listed
         // under the category with our hash (REQ G1 "no untraceable records") — this is

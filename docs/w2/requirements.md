@@ -487,10 +487,15 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
 - [x] SLOs stated (locked): ingestion p95 ≤ 90 s/doc; retrieval p95 ≤ 2.5 s
   incl. rerank; evidence turns ≤ 5 s streamed; fast-path chat < 2 s first
   token + ≤ 0.4 s router. Measured against baselines (G11).
-- [ ] Every outbound LLM/VLM/embed/rerank/FHIR call has an explicit timeout +
+- [x] Every outbound LLM/VLM/embed/rerank/FHIR call has an explicit timeout +
   bounded retry (transient-error classification per Week 1's
   `isTransientAnthropicError` pattern; chat-path retry gap closed for new
-  calls). Known Week 1 gap to not replicate: FHIR client has no timeout today.
+  calls). Known Week 1 gap to not replicate: FHIR client has no timeout today
+  *(closed by H.5, 2026-07-15: helper moved to `src/lib/httpRetry.ts`;
+  FHIR/standard-API reads + token mints get 10 s timeout + one bounded
+  retry; writes, uploads (30 s), and client registration get timeouts with
+  NO auto-retry — a retried write can double-file a document; JWKS/
+  introspection and the doc-write diagnostic script covered too).*
 - [ ] Circuit-breaking behavior per dependency: after N consecutive failures,
   short-circuit with degraded response + `/ready` reflects it (simple breaker
   or documented equivalent fallback — no silent hammering).

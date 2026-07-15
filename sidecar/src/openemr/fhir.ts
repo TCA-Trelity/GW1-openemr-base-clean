@@ -1,11 +1,16 @@
 // FHIR R4 read-only client for OpenEMR: GET /apis/default/fhir/<Resource> with bearer auth
 // (API_README.md:36-38,96-107) and per-patient search via ?patient=<uuid>
 // (Documentation/api/FHIR_API.md:116,982-1037). Every request carries the caller's x-correlation-id.
+import { withTimeoutAndRetry } from '../lib/httpRetry.js';
 import type { FetchLike } from './auth.js';
 
 export interface TokenProvider {
     getAccessToken(): Promise<string>;
 }
+
+// Hard per-attempt ceiling for FHIR reads (REQ G2). Reads run on the background prep/sync
+// path, so 10s is generous headroom without letting a hung EHR stall the pipeline forever.
+const FHIR_READ_TIMEOUT_MS = 10_000;
 
 // The eight resource types the sidecar reads (matches SYSTEM_SCOPES in ./auth.ts).
 export const PATIENT_RESOURCE_TYPES = [
@@ -49,17 +54,21 @@ export interface FhirClientOptions {
     baseUrl: string;
     tokenProvider: TokenProvider;
     fetchImpl?: FetchLike;
+    /** Per-attempt request ceiling; tests shorten it (same shape as rerank's options.timeoutMs). */
+    timeoutMs?: number;
 }
 
 export class FhirClient {
     private readonly fhirBase: string;
     private readonly tokenProvider: TokenProvider;
     private readonly fetchImpl: FetchLike;
+    private readonly timeoutMs: number;
 
     constructor(options: FhirClientOptions) {
         this.fhirBase = `${options.baseUrl.replace(/\/+$/, '')}/apis/default/fhir`;
         this.tokenProvider = options.tokenProvider;
         this.fetchImpl = options.fetchImpl ?? globalThis.fetch;
+        this.timeoutMs = options.timeoutMs ?? FHIR_READ_TIMEOUT_MS;
     }
 
     async getPatient(patientId: string, correlationId: string): Promise<Record<string, unknown>> {
@@ -87,22 +96,30 @@ export class FhirClient {
 
     private async request(path: string, correlationId: string): Promise<Record<string, unknown>> {
         const token = await this.tokenProvider.getAccessToken();
-        const response = await this.fetchImpl(`${this.fhirBase}${path}`, {
-            method: 'GET',
-            headers: {
-                authorization: `Bearer ${token}`,
-                accept: 'application/fhir+json',
-                'x-correlation-id': correlationId,
-            },
+        // Read-only client — every request is an idempotent GET, so the helper's one bounded
+        // retry on transient statuses is always safe here (REQ G2).
+        return withTimeoutAndRetry(`FHIR GET ${path}`, this.timeoutMs, async (signal) => {
+            const response = await this.fetchImpl(`${this.fhirBase}${path}`, {
+                method: 'GET',
+                headers: {
+                    authorization: `Bearer ${token}`,
+                    accept: 'application/fhir+json',
+                    'x-correlation-id': correlationId,
+                },
+                signal,
+            });
+            const body = await parseJsonBody(response);
+            if (!response.ok) {
+                throw new FhirRequestError(path, response.status, operationOutcomeText(body));
+            }
+            if (body === undefined) {
+                throw new FhirRequestError(path, response.status, 'response was not a JSON object');
+            }
+            return body;
+        }, {
+            // Timeouts stay in the FHIR error family so callers' instanceof handling keeps working.
+            onTimeout: (operation, timeoutMs) => new FhirRequestError(path, 408, `${operation} timed out after ${timeoutMs}ms`),
         });
-        const body = await parseJsonBody(response);
-        if (!response.ok) {
-            throw new FhirRequestError(path, response.status, operationOutcomeText(body));
-        }
-        if (body === undefined) {
-            throw new FhirRequestError(path, response.status, 'response was not a JSON object');
-        }
-        return body;
     }
 }
 

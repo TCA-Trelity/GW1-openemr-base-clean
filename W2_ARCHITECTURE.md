@@ -332,7 +332,7 @@ and cost reports contain no patient identifiers, no raw document text, and no
 extracted clinical values — identifiers and hashes only, verified by the CI
 canary check (REQ: G18).
 
-## 9. SLOs, resilience, readiness (REQ: G2, G14) — [SHIPPED: /ready W2 probes (document storage via cached token mint, retriever index fails-on-empty, reranker last-observed-traffic-outcome (H.2: ok + detail "keyed (unverified since boot)" until first use, failed after a rerank failure newer than the last success; never a per-poll Cohere call)) with degraded not_configured semantics; timeouts/retries on Cohere + VLM legs; ≤5 s evidence budget w/ honest degrade ; measured stub-backend baselines + W1 byte-identical regression evidence (F.1) · TARGET: live-backend numbers post key-drop, circuit-breaker documentation per dependency (H.10)]
+## 9. SLOs, resilience, readiness (REQ: G2, G14) — [SHIPPED: /ready W2 probes (document storage via cached token mint, retriever index fails-on-empty, reranker last-observed-traffic-outcome (H.2: ok + detail "keyed (unverified since boot)" until first use, failed after a rerank failure newer than the last success; never a per-poll Cohere call)) with degraded not_configured semantics; timeouts/retries on Cohere + VLM + all OpenEMR legs (H.5: FHIR/standard-API reads retry once, writes + uploads + registration never auto-retry, token mints retry with fresh jti); ≤5 s evidence budget w/ honest degrade ; measured stub-backend baselines + W1 byte-identical regression evidence (F.1) · TARGET: live-backend numbers post key-drop, circuit-breaker documentation per dependency (H.10)]
 
 | Flow | SLO (p95) | Measured (stub backends, 2026-07-13) | Where the budget lives |
 |---|---|---|---|
