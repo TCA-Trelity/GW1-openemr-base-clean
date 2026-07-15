@@ -229,8 +229,33 @@ jobs:
           ctype=$(curl -s -o /tmp/stored.pdf -w '%{content_type}' --max-time 30 "${AUTH[@]}" "$SIDECAR_URL/api/ingestions/$ING/file")
           case "$ctype" in application/pdf*) echo "stored original OK ($ctype, $(wc -c < /tmp/stored.pdf) bytes)" ;; *) echo "file fetch FAILED ($ctype)"; exit 1 ;; esac
 
+          echo "== Second doc type: intake form (fresh-path or dedupe both prove the pipeline) =="
+          INTAKE=sidecar/eval/fixtures/documents/intake-update-clean.pdf
+          code=$(curl -s -D /tmp/up2.headers -o /tmp/up2.json -w '%{http_code}' --max-time 60 "${AUTH[@]}" \
+            -F "doc_type=intake_form" -F "file=@$INTAKE;type=application/pdf" \
+            "$SIDECAR_URL/api/patients/margaret-chen/documents")
+          echo "HTTP $code"; cat /tmp/up2.json; echo
+          case "$code" in 200|202) : ;; *) echo "intake upload FAILED"; exit 1 ;; esac
+          ING2=$(jq -r '.ingestion_id // empty' /tmp/up2.json)
+          CORR2=$(grep -i '^x-correlation-id:' /tmp/up2.headers | tr -d '\r' | awk '{print $2}')
+          echo "intake ingestion: $ING2 (correlation ${CORR2:-unknown})"
+          status2=""
+          for i in $(seq 1 36); do
+            curl -s --max-time 30 "${AUTH[@]}" "$SIDECAR_URL/api/ingestions/$ING2" -o /tmp/ing2.json || true
+            status2=$(jq -r '.status // empty' /tmp/ing2.json)
+            echo "attempt $i: status=$status2"
+            case "$status2" in
+              complete) break ;;
+              failed_*|blocked_*) echo "intake ingestion terminal failure (post-write verification catches silent EHR orphans):"; cat /tmp/ing2.json; exit 1 ;;
+            esac
+            sleep 5
+          done
+          [ "$status2" = "complete" ] || { echo "intake ingestion never completed"; cat /tmp/ing2.json; exit 1; }
+          jq -e '.facts_persisted >= 1' /tmp/ing2.json >/dev/null \
+            && echo "intake facts persisted: $(jq '.facts_persisted' /tmp/ing2.json) OK" || { echo "no intake facts persisted"; exit 1; }
+
           echo "== POST /api/evidence/search (guideline corpus, same retrieval the chat uses) =="
-          curl -s -X POST --max-time 30 "$SIDECAR_URL/api/evidence/search" -H 'content-type: application/json' \
+          curl -s -X POST --max-time 30 "${AUTH[@]}" "$SIDECAR_URL/api/evidence/search" -H 'content-type: application/json' \
             -d '{"q":"hydroxychloroquine screening interval"}' -o /tmp/search.json
           jq -e '(.results // .snippets // []) | length > 0' /tmp/search.json >/dev/null \
             && echo "evidence search: $(jq '(.results // .snippets // []) | length' /tmp/search.json) hits OK" \
