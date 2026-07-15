@@ -30,15 +30,16 @@ pinned; the critic verifies the drafted claim before release.
 ```
 
 Reconstructed trace (parent/child by from→to order — the span tree the tracer binding
-in E.4 will render in Langfuse):
+in E.4 + H.7 renders in Langfuse: workers ⊂ supervisor, sub-calls ⊂ their worker):
 
 ```
 clinical_graph w2-demo-7f3a  (patient margaret-chen)
-├─ supervisor                 routed: document upload event (rule)
-├─ intake_extractor           extraction complete → ingestion ing-fbc0385ca41a
-├─ evidence_retriever         4 chunks; pinned 4 against margaret-chen (Tier-0 for the visit)
-├─ critic                     1 verified / 0 blocked; 0 prescriptiveness flags
-└─ answer                     released with guideline citations only
+└─ supervisor                    routed: document upload event (rule)
+   ├─ intake_extractor           extraction complete → ingestion ing-fbc0385ca41a
+   ├─ evidence_retriever         4 chunks against margaret-chen (Tier-0 for the visit)
+   │  └─ evidence_pinned         ingestion ing-fbc0385ca41a, pinned 4
+   ├─ critic                     1 verified / 0 blocked; 0 prescriptiveness flags
+   └─ answer                     released with guideline citations only
 ```
 
 Note what the events already answer without any tracing backend:
@@ -78,13 +79,19 @@ Two failure-mode events ride the identical correlation key (asserted in
 - `critic_flags` (warn) — the citation gate blocked claims and/or the prescriptiveness
   lint flagged the draft; blocked claims never release citations.
 
-## Where this goes next (E.4)
+## Where this went (E.4 + H.7)
 
-These events are the span skeleton: `worker_handoff` from/to pairs define parent/child
-edges (worker spans ⊂ supervisor span, G13), and `evidence_pinned` /
-`evidence_degraded` / `critic_flags` become span attributes. The Langfuse binding in
-E.4 consumes exactly this event stream — no new instrumentation points are needed in
-the graph.
+These events are the span skeleton, and the Langfuse binding
+(`sidecar/src/obs/graphTracer.ts`, E.4) consumes exactly this event stream — no new
+instrumentation points were added to the graph. H.7 shipped the nesting: one
+`supervisor` span per trace (trace id = the correlation id), each worker
+(`intake_extractor`, `evidence_retriever`, `critic`, `answer`) a child span of
+`supervisor`, and sub-call events children of their worker span —
+`evidence_pinned` / `evidence_degraded` under `evidence_retriever`, `critic_flags`
+under `critic`, ingestion stage events under `intake_extractor` (G13). A handoff
+FROM a worker ends that worker's span. The tree shape is pinned by span-parent
+assertions in `sidecar/test/obs.test.ts`; the visual confirm of a live Langfuse
+trace stays USER-ACTIONS item 10.
 
 PHI note (G5): events carry IDs (`patient_id`, `ingestion_id`, chunk ids) and counts —
 never document text, extracted values, or names from documents. The log-capture PHI

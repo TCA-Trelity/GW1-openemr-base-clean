@@ -133,7 +133,7 @@ observation-shaped write is the fixed-field vitals endpoint. Hence the
 persistence split above, with data authority declared per type (§10) rather
 than shoehorning lab values into fields that don't fit.
 
-## 4. The worker graph (REQ: S3/R4) — [SHIPPED: `sidecar/src/graph/` — 5-node StateGraph, deterministic router + LlmRouterModel tie-break (never-throw, fast_path-safe), Zod boundary contracts w/ GraphContractError, ≤5 s evidence budget w/ degraded handoff, per-patient pin store keyed to ingestion, worker_handoff events (worked example: docs/w2/trace-example.md); 15 tests · TARGET: Langfuse span binding (E.4), routing-latency baseline (F.1)] — chat delegation + production composer SHIPPED (E.9): `graph/composer.ts` LLM composer (verbatim-quote contract, ledger-priced, never-throws) wired into the chat route behind the router; evidence turns stream status→cited answer; graph failures fall back to the Week 1 loop
+## 4. The worker graph (REQ: S3/R4) — [SHIPPED: `sidecar/src/graph/` — 5-node StateGraph, deterministic router + LlmRouterModel tie-break (never-throw, fast_path-safe), Zod boundary contracts w/ GraphContractError, ≤5 s evidence budget w/ degraded handoff, per-patient pin store keyed to ingestion, worker_handoff events + nested span tree asserted (H.7) (worked example: docs/w2/trace-example.md); 15 tests · TARGET: Langfuse span binding (E.4), routing-latency baseline (F.1)] — chat delegation + production composer SHIPPED (E.9): `graph/composer.ts` LLM composer (verbatim-quote contract, ledger-priced, never-throws) wired into the chat route behind the router; evidence turns stream status→cited answer; graph failures fall back to the Week 1 loop
 
 **Framework:** LangGraph.js `StateGraph` inside the existing TypeScript
 sidecar. Nodes wrap existing services — the direct Anthropic client, Zod
@@ -292,7 +292,7 @@ drop a citation (`citation_present` hard-fails), plant a canary identifier in
 a log line (`no_phi_in_logs` hard-fails). Three injections, three categories,
 documented and repeatable (REQ: D5 evidence).
 
-## 8. Observability & cost (REQ: R7, G4–G6, G13, G15) — [SHIPPED: graph→Langfuse span adapter over the handoff event stream (guarded, keyed-off — src/obs/graphTracer.ts), alerts A4–A6 w/ response actions, W2 ops tiles (static until deploy), correlation-ID trace worked example · TARGET: Langfuse/LangSmith key activation (USER-ACTIONS), live tile feeds, cost report (F.2)]
+## 8. Observability & cost (REQ: R7, G4–G6, G13, G15) — [SHIPPED: graph→Langfuse span adapter over the handoff event stream (guarded, keyed-off — src/obs/graphTracer.ts), alerts A4–A6 w/ response actions, W2 ops tiles (static until deploy), correlation-ID trace worked example, nested worker⊂supervisor span tree (H.7) · TARGET: Langfuse/LangSmith key activation (USER-ACTIONS), live tile feeds, cost report (F.2)]
 
 **Shipped spine:** correlation IDs end-to-end (`server.ts`), pino structured
 logs, `llm_calls` cost ledger + `SpendGuard` ($5/day, unchanged — locked #16)

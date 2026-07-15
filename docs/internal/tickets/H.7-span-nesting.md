@@ -28,7 +28,7 @@ visual half stays a user action (USER-ACTIONS item 10).
 
 ## Files to create/modify
 
-- **Modify** `sidecar/src/obs/langfuse.ts` — add `export interface LangfuseSpanLike { span(body: <same body type as trace.span>): LangfuseSpanLike; end?(body?: { endTime?: Date }): unknown; }`; change `LangfuseTraceLike.span(...)` return type `unknown` → `LangfuseSpanLike`. (`LangfuseTracer` ignores the return value — no behavior change there.)
+- **Modify** `sidecar/src/obs/langfuse.ts` — add `export interface LangfuseSpanLike { span(body: <same body type as trace.span>): LangfuseSpanLike; end?(): unknown; }`; change `LangfuseTraceLike.span(...)` return type `unknown` → `LangfuseSpanLike`. (`LangfuseTracer` ignores the return value — no behavior change there.) *(Drift fixed during execution: the spec originally said `end?(body?: { endTime?: Date }): unknown`, but the real SDK's span client declares `end(body?: Omit<UpdateLangfuseSpanBody, "id" | "endTime" | "traceId">): this` — `endTime` is omitted because the SDK stamps it itself, so a `{ endTime?: Date }` body fails the structural check in both variance directions. The seam takes no arguments; the adapter only ever calls `.end?.()`.)*
 - **Modify** `sidecar/src/obs/graphTracer.ts` — nest spans (see steps).
 - **Modify** `sidecar/src/server.ts` — step 5 only (ingestion events into the same adapter), and only if H.8 hasn't already done it.
 - **Modify** `sidecar/test/obs.test.ts` — child-capable fakes + shape tests.

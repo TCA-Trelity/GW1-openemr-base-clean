@@ -195,10 +195,23 @@ export function buildDeps(config: Config): AppDeps | undefined {
                   tokenProvider: ehrTokenProvider,
               })
             : undefined;
+    // H.7 (step 5, H.8 seam): ingestion stage events (`ingestion_*`,
+    // `extraction_field_outcome`) were silent in production — give them the same
+    // structured-JSON console shape as the graph logger so every stage is one
+    // correlation-id grep away. H.8 owns upgrading this to the shared app logger;
+    // graph-run ingestions additionally nest under the intake_extractor span once
+    // these events route through tracingGraphLogger (adapter side shipped with H.7).
+    const ingestionLogger = {
+        info: (obj: unknown, msg: string): void =>
+            console.log(JSON.stringify({ level: 'info', msg, ...(typeof obj === 'object' && obj !== null ? obj : {}) })),
+        warn: (obj: unknown, msg: string): void =>
+            console.warn(JSON.stringify({ level: 'warn', msg, ...(typeof obj === 'object' && obj !== null ? obj : {}) })),
+    };
     const ingestionService = new IngestionService({
         extractor: new VlmExtractor(prepLlmClient),
         records: ingestionRecords,
         factSink: store,
+        logger: ingestionLogger,
         ...(ehrDocsClient !== undefined
             ? {
                   ehr: {

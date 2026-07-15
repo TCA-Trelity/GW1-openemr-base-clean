@@ -241,10 +241,10 @@ production composer), Langfuse span binding (E.4), routing-latency baseline.
   transition emits a structured log event `{correlation_id, from, to,
   routing_reason, timestamp}` (P3 anti-pattern guard: the supervisor is never a
   black box). *(Worked example: `docs/w2/trace-example.md`.)*
-- [ ] Tracing: worker invocations are child spans of the supervisor span;
+- [x] Tracing: worker invocations are child spans of the supervisor span;
   extraction/retrieval sub-calls are children of their worker spans (G13).
-  *(Span skeleton = the handoff events, documented in trace-example.md;
-  Langfuse binding lands in E.4.)*
+  *(Nested tree shipped + shape-asserted (H.7); visual confirm =
+  USER-ACTIONS item 10.)*
 - [x] Contract tests on the supervisor↔worker interface (typed state schema —
   G1/G7): a malformed worker payload fails the graph loudly, never propagates.
   *(`graph/contracts.ts`: entry ask + evidence payload, `.strict()` Zod;
@@ -627,10 +627,12 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
   the boot seam too.)*
 
 ### G13 — Distributed tracing hierarchy
-- [ ] Worker invocations are child spans of the supervisor span; extraction
+- [x] Worker invocations are child spans of the supervisor span; extraction
   and retrieval sub-calls are children of their worker spans; verified
   visually in Langfuse (and LangSmith demo env) and by span-parent assertions
-  in an integration test.
+  in an integration test. *(Span-parent assertions shipped (H.7). Langfuse
+  visual = USER-ACTIONS item 10 — a flat layout there reopens this box.
+  LangSmith leg on hold with USER-ACTIONS item 4.)*
 
 ### G14 — Health/readiness
 - [x] `/ready` adds probes: document storage (OpenEMR standard API
