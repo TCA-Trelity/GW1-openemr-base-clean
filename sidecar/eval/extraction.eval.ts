@@ -8,6 +8,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 import { computeMedicationRiskFlags } from '../src/engines/medicationRisk.js';
 import { VlmExtractor } from '../src/ingest/extractor.js';
 import {
@@ -18,6 +19,7 @@ import {
 } from '../src/ingest/service.js';
 import type { AnthropicCompletion } from '../src/prep/anthropic.js';
 import type { EhrVitalPayload } from '../src/openemr/standardApi.js';
+import { CitationRefSchema, type CitationRef } from '../src/schemas/citations.js';
 import type { FactInput, SourceDocumentInput } from '../src/store/factStore.js';
 import { recordEval } from './collector.js';
 
@@ -74,6 +76,15 @@ function harness(...vlmTexts: string[]): {
         },
     });
     return { service, captured, vlm };
+}
+
+/**
+ * fact.sources is `unknown` at the store boundary (jsonb column); parse it back through
+ * the real citation schema instead of casting — the ingestion pipeline built these rows
+ * as CitationRef[], so a parse failure here is itself a regression worth failing on.
+ */
+function citationsOf(fact: FactInput): CitationRef[] {
+    return z.array(CitationRefSchema).parse(fact.sources ?? []);
 }
 
 async function ingest(
@@ -150,6 +161,7 @@ describe('extraction goldens — schema_valid', () => {
             value: `${record.status} / ${vlm.complete.mock.calls.length} call(s)`,
             threshold: 'complete / 1 call',
             pass: record.status === 'complete' && vlm.complete.mock.calls.length === 1,
+            difficulty: 'straightforward',
             category: 'schema_valid',
             enforce: 'soft',
         });
@@ -169,6 +181,7 @@ describe('extraction goldens — schema_valid', () => {
             value: `${record.status} / vitals ${vitalsOk ? 'mapped 64in-138lb-128/78' : 'NOT mapped'}`,
             threshold: 'complete / height+weight+BP mapped',
             pass: record.status === 'complete' && record.vitals_written && vitalsOk,
+            difficulty: 'straightforward',
             category: 'schema_valid',
             enforce: 'soft',
         });
@@ -187,6 +200,8 @@ describe('extraction goldens — schema_valid', () => {
             value: `${record.status} / ${a1c === undefined ? 'missing' : 'persisted'}`,
             threshold: 'complete / persisted',
             pass: record.status === 'complete' && a1c !== undefined,
+            // Reordered printed name ('ALVAREZ, ROBERT M' vs chart 'Robert M. Alvarez') needs disambiguation.
+            difficulty: 'ambiguous',
             category: 'schema_valid',
             enforce: 'soft',
         });
@@ -204,6 +219,8 @@ describe('extraction goldens — schema_valid', () => {
             value: `${record.status} / retried=${String(retried)} / ${vlm.complete.mock.calls.length} calls`,
             threshold: 'complete / retried=true / 2 calls',
             pass: record.status === 'complete' && retried && vlm.complete.mock.calls.length === 2,
+            // Degenerate model output (malformed JSON) on the first attempt.
+            difficulty: 'edge-case',
             category: 'schema_valid',
             enforce: 'soft',
         });
@@ -221,6 +238,7 @@ describe('extraction goldens — schema_valid', () => {
             value: `${record.status} / ${captured.facts.length} facts`,
             threshold: 'failed_validation / 0 facts',
             pass: record.status === 'failed_validation' && captured.facts.length === 0,
+            difficulty: 'edge-case',
             category: 'schema_valid',
             enforce: 'soft',
         });
@@ -235,13 +253,14 @@ describe('extraction goldens — citation_present', () => {
     it('every persisted fact carries a per-field citation back to the source document', async () => {
         const { service, captured } = harness(RENAL_JSON);
         await ingest(service, cleanRenal, 'lab_pdf');
-        const uncited = captured.facts.filter(
-            (fact) =>
+        const uncited = captured.facts.filter((fact) => {
+            const sources = citationsOf(fact);
+            return (
                 fact.source_document_id === undefined ||
-                fact.sources === undefined ||
-                fact.sources.length === 0 ||
-                fact.sources.some((source) => source.excerpt_text === '' || source.source_document_id === null),
-        );
+                sources.length === 0 ||
+                sources.some((source) => source.excerpt_text === '' || source.source_document_id === null)
+            );
+        });
         recordEval({
             id: 'extraction.every-persisted-fact-cites',
             description: 'Every fact persisted from a document carries excerpt text + source document id (R5 citation contract)',
@@ -249,6 +268,7 @@ describe('extraction goldens — citation_present', () => {
             value: `${uncited.length} of ${captured.facts.length}`,
             threshold: '0 uncited',
             pass: captured.facts.length > 0 && uncited.length === 0,
+            difficulty: 'straightforward',
             category: 'citation_present',
         });
         expect(uncited).toHaveLength(0);
@@ -259,8 +279,8 @@ describe('extraction goldens — citation_present', () => {
         await ingest(service, cleanRenal, 'lab_pdf');
         const planted = captured.facts.find((fact) => (fact.content as { test_name?: string }).test_name === 'Planted Absent Test');
         const real = captured.facts.find((fact) => (fact.content as { test_name?: string }).test_name === 'Creatinine');
-        const plantedLocation = planted?.sources?.[0]?.excerpt_location ?? null;
-        const realLocation = real?.sources?.[0]?.excerpt_location ?? null;
+        const plantedLocation = planted === undefined ? null : (citationsOf(planted)[0]?.excerpt_location ?? null);
+        const realLocation = real === undefined ? null : (citationsOf(real)[0]?.excerpt_location ?? null);
         recordEval({
             id: 'extraction.invented-quote-never-citable',
             description: 'The grounding ladder flags a planted absent quote unverified (location null) while real values keep located citations (P2)',
@@ -268,6 +288,8 @@ describe('extraction goldens — citation_present', () => {
             value: `${plantedLocation === null ? 'null' : 'LOCATED (bad)'} / ${realLocation === null ? 'MISSING (bad)' : realLocation.type}`,
             threshold: 'null / word_box or page location',
             pass: planted !== undefined && plantedLocation === null && realLocation !== null,
+            // Adversarial planted quote absent from the document.
+            difficulty: 'edge-case',
             category: 'citation_present',
         });
         expect(plantedLocation).toBeNull();
@@ -286,6 +308,8 @@ describe('extraction goldens — citation_present', () => {
             value: grounding === null ? 'no summary' : `word_box=${grounding.word_box}, unverified=${grounding.unverified}/${grounding.total}`,
             threshold: 'word_box=0, all unverified',
             pass: record.status === 'complete' && honest,
+            // Degraded input (image-only low-DPI scan): honest-grounding judgment, not a clean path.
+            difficulty: 'ambiguous',
             category: 'citation_present',
         });
         expect(honest).toBe(true);
@@ -312,6 +336,7 @@ describe('extraction goldens — factually_consistent', () => {
             value: faithful ? 'value/numeric/flag/date intact' : `DRIFTED: ${JSON.stringify(content)}`,
             threshold: 'all four fields intact',
             pass: faithful,
+            difficulty: 'straightforward',
             category: 'factually_consistent',
             enforce: 'soft',
         });
@@ -332,6 +357,7 @@ describe('extraction goldens — factually_consistent', () => {
             value: `${baseline?.severity ?? 'none'} → ${retiered?.severity ?? 'none'} (egfr ${String(retiered?.details?.egfr)})`,
             threshold: 'low → medium (egfr 42)',
             pass: escalated,
+            difficulty: 'straightforward',
             category: 'factually_consistent',
             enforce: 'soft',
         });
@@ -352,6 +378,8 @@ describe('extraction goldens — factually_consistent', () => {
             value: idempotent ? 'same id, 0 extra inserts, 0 extra calls' : 'DUPLICATED',
             threshold: 'no duplicate work',
             pass: idempotent,
+            // Degenerate double-submit of byte-identical content.
+            difficulty: 'edge-case',
             category: 'factually_consistent',
             enforce: 'soft',
         });
@@ -371,6 +399,7 @@ describe('extraction goldens — factually_consistent', () => {
             value: ok ? 'persisted with goals text' : 'MISSING',
             threshold: 'persisted',
             pass: ok,
+            difficulty: 'straightforward',
             category: 'factually_consistent',
             enforce: 'soft',
         });
@@ -391,6 +420,8 @@ describe('extraction goldens — safe_refusal', () => {
             value: `${record.status} / ${captured.facts.length} facts`,
             threshold: 'blocked_patient_mismatch / 0 facts',
             pass: record.status === 'blocked_patient_mismatch' && captured.facts.length === 0,
+            // Cross-patient isolation: the document belongs to a different patient.
+            difficulty: 'edge-case',
             category: 'safe_refusal',
         });
         expect(record.status).toBe('blocked_patient_mismatch');

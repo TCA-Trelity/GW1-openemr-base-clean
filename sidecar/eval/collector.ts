@@ -13,6 +13,17 @@ import { appendFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { isSafetyCategory, type EvalCategory } from './categories.js';
 
+// Difficulty tiers (CT2). REQUIRED on every record — deliberately compile-breaking for any
+// call site that omits it (`npm run typecheck:eval` enforces), so a case can never slip in
+// untagged. Reporting-only: the gate (eval/gate.ts) and baseline never read difficulty.
+//   straightforward — clean input, expected happy path.
+//   ambiguous       — requires judgment/disambiguation: multi-turn context, degraded
+//                     scans, overlapping-document tie-breaks, nuanced phrasing.
+//   edge-case       — adversarial or degenerate: injection, PHI canaries, empty record,
+//                     cross-patient isolation, malformed model output, refusals.
+export const EVAL_DIFFICULTIES = ['straightforward', 'ambiguous', 'edge-case'] as const;
+export type EvalDifficulty = (typeof EVAL_DIFFICULTIES)[number];
+
 export interface EvalRecord {
     /** Stable id, `<suite>.<case>` (e.g. `citation-validity-100.margaret-chen`). */
     id: string;
@@ -25,6 +36,8 @@ export interface EvalRecord {
     /** The acceptance threshold the value is judged against. */
     threshold: string | number;
     pass: boolean;
+    /** Difficulty tier (CT2, required — see EVAL_DIFFICULTIES above). */
+    difficulty: EvalDifficulty;
     /** Honest caveats surfaced in the report's notes section. */
     notes?: string;
     /** Rubric category (Week 2). Legacy suites map via eval/categories.ts when absent. */

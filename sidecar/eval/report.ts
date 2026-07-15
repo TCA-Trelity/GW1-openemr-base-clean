@@ -5,8 +5,8 @@
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { EVAL_CATEGORIES, isSafetyCategory } from './categories.js';
-import { RESULTS_PATH, type EvalRecord } from './collector.js';
+import { categoryForRecord, EVAL_CATEGORIES, isSafetyCategory } from './categories.js';
+import { EVAL_DIFFICULTIES, RESULTS_PATH, type EvalDifficulty, type EvalRecord } from './collector.js';
 import { computeCategoryStats } from './gate.js';
 
 const OUTPUT_PATH = fileURLToPath(new URL('../../docs/execution/eval-results.md', import.meta.url));
@@ -122,6 +122,70 @@ export function generateReport(options: { suiteFailed?: boolean } = {}): ReportS
     }
     if (uncategorized.length > 0) {
         lines.push('', `**Uncategorized records (fix suite or legacy map):** ${uncategorized.map((id) => `\`${id}\``).join(', ')}`);
+    }
+
+    // CT2 difficulty rollup — reporting only, the gate never reads difficulty. The tier is
+    // REQUIRED on every EvalRecord at compile time (typecheck:eval), so no case can land
+    // here untagged; the untagged guard below only catches a stale hand-made ledger.
+    const byDifficulty = new Map<EvalDifficulty, { total: number; passed: number }>(
+        EVAL_DIFFICULTIES.map((difficulty) => [difficulty, { total: 0, passed: 0 }]),
+    );
+    const untagged: string[] = [];
+    for (const record of records) {
+        const bucket = byDifficulty.get(record.difficulty);
+        if (bucket === undefined) {
+            untagged.push(record.id);
+            continue;
+        }
+        bucket.total += 1;
+        if (record.pass) {
+            bucket.passed += 1;
+        }
+    }
+    lines.push(
+        '',
+        '## Coverage by difficulty',
+        '',
+        'Every case carries a required difficulty tier (compile-enforced, reporting-only):',
+        '**straightforward** = clean input, expected happy path; **ambiguous** = requires',
+        'judgment/disambiguation (multi-turn context, degraded scans, overlapping-document',
+        'tie-breaks); **edge-case** = adversarial/degenerate (injection, PHI canaries, empty',
+        'record, cross-patient isolation, refusals).',
+        '',
+        '| Difficulty | Cases | Passed | Pass rate |',
+        '|------------|------:|-------:|----------:|',
+    );
+    for (const difficulty of EVAL_DIFFICULTIES) {
+        const d = byDifficulty.get(difficulty) ?? { total: 0, passed: 0 };
+        const rate = d.total === 0 ? '—' : `${((d.passed / d.total) * 100).toFixed(1)}%`;
+        lines.push(`| ${difficulty} | ${d.total === 0 ? '—' : d.total} | ${d.total === 0 ? '—' : d.passed} | ${rate} |`);
+    }
+    if (untagged.length > 0) {
+        lines.push('', `**Untagged records (stale ledger — rerun \`npm run eval\`):** ${untagged.map((id) => `\`${id}\``).join(', ')}`);
+    }
+    // Category × difficulty concentration matrix: where the hard cases actually live.
+    const matrix = new Map<string, number>();
+    for (const record of records) {
+        const category = categoryForRecord(record);
+        if (category === undefined) {
+            continue; // already surfaced by the uncategorized list above
+        }
+        const key = `${category}|${record.difficulty}`;
+        matrix.set(key, (matrix.get(key) ?? 0) + 1);
+    }
+    lines.push(
+        '',
+        'Case counts per rubric category × difficulty:',
+        '',
+        `| Category | ${EVAL_DIFFICULTIES.join(' | ')} |`,
+        `|----------|${EVAL_DIFFICULTIES.map(() => '---:').join('|')}|`,
+    );
+    for (const category of EVAL_CATEGORIES) {
+        const counts = EVAL_DIFFICULTIES.map((difficulty) => {
+            const n = matrix.get(`${category}|${difficulty}`) ?? 0;
+            return n === 0 ? '—' : String(n);
+        });
+        lines.push(`| \`${category}\` | ${counts.join(' | ')} |`);
     }
 
     lines.push(

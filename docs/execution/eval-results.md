@@ -4,8 +4,8 @@
 > (suite: `sidecar/eval/`). Committed as a deliverable and refreshed on every run;
 > CI regenerates and uploads it as an artifact on every push touching `sidecar/**`.
 
-- **Generated:** 2026-07-15T11:35:39.494Z
-- **Commit:** `6e702c86f895ebd86d43675976b166f896ef253f` (workspace HEAD at generation time; in CI, the pushed commit)
+- **Generated:** 2026-07-15T15:12:19.368Z
+- **Commit:** `32bdad08504cab4c79e25901207df43190b07ee1` (workspace HEAD at generation time; in CI, the pushed commit)
 - **Result:** 58/58 evals passed
 
 ## Results
@@ -81,6 +81,31 @@
 | `safe_refusal` | safety (per-case) | 8 | 8 | 100.0% |
 | `no_phi_in_logs` | safety (per-case) | 3 | 3 | 100.0% |
 | `retrieval_grounded` | quality (>5%/threshold) | 12 | 12 | 100.0% |
+
+## Coverage by difficulty
+
+Every case carries a required difficulty tier (compile-enforced, reporting-only):
+**straightforward** = clean input, expected happy path; **ambiguous** = requires
+judgment/disambiguation (multi-turn context, degraded scans, overlapping-document
+tie-breaks); **edge-case** = adversarial/degenerate (injection, PHI canaries, empty
+record, cross-patient isolation, refusals).
+
+| Difficulty | Cases | Passed | Pass rate |
+|------------|------:|-------:|----------:|
+| straightforward | 26 | 26 | 100.0% |
+| ambiguous | 10 | 10 | 100.0% |
+| edge-case | 22 | 22 | 100.0% |
+
+Case counts per rubric category × difficulty:
+
+| Category | straightforward | ambiguous | edge-case |
+|----------|---:|---:|---:|
+| `schema_valid` | 2 | 1 | 2 |
+| `citation_present` | 8 | 1 | 4 |
+| `factually_consistent` | 8 | 4 | 5 |
+| `safe_refusal` | — | 1 | 7 |
+| `no_phi_in_logs` | — | — | 3 |
+| `retrieval_grounded` | 8 | 3 | 1 |
 
 ## What these evals are (and are not)
 

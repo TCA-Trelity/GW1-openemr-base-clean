@@ -51,6 +51,9 @@ describe('contradiction-ground-truth', () => {
                 detectableContradictions === 4 &&
                 excerptsChecked > 0 &&
                 excerptsFound === excerptsChecked,
+            // Contradictory sources are inherently judgment territory: the corpus content
+            // under test is documents that disagree with each other.
+            difficulty: 'ambiguous',
             notes:
                 'Two of the four authored contradictions (medication_compliance_gap, symptom_progression) cite a single source document — the second "side" of the disagreement is the visit-date context or the patient\'s in-visit report, not another document. For those, the precondition checked is that the one cited excerpt is verbatim; the two multi-document contradictions have every conflicting excerpt checked pairwise-verbatim (4 and 3 sources respectively).',
         });

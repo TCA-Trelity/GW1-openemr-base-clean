@@ -5,24 +5,28 @@
 // fusion/floor regression fails these cases identically everywhere.
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { recordEval } from './collector.js';
+import { recordEval, type EvalDifficulty } from './collector.js';
 import { HashEmbeddings } from '../src/retrieval/embeddings.js';
 import { PassthroughReranker } from '../src/retrieval/rerank.js';
 import { HybridRetriever, loadCorpusChunks } from '../src/retrieval/retriever.js';
 
 const CORPUS_DIR = fileURLToPath(new URL('../corpus/', import.meta.url));
 
-const GOLDENS: { id: string; query: string; expectDoc: string; tags?: string[] }[] = [
-    { id: 'hcq-dosing', query: 'hydroxychloroquine daily dose threshold real body weight', expectDoc: 'hcq-screening' },
-    { id: 'hcq-renal', query: 'reduced eGFR renal impairment hydroxychloroquine screening interval', expectDoc: 'renal-function-ocular-drug-safety' },
-    { id: 'hcq-asian-pattern', query: 'pericentral toxicity pattern Asian ancestry visual field 24-2', expectDoc: 'hcq-screening' },
-    { id: 'tande-extend', query: 'treat and extend injection interval extension increment maximum', expectDoc: 'anti-vegf-treat-and-extend' },
-    { id: 'tande-shorten', query: 'shorten injection interval fluid recurrence CRT increase', expectDoc: 'anti-vegf-treat-and-extend' },
-    { id: 'dr-staging', query: 'nonproliferative diabetic retinopathy severity 4-2-1 rule follow-up', expectDoc: 'diabetic-retinopathy-management' },
-    { id: 'dr-systemic', query: 'HbA1c target blood pressure control retinopathy progression', expectDoc: 'systemic-risk-factors-dr' },
-    { id: 'amd-areds', query: 'AREDS2 supplement formula intermediate AMD risk reduction', expectDoc: 'amd-management' },
-    { id: 'rvo-neovascular', query: 'central retinal vein occlusion neovascular glaucoma surveillance gonioscopy', expectDoc: 'rvo-management' },
-    { id: 'intake-standards', query: 'intake documentation required laterality patient goals verification', expectDoc: 'intake-documentation-standards' },
+// Difficulty is authored PER GOLDEN (CT2): most asks have one clear home document
+// (straightforward); 'hcq-renal' and 'dr-systemic' straddle two overlapping corpus docs
+// (hcq-screening also covers renal risk; retinopathy progression is core to BOTH DR docs)
+// — the retriever has to win a genuine tie-break, so those two are ambiguous.
+const GOLDENS: { id: string; query: string; expectDoc: string; difficulty: EvalDifficulty; tags?: string[] }[] = [
+    { id: 'hcq-dosing', query: 'hydroxychloroquine daily dose threshold real body weight', expectDoc: 'hcq-screening', difficulty: 'straightforward' },
+    { id: 'hcq-renal', query: 'reduced eGFR renal impairment hydroxychloroquine screening interval', expectDoc: 'renal-function-ocular-drug-safety', difficulty: 'ambiguous' },
+    { id: 'hcq-asian-pattern', query: 'pericentral toxicity pattern Asian ancestry visual field 24-2', expectDoc: 'hcq-screening', difficulty: 'straightforward' },
+    { id: 'tande-extend', query: 'treat and extend injection interval extension increment maximum', expectDoc: 'anti-vegf-treat-and-extend', difficulty: 'straightforward' },
+    { id: 'tande-shorten', query: 'shorten injection interval fluid recurrence CRT increase', expectDoc: 'anti-vegf-treat-and-extend', difficulty: 'straightforward' },
+    { id: 'dr-staging', query: 'nonproliferative diabetic retinopathy severity 4-2-1 rule follow-up', expectDoc: 'diabetic-retinopathy-management', difficulty: 'straightforward' },
+    { id: 'dr-systemic', query: 'HbA1c target blood pressure control retinopathy progression', expectDoc: 'systemic-risk-factors-dr', difficulty: 'ambiguous' },
+    { id: 'amd-areds', query: 'AREDS2 supplement formula intermediate AMD risk reduction', expectDoc: 'amd-management', difficulty: 'straightforward' },
+    { id: 'rvo-neovascular', query: 'central retinal vein occlusion neovascular glaucoma surveillance gonioscopy', expectDoc: 'rvo-management', difficulty: 'straightforward' },
+    { id: 'intake-standards', query: 'intake documentation required laterality patient goals verification', expectDoc: 'intake-documentation-standards', difficulty: 'straightforward' },
 ];
 
 const OUT_OF_CORPUS: { id: string; query: string }[] = [
@@ -59,6 +63,7 @@ describe('retrieval-grounded goldens (B.6)', () => {
                 value: hit ? `hit (got ${docs.join(',')})` : `MISS (got ${docs.join(',') || 'EMPTY'})`,
                 threshold: 'expected doc in top-3, top quote > 40 chars',
                 pass: hit,
+                difficulty: golden.difficulty,
                 category: 'retrieval_grounded',
                 enforce: 'soft',
             });
@@ -82,6 +87,8 @@ describe('retrieval-grounded goldens (B.6)', () => {
             value: `${refusals}/${OUT_OF_CORPUS.length}`,
             threshold: `${OUT_OF_CORPUS.length}/${OUT_OF_CORPUS.length}`,
             pass: refusals === OUT_OF_CORPUS.length,
+            // Refusal floor over out-of-corpus asks — one uniform tier for the pair.
+            difficulty: 'edge-case',
             category: 'retrieval_grounded',
         });
         expect(refusals).toBe(OUT_OF_CORPUS.length);
@@ -101,6 +108,7 @@ describe('retrieval-grounded goldens (B.6)', () => {
             value: leaked.length === 0 ? '0 leaked' : `LEAKED: ${leaked.join(', ')}`,
             threshold: '0 leaked',
             pass: leaked.length === 0,
+            difficulty: 'edge-case',
             category: 'no_phi_in_logs',
         });
         expect(leaked).toEqual([]);

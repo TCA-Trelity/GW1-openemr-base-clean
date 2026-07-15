@@ -110,6 +110,7 @@ describe('full-path graph goldens (D.3)', () => {
             value: `${outcome.ingestion?.status ?? 'none'} / ${outcome.answer?.verified_claims ?? 0} verified / ${citation?.source_type ?? 'none'}`,
             threshold: 'complete / ≥1 verified / guideline_evidence',
             pass,
+            difficulty: 'straightforward',
             category: 'citation_present',
         });
         expect(pass).toBe(true);
@@ -134,6 +135,8 @@ describe('full-path graph goldens (D.3)', () => {
             value: `${outcome.answer?.blocked_claims ?? 0} blocked / ${outcome.answer?.verified_claims ?? 0} verified / ${outcome.answer?.citations.length ?? 0} citations`,
             threshold: '1 blocked / 0 verified / 0 citations',
             pass,
+            // Adversarial composer: invents a guideline quote the critic must block.
+            difficulty: 'edge-case',
             category: 'citation_present',
         });
         expect(pass).toBe(true);
@@ -158,6 +161,8 @@ describe('full-path graph goldens (D.3)', () => {
             value: `${outcome.route} / ${outcome.evidence.length} snippets / ${outcome.answer?.text.slice(0, 40) ?? 'none'}…`,
             threshold: 'needs_evidence / 0 snippets / "No practice protocol on file"',
             pass,
+            // Refusal path: out-of-domain ask must yield an honest empty answer.
+            difficulty: 'edge-case',
             category: 'safe_refusal',
         });
         expect(pass).toBe(true);
@@ -176,6 +181,8 @@ describe('full-path graph goldens (D.3)', () => {
             value: docs.join(', ') || 'none',
             threshold: 'includes hcq-screening or renal-function-ocular-drug-safety',
             pass: stored.length === 1 && onTopic,
+            // Topical-relevance judgment: which of two plausible protocols gets pinned.
+            difficulty: 'ambiguous',
             category: 'retrieval_grounded',
             enforce: 'soft',
         });
