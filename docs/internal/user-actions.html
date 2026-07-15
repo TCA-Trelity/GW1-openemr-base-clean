@@ -260,9 +260,10 @@ const ACTIVE_ITEMS = [
 <li>Find the graph/chat trace ~<b>15:33:50 UTC 07-15</b> (conversation <code>cf4bfa54-edd3-4c02-a7be-0a8bc3466acc</code>): check whether <code>supervisor</code> shows <code>evidence_retriever</code> (and critic) as <b>children nested inside it</b>. <b>Expected today: flat siblings</b> — spec-verification found the tracer emits flat spans; H.7 is the fix ticket. Your look confirms the before-state (H.7/G13's visual half).</li>
 <li>Privacy spot-check: ids/hashes/counts only — no patient names, no document text.</li>
 </ol>
-<h4>B — Railway → sidecar service → Deployments → View logs</h4>
+<h4>B — Railway → the SIDECAR service → latest deployment → Deploy Logs</h4>
+<div class="warnbox"><b>Two common misses (hit 07-15):</b> the right card is the one whose domain is <code>enchanting-mercy-production-5d32.up.railway.app</code> — NOT the <code>gw1-openemr-…</code> card (that's OpenEMR; its logs never contain <code>blockedFacts</code>). And the search goes in the <b>Deploy Logs</b> tab — Build Logs only show the image build.</div>
 <ol>
-<li>Search <code>blockedFacts</code> around <b>15:01–15:07 UTC</b> (prep correlation <code>e0b043a1-1eaa-400d-813c-a5299b16cc63</code>) → paste the line(s) in chat — names which 5 prep claims got blocked and why (finding 1).</li>
+<li>Search <code>blockedFacts</code> around <b>15:01–15:07 UTC (11:01–11:07 AM EDT)</b> 2026-07-15 (prep correlation <code>e0b043a1-1eaa-400d-813c-a5299b16cc63</code>; fallbacks: <code>blocked</code>, or the correlation id itself) → paste the line(s) in chat — names which 5 prep claims got blocked and why (finding 1).</li>
 <li><s>Search the critic/gate rejection for the chat turn</s> — <b>no longer needed</b>: finding 2 was root-caused in-session by direct live repro (composer paraphrases; verbatim gate strips). Fix = ticket H.4b on the branch.</li>
 </ol>
 <div class="verify"><b>Report in chat:</b> the two pasted log lines + "trace visible, nested, clean" (or what you actually see). The agent turns them into a one-time live-data cleanup or a product ticket.</div>`},

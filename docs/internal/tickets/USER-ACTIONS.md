@@ -71,11 +71,19 @@ can open:
 3. Privacy spot-check: spans carry ids/hashes/counts — no patient names, no
    document text.
 
-**B. Railway → sidecar service → Deployments → View logs (same ~5 min):**
+**B. Railway → the SIDECAR service → latest deployment → Deploy Logs:**
 
-1. Search `blockedFacts` around **15:01–15:07 UTC** (prep correlation
-   `e0b043a1-1eaa-400d-813c-a5299b16cc63`) — paste the log line(s) in chat.
-   This names exactly which 5 prep claims got blocked and why (finding 1).
+> ⚠️ Two common misses (hit 2026-07-15): (1) the right card is the one
+> whose domain is `enchanting-mercy-production-5d32.up.railway.app` — NOT
+> the `gw1-openemr-…` card (that's OpenEMR itself; its logs never contain
+> `blockedFacts`); (2) the search goes in the **Deploy Logs** tab —
+> Build Logs only show the image build.
+
+1. Search `blockedFacts` around **15:01–15:07 UTC (11:01–11:07 AM EDT)**
+   2026-07-15 (prep correlation `e0b043a1-1eaa-400d-813c-a5299b16cc63`;
+   fallback searches: `blocked`, or the correlation id itself) — paste the
+   log line(s) in chat. This names exactly which 5 prep claims got blocked
+   and why (finding 1).
 2. ~~Search the critic/gate rejection for the chat turn~~ **No longer
    needed** — finding 2 was root-caused in-session by direct live repro
    once network access opened (composer paraphrases; verbatim gate
