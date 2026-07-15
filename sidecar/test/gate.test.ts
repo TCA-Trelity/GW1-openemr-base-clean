@@ -116,6 +116,143 @@ describe('runCitationGate', () => {
     });
 });
 
+// v2 evidence types (H.6): reject-path proof for the two Week 2 citation classes.
+// The gate's verbatim rule is generic (citationGate.ts:55-57) — these tests pin that
+// it actually REJECTS unverifiable quotes arriving as document-extraction citations
+// (page/page_bbox locations, the shape factsOf() builds after grounding) and as
+// guideline_evidence citations (chunk-id sources, the shape the composer emits).
+const LAB_TEXT = 'RENAL FUNCTION PANEL — Margaret Chen. eGFR 42 mL/min/1.73m2 (Low). Creatinine 1.58 mg/dL (High).';
+
+const labResolver: DocumentTextResolver = (id) => (id === 'doc-lab-renal' ? LAB_TEXT : undefined);
+
+function pageBboxCitation(overrides: Partial<CitationRef> = {}): CitationRef {
+    return citation({
+        id: 'cit-doc-1',
+        source_label: 'Outside lab PDF',
+        source_type: 'lab_report',
+        excerpt_text: 'eGFR 42 mL/min/1.73m2',
+        excerpt_location: { type: 'page_bbox', page: 1, x: 0.12, y: 0.4, w: 0.2, h: 0.03 },
+        source_document_id: 'doc-lab-renal',
+        page_or_section: 'page 1',
+        field_or_chunk_id: 'results[0].value',
+        ...overrides,
+    });
+}
+
+// Mirrors the critic's source-resolution seam (graph.ts:217-218): only chunk ids
+// retrieved this turn resolve, and they resolve to the chunk's quote body.
+const GUIDELINE_CHUNK_ID = 'hcq-screening#risk-factors';
+const GUIDELINE_CHUNK_TEXT =
+    'Renal disease is a major risk factor; begin annual screening at initiation when eGFR is reduced.';
+
+const chunkResolver: DocumentTextResolver = (id) => (id === GUIDELINE_CHUNK_ID ? GUIDELINE_CHUNK_TEXT : undefined);
+
+function guidelineCitation(overrides: Partial<CitationRef> = {}): CitationRef {
+    return citation({
+        id: 'cit-guideline-1',
+        source_label: 'AAO 2016 hydroxychloroquine screening recommendations',
+        source_type: 'guideline_evidence',
+        excerpt_text: 'Renal disease is a major risk factor',
+        excerpt_location: null,
+        attribution: null,
+        source_document_id: GUIDELINE_CHUNK_ID,
+        document_date: null,
+        page_or_section: '§ Risk factors',
+        field_or_chunk_id: GUIDELINE_CHUNK_ID,
+        ...overrides,
+    });
+}
+
+describe('v2 evidence types: page/page_bbox + guideline_evidence citations', () => {
+    // Accept-path sanity (no gate-unit case for this type existed): a page_bbox
+    // location carries no character range, so a genuine quote must verify through
+    // the verbatim-search path.
+    it('verifies a page_bbox citation whose excerpt appears verbatim in the document text', () => {
+        const check = checkCitation(pageBboxCitation(), labResolver);
+        expect(check.result).toBe('ok_search');
+        if (check.result === 'ok_search') {
+            expect(LAB_TEXT.slice(check.correctedRange.start_char, check.correctedRange.end_char)).toBe(
+                'eGFR 42 mL/min/1.73m2',
+            );
+        }
+    });
+
+    // Guards: THE invariant for document extraction — a value the model invented
+    // (never printed on the page) must not verify just because the bbox looks plausible.
+    it('blocks a page_bbox citation whose excerpt is absent from the document text', () => {
+        expect(checkCitation(pageBboxCitation({ excerpt_text: 'eGFR 61 mL/min/1.73m2' }), labResolver).result).toBe(
+            'excerpt_mismatch',
+        );
+    });
+
+    // Guards: paraphrase sneaking through the whitespace-flexible fallback for
+    // document-extraction citations (same rule the referral tests pin for W1 ranges).
+    it('blocks a page_bbox citation that paraphrases the document instead of quoting it', () => {
+        const paraphrase = pageBboxCitation({ excerpt_text: 'estimated GFR of 42, consistent with reduced renal function' });
+        expect(checkCitation(paraphrase, labResolver).result).toBe('excerpt_mismatch');
+    });
+
+    // Guards: the page-level fallback shape (grounding found the page but no word
+    // box) gets no extra leniency — the quote must still exist verbatim.
+    it('blocks a page-fallback citation whose excerpt is absent from the document text', () => {
+        const fabricated = pageBboxCitation({
+            excerpt_text: 'Creatinine 0.90 mg/dL',
+            excerpt_location: { type: 'page', page: 1 },
+        });
+        expect(checkCitation(fabricated, labResolver).result).toBe('excerpt_mismatch');
+    });
+
+    // Accept-path sanity (no gate-unit case for this type existed): a chunk-backed
+    // guideline quote that IS verbatim must verify — locations are never present.
+    it('verifies a guideline_evidence citation quoting its retrieved chunk verbatim', () => {
+        expect(checkCitation(guidelineCitation(), chunkResolver).result).toBe('ok_search');
+    });
+
+    // Guards: an invented recommendation attributed to a real guideline chunk —
+    // the exact fabrication the critic node exists to stop (E1).
+    it('blocks a guideline_evidence citation whose quote is not verbatim in the referenced chunk', () => {
+        const invented = guidelineCitation({ excerpt_text: 'Discontinue hydroxychloroquine when eGFR falls below 45' });
+        expect(checkCitation(invented, chunkResolver).result).toBe('excerpt_mismatch');
+    });
+
+    // Guards: near-miss rewording of real guideline text ("kidney" for "renal") —
+    // paraphrase is not provenance for guideline quotes either.
+    it('blocks a guideline_evidence citation that paraphrases the chunk instead of quoting it', () => {
+        const paraphrase = guidelineCitation({ excerpt_text: 'Kidney disease is a major risk factor' });
+        expect(checkCitation(paraphrase, chunkResolver).result).toBe('excerpt_mismatch');
+    });
+
+    // Guards: a citation naming a chunk that was never retrieved this turn — the
+    // critic's resolver only knows current evidence, so this must fail as missing,
+    // never silently pass.
+    it('blocks a guideline_evidence citation whose chunk id was never retrieved', () => {
+        expect(checkCitation(guidelineCitation({ source_document_id: 'hcq-screening#dosing' }), chunkResolver)).toEqual({
+            result: 'missing_document',
+        });
+    });
+
+    // Guards: end-to-end — a claim backed by either v2 citation type with an
+    // unverifiable quote must leave runCitationGate BLOCKED, and counted as failed.
+    it('runCitationGate blocks claims carrying fabricated page_bbox or guideline quotes', () => {
+        const resolve: DocumentTextResolver = (id) => labResolver(id) ?? chunkResolver(id);
+        const result = runCitationGate(
+            [
+                { id: 'doc-claim', citations: [pageBboxCitation({ excerpt_text: 'eGFR 61 mL/min/1.73m2' })] },
+                {
+                    id: 'guideline-claim',
+                    citations: [guidelineCitation({ excerpt_text: 'Discontinue hydroxychloroquine when eGFR falls below 45' })],
+                },
+            ],
+            resolve,
+        );
+        expect(result.verdicts.map((v) => ({ id: v.id, status: v.status, reason: v.reason }))).toEqual([
+            { id: 'doc-claim', status: 'blocked', reason: 'citation_failed' },
+            { id: 'guideline-claim', status: 'blocked', reason: 'citation_failed' },
+        ]);
+        expect(result.metrics).toMatchObject({ claims: 2, verified: 0, blocked: 2, citationsFailed: 2 });
+    });
+});
+
 describe('corpus invariant: 100% citation validity', () => {
     // Guards: the seeded corpus drifting out of provenance — if this fails, a
     // demo brief would contain citations the gate must block.

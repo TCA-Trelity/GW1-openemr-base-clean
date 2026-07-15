@@ -283,7 +283,9 @@ page/bbox variant, no PDF preview overlay.
 - [x] Guideline citations verify quote-vs-stored-chunk through the same gate
   path as record citations. *(E.9: the critic node runs `runCitationGate`
   over composer claims against snippet bodies; blocked claims release zero
-  citations end-to-end through the chat SSE — route-tested.)*
+  citations end-to-end through the chat SSE — route-tested. H.6 (merged
+  plan) adds gate-unit reject proof for both v2 citation types —
+  page/page_bbox and guideline_evidence — in `sidecar/test/gate.test.ts`.)*
 
 ### S4/R6 — Eval-driven CI gate
 
@@ -433,7 +435,7 @@ when PR #9's build deploys. LangSmith fenced to the demo env (E.5); no OTEL.
 
 | ID | Spec item | Status / decision |
 |----|-----------|-------------------|
-| E1 | *"Critic agent that rejects uncited claims or unsafe action suggestions."* | **Committed.** Week 1's deterministic citation gate + prescriptiveness lint promoted to the graph's answer-side critic node. Acceptance: no answer leaves the graph without passing the critic node; rejections logged with reason. |
+| E1 | *"Critic agent that rejects uncited claims or unsafe action suggestions."* | **Committed.** Week 1's deterministic citation gate + prescriptiveness lint promoted to the graph's answer-side critic node. Acceptance: no answer leaves the graph without passing the critic node; rejections logged with reason. H.6 (merged plan) adds gate-unit reject proof for page/page_bbox + guideline_evidence citations — 7 reject-path cases in `sidecar/test/gate.test.ts`; the gate rejected both on first run. |
 | E2 | *"Click-to-source UI for citation snippets, with a simple document preview."* | **Delivered via R5** (required bbox overlay implies preview + click-to-source). Acceptance folded into R5. |
 | E3 | *"A third document type such as referral fax or medication list."* | **Not committed** — framed "seam built, sequenced next" (schema enum + doc-type registry designed for extension; referral fax is the designed slot, UC-3). |
 | E4 | *"Lab trend chart widget that uses extracted Observation data."* | **Not committed** this week — seam: extracted lab facts carry `{test_name, value, unit, collection_date}` sufficient for the panel's existing `Trends.tsx` pattern to consume later. |
