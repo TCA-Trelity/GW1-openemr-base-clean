@@ -263,7 +263,7 @@ const ACTIVE_ITEMS = [
 <h4>B — Railway → the SIDECAR service → latest deployment → Deploy Logs</h4>
 <div class="warnbox"><b>Two common misses (hit 07-15):</b> the right card is the one whose domain is <code>enchanting-mercy-production-5d32.up.railway.app</code> — NOT the <code>gw1-openemr-…</code> card (that's OpenEMR; its logs never contain <code>blockedFacts</code>). And the search goes in the <b>Deploy Logs</b> tab — Build Logs only show the image build.</div>
 <ol>
-<li>Search <code>blockedFacts</code> around <b>15:01–15:07 UTC (11:01–11:07 AM EDT)</b> 2026-07-15 (prep correlation <code>e0b043a1-1eaa-400d-813c-a5299b16cc63</code>; fallbacks: <code>blocked</code>, or the correlation id itself) → paste the line(s) in chat — names which 5 prep claims got blocked and why (finding 1).</li>
+<li><s>Search <code>blockedFacts</code></s> — <b>DONE (07-15, via <code>citation AND gate</code>):</b> 15:06 UTC prep blocked <code>med-001..med-005</code>, all <code>citation_failed</code>; 15:33 UTC prep verified 147/147, <code>blockedFacts: []</code>. Intermittent live-model paraphrase in prep extraction confirmed — fix = ticket H.4c. Nothing further needed.</li>
 <li><s>Search the critic/gate rejection for the chat turn</s> — <b>no longer needed</b>: finding 2 was root-caused in-session by direct live repro (composer paraphrases; verbatim gate strips). Fix = ticket H.4b on the branch.</li>
 </ol>
 <div class="verify"><b>Report in chat:</b> the two pasted log lines + "trace visible, nested, clean" (or what you actually see). The agent turns them into a one-time live-data cleanup or a product ticket.</div>`},

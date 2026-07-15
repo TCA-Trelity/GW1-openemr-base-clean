@@ -79,11 +79,12 @@ can open:
 > `blockedFacts`); (2) the search goes in the **Deploy Logs** tab —
 > Build Logs only show the image build.
 
-1. Search `blockedFacts` around **15:01–15:07 UTC (11:01–11:07 AM EDT)**
-   2026-07-15 (prep correlation `e0b043a1-1eaa-400d-813c-a5299b16cc63`;
-   fallback searches: `blocked`, or the correlation id itself) — paste the
-   log line(s) in chat. This names exactly which 5 prep claims got blocked
-   and why (finding 1).
+1. ~~Search `blockedFacts`~~ **DONE (user, 2026-07-15, via `citation AND
+   gate`):** the 15:06 UTC prep blocked `med-001..med-005`, all reason
+   `citation_failed`; the 15:33 UTC prep verified 147/147 with
+   `blockedFacts: []`. Confirms intermittent live-model paraphrase in prep
+   extraction — fix is ticket H.4c on the branch. Nothing further needed
+   here.
 2. ~~Search the critic/gate rejection for the chat turn~~ **No longer
    needed** — finding 2 was root-caused in-session by direct live repro
    once network access opened (composer paraphrases; verbatim gate
