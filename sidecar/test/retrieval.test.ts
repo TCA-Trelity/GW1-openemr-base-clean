@@ -212,4 +212,44 @@ describe('Cohere providers (mocked fetch — contract, timeout, retry)', () => {
         expect(outcome.order.map((entry) => entry.id)).toEqual(['b', 'a']);
         expect(outcome.rerankApplied).toBe(true);
     });
+
+    // H.2 (/ready honesty): the readiness probe reads lastOutcome instead of spending a
+    // Cohere call per poll — so the reranker must remember how its last REAL call ended.
+    it('rerank: records the last real call outcome for the readiness probe', async () => {
+        let status = 200;
+        const fetchImpl = vi.fn(async () =>
+            status === 200
+                ? new Response(JSON.stringify({ results: [{ index: 0, relevance_score: 0.9 }] }), { status })
+                : new Response('{}', { status }),
+        );
+        const reranker = new CohereReranker({ apiKey: 'k', model: 'rerank-english-v3.0', fetchImpl });
+
+        // Keyed but never exercised: no observation — the probe reports "unverified".
+        expect(reranker.lastOutcome).toBeUndefined();
+
+        // Zero candidates short-circuits WITHOUT an API call — the view must not change.
+        await reranker.rerank('q', [], 3, 'corr');
+        expect(fetchImpl).not.toHaveBeenCalled();
+        expect(reranker.lastOutcome).toBeUndefined();
+
+        await reranker.rerank('q', [{ id: 'a', text: 'A' }], 1, 'corr');
+        expect(reranker.lastOutcome?.ok).toBe(true);
+        expect(reranker.lastOutcome?.at).toBeInstanceOf(Date);
+
+        // Non-transient failure (single attempt): the failure supersedes the success and
+        // carries provider/status text only — never query or document content.
+        status = 400;
+        await expect(
+            reranker.rerank('sensitive query text', [{ id: 'a', text: 'SENSITIVE-DOC-TEXT' }], 1, 'corr'),
+        ).rejects.toBeInstanceOf(RetrievalProviderError);
+        expect(reranker.lastOutcome?.ok).toBe(false);
+        expect(reranker.lastOutcome?.detail).toContain('status 400');
+        expect(reranker.lastOutcome?.detail).not.toContain('SENSITIVE');
+        expect(reranker.lastOutcome?.detail).not.toContain('sensitive');
+
+        // Traffic succeeding again flips the observation back to ok.
+        status = 200;
+        await reranker.rerank('q', [{ id: 'a', text: 'A' }], 1, 'corr');
+        expect(reranker.lastOutcome?.ok).toBe(true);
+    });
 });

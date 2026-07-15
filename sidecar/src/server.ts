@@ -327,10 +327,13 @@ export function buildServer(config: Config, deps?: AppDeps): FastifyInstance {
                                 }
                             },
                         }),
-                  // Reranker: keyed → live Cohere client was constructed at boot; unkeyed
-                  // deployments run PassthroughReranker and report not_configured (degraded,
-                  // accurate — fused order still serves).
-                  ...(config.COHERE_API_KEY === undefined ? {} : { checkReranker: async () => {} }),
+                  // Reranker (H.2): the probe reflects the outcome of the last REAL rerank
+                  // made by traffic — key presence alone is no evidence Cohere answers, and
+                  // a per-poll live call is ruled out (rate limits + per-call cost). Wired
+                  // beside the CohereReranker in buildEvidenceDeps; unkeyed deployments run
+                  // PassthroughReranker with no probe → not_configured (degraded, accurate —
+                  // fused order still serves).
+                  ...(deps.evidence?.checkReranker === undefined ? {} : { checkReranker: deps.evidence.checkReranker }),
               },
     );
     registerAuthRoutes(app, deps?.authRoutes);
@@ -441,6 +444,27 @@ export async function buildEvidenceDeps(
             ...(logger === undefined ? {} : { logger }),
             ...(denseIndex === undefined ? {} : { denseIndex }),
         }),
+        // H.2: /ready's reranker probe. Reports the outcome of the LAST real rerank made
+        // by traffic (CohereReranker records it) — never a per-poll Cohere call: trial
+        // keys are rate-limited and every rerank costs money. Keyed but not yet exercised
+        // is ok with an explicit "unverified" detail; a failure more recent than the last
+        // success reports failed until traffic succeeds again.
+        ...(reranker instanceof CohereReranker
+            ? {
+                  checkReranker: async (): Promise<string> => {
+                      const observed = reranker.lastOutcome;
+                      if (observed === undefined) {
+                          return 'keyed (unverified since boot — no rerank traffic yet)';
+                      }
+                      if (!observed.ok) {
+                          throw new Error(
+                              `last real rerank failed at ${observed.at.toISOString()}${observed.detail === undefined ? '' : ` — ${observed.detail}`}`,
+                          );
+                      }
+                      return `verified by live traffic (last rerank ok at ${observed.at.toISOString()})`;
+                  },
+              }
+            : {}),
     };
 }
 

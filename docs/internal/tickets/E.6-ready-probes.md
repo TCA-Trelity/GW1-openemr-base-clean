@@ -29,8 +29,8 @@ the reranker live or in passthrough fallback?" — before he uploads anything.
 
 ## Files to create/modify (as-built)
 
-- `src/routes/health.ts` — `HealthProbes` gains `checkDocumentStorage?`, `checkRetrieverIndex?`, `checkReranker?` (all `() => Promise<void>`); `buildChecks()` appends three `DepCheck` entries named `document_storage`, `retriever_index`, `reranker`, each `requiredInProduction: false`, `configured: probes?.<fn> !== undefined`, `check: probes?.<fn> ?? (async () => {})`.
-- `src/server.ts` — `AppDeps` gains `checkDocumentStorage?: () => Promise<void>`. `buildDeps` hoists the password-grant client into a shared `ehrTokenProvider` (used by both `StandardApiClient` and the probe) and returns `...(ehrTokenProvider !== undefined ? { checkDocumentStorage: async () => { await ehrTokenProvider.getAccessToken(); } } : {})`. The `registerHealthRoutes(...)` call site passes all wired probes (postgres + document_storage always from deps; retriever_index/reranker join where `buildEvidenceDeps` resolves in the boot block — a retriever that holds chunks answers, a keyed Cohere reranker answers, otherwise the probe is absent → `not_configured`).
+- `src/routes/health.ts` — `HealthProbes` gains `checkDocumentStorage?`, `checkRetrieverIndex?`, `checkReranker?` (all `HealthProbe = () => Promise<string | void>`; H.2 — a probe that resolves a string attaches it as the dependency's `detail` on `ok`); `buildChecks()` appends three `DepCheck` entries named `document_storage`, `retriever_index`, `reranker`, each `requiredInProduction: false`, `configured: probes?.<fn> !== undefined`, `check: probes?.<fn> ?? (async () => {})`.
+- `src/server.ts` — `AppDeps` gains `checkDocumentStorage?: () => Promise<void>`. `buildDeps` hoists the password-grant client into a shared `ehrTokenProvider` (used by both `StandardApiClient` and the probe) and returns `...(ehrTokenProvider !== undefined ? { checkDocumentStorage: async () => { await ehrTokenProvider.getAccessToken(); } } : {})`. The `registerHealthRoutes(...)` call site passes all wired probes (postgres + document_storage always from deps; retriever_index/reranker join where `buildEvidenceDeps` resolves in the boot block — a retriever that holds chunks answers, otherwise the probe is absent → `not_configured`). The reranker probe (H.2) is built in `buildEvidenceDeps` beside the `CohereReranker` and carried on `EvidenceRouteDeps.checkReranker`: it reports the outcome of the **last real rerank made by traffic** (`CohereReranker.lastOutcome`), never key presence and never a per-poll live call.
 - `test/server.test.ts` — new E.6 cases (see Tests).
 
 ## Step-by-step implementation
@@ -43,7 +43,14 @@ Already implemented; the increments were:
 4. Wire probes into the `registerHealthRoutes` call. Probe meanings:
    - `document_storage`: token mint via `ehrTokenProvider.getAccessToken()` — no chart data touched.
    - `retriever_index`: resolves only when the guideline index holds chunks (reject/throw on an empty or absent index).
-   - `reranker`: resolves when a live (Cohere) reranker is keyed; absent = PassthroughReranker fallback, which is honestly `not_configured` (fusion order still serves).
+   - `reranker` (semantics fixed by H.2): reports the outcome of the last **real** rerank
+     call made by actual traffic. Keyed but not yet exercised → `ok` with
+     `detail: "keyed (unverified since boot — no rerank traffic yet)"`; last observed
+     rerank succeeded → `ok` with a `verified by live traffic (…)` detail; a failure more
+     recent than the last success → `failed` (503) until traffic succeeds again. Absent =
+     PassthroughReranker fallback, which is honestly `not_configured` (fusion order still
+     serves). Key presence alone is **not** reported as health — and the probe never makes
+     its own Cohere call (trial keys are rate-limited; every rerank call has a cost).
 5. Tests, then trackers.
 
 ## What NOT to do
@@ -53,6 +60,10 @@ Already implemented; the increments were:
   a key is missing.
 - Do NOT have `reranker` report `ok` when `PassthroughReranker` is active —
   the fallback is a *degraded* posture and `/ready` must say so.
+- Do NOT make the `reranker` probe issue a live Cohere call per poll — readiness
+  is polled, trial keys are rate-limited, and every rerank call costs money. The
+  probe reads `CohereReranker.lastOutcome` (H.2); the only rerank calls are the
+  ones traffic makes anyway.
 - Do NOT call OpenEMR chart/document endpoints from the probe; a token mint is
   the whole check (PHI never rides a readiness probe).
 - Do NOT add per-probe HTTP handlers; everything flows through the one
@@ -68,6 +79,10 @@ curl -s localhost:8080/ready | jq '.dependencies | {document_storage, retriever_
 #    "retriever_index":{"status":"ok"},           # corpus ships in-repo → index holds chunks
 #    "reranker":{"status":"not_configured"}}      # no COHERE_API_KEY → passthrough
 # and top-level "ready": true (not_configured never fails readiness).
+# keyed boot, before any rerank traffic (H.2) →
+#   "reranker":{"status":"ok","detail":"keyed (unverified since boot — no rerank traffic yet)"}
+# after traffic: detail flips to "verified by live traffic (last rerank ok at …)";
+# a rerank failure more recent than the last success → {"status":"failed", ...} + 503.
 ```
 
 Kill test (G14 acceptance): configure a probe that throws → its dep shows
@@ -78,7 +93,11 @@ other deps still report independently.
 
 - `it('GET /ready reports the W2 deps as not_configured when their subsystems are absent')` — keyless `buildServer` → all three new keys present with `not_configured`; `ready` unaffected.
 - `it('GET /ready flips retriever_index to failed when the injected probe throws')` — inject `checkRetrieverIndex: async () => { throw ... }` → `dependencies.retriever_index.status === 'failed'`, response 503, siblings unaffected.
-  (Exact names may differ slightly in the working tree — trust the file; the two behaviors above are what must stay covered.)
+- H.2 additions: a reranker probe that resolves a string surfaces it as
+  `dependencies.reranker.detail` on `ok`; a throwing reranker probe → `failed` + 503
+  (`test/server.test.ts`), and `CohereReranker` outcome memory — success/failure/
+  no-call-on-empty-candidates — is covered in `test/retrieval.test.ts`.
+  (Exact names may differ slightly in the working tree — trust the file; the behaviors above are what must stay covered.)
 
 ## Tracker updates
 

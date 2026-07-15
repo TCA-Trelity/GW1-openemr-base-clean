@@ -12,6 +12,7 @@ import { capabilitiesFor } from '../auth/principal.js';
 import { DocTypeSchema } from '../schemas/extraction.js';
 import { ingestionIdOf, type AttachAndExtractInput, type IngestionRecordStore, type IngestionService } from '../ingest/service.js';
 import type { HybridRetriever } from '../retrieval/retriever.js';
+import type { HealthProbe } from './health.js';
 
 export interface IngestRouteDeps {
     service: IngestionService;
@@ -156,6 +157,11 @@ const EvidenceSearchSchema = z.object({
 
 export interface EvidenceRouteDeps {
     retriever: HybridRetriever;
+    /** H.2: /ready's reranker probe, built beside the CohereReranker in buildEvidenceDeps
+     *  so buildServer can wire it next to the retriever_index probe. Reports the last
+     *  observed traffic outcome (never a per-poll Cohere call); absent when the
+     *  PassthroughReranker fallback is active. registerEvidenceRoutes ignores it. */
+    checkReranker?: HealthProbe;
 }
 
 export function registerEvidenceRoutes(app: FastifyInstance, deps?: EvidenceRouteDeps): void {

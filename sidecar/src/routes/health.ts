@@ -8,10 +8,15 @@ import type { Config } from '../config.js';
 
 type DepStatus = 'ok' | 'failed' | 'not_configured';
 
+/** A probe resolves when the dependency is healthy. Resolving with a string attaches it
+ *  as the dependency's `detail` (e.g. the reranker's "keyed (unverified since boot)");
+ *  a throw marks the dependency `failed` with the error surfaced. */
+export type HealthProbe = () => Promise<string | void>;
+
 interface DepCheck {
     name: string;
     requiredInProduction: boolean;
-    check: () => Promise<void>;
+    check: HealthProbe;
     configured: boolean;
 }
 
@@ -29,15 +34,18 @@ async function fetchOk(url: string, init?: RequestInit): Promise<void> {
  *  dependency is not wired on this deployment → `not_configured` (degraded, visible,
  *  never binary-down). */
 export interface HealthProbes {
-    checkPostgres?: () => Promise<void>;
+    checkPostgres?: HealthProbe;
     /** OpenEMR standard-API write client (document storage): token mint proves the
      *  password-grant client + scopes are live. */
-    checkDocumentStorage?: () => Promise<void>;
+    checkDocumentStorage?: HealthProbe;
     /** Hybrid retriever: resolves only when the guideline index holds chunks. */
-    checkRetrieverIndex?: () => Promise<void>;
-    /** Reranker: resolves when the live (Cohere) reranker is keyed; absent probe =
-     *  PassthroughReranker fallback (degraded is accurate — fusion order still serves). */
-    checkReranker?: () => Promise<void>;
+    checkRetrieverIndex?: HealthProbe;
+    /** Reranker (H.2): reports the outcome of the last REAL rerank made by traffic —
+     *  never a per-poll live Cohere call (rate limits + per-call cost). Keyed but not
+     *  yet exercised resolves ok with an "unverified since boot" detail; a failure more
+     *  recent than the last success throws (→ failed). Absent probe = PassthroughReranker
+     *  fallback (degraded is accurate — fusion order still serves). */
+    checkReranker?: HealthProbe;
 }
 
 function buildChecks(config: Config, probes?: HealthProbes): DepCheck[] {
@@ -112,7 +120,7 @@ export function registerHealthRoutes(app: FastifyInstance, config: Config, probe
 
     app.get('/ready', async (request, reply) => {
         const checks = buildChecks(config, probes);
-        const results: Record<string, { status: DepStatus; error?: string }> = {};
+        const results: Record<string, { status: DepStatus; error?: string; detail?: string }> = {};
 
         await Promise.all(
             checks.map(async (dep) => {
@@ -121,8 +129,8 @@ export function registerHealthRoutes(app: FastifyInstance, config: Config, probe
                     return;
                 }
                 try {
-                    await dep.check();
-                    results[dep.name] = { status: 'ok' };
+                    const detail = await dep.check();
+                    results[dep.name] = { status: 'ok', ...(typeof detail === 'string' ? { detail } : {}) };
                 } catch (error) {
                     request.log.warn({ dep: dep.name, error: String(error) }, 'readiness check failed');
                     results[dep.name] = { status: 'failed', error: String(error) };

@@ -82,6 +82,44 @@ describe('health endpoints', () => {
         expect(healthyBody.ready).toBe(true);
         expect(healthyBody.dependencies.reranker.status).toBe('ok');
     });
+
+    // H.2: the reranker probe is honest about what it proves. Keyed-but-unexercised
+    // resolves a detail string that must ride the ok status (never silently dropped),
+    // so /ready readers can tell "verified by traffic" from "key present, unproven".
+    it('GET /ready surfaces a probe-resolved detail string on an ok dependency', async () => {
+        const { default: Fastify } = await import('fastify');
+        const { registerHealthRoutes } = await import('../src/routes/health.js');
+        const app = Fastify();
+        registerHealthRoutes(app, loadConfig({ NODE_ENV: 'test' }), {
+            checkReranker: async () => 'keyed (unverified since boot — no rerank traffic yet)',
+        });
+        const body = (await app.inject({ method: 'GET', url: '/ready' })).json();
+        expect(body.ready).toBe(true);
+        expect(body.dependencies.reranker.status).toBe('ok');
+        expect(body.dependencies.reranker.detail).toContain('unverified since boot');
+        // Probes that resolve void keep the lean shape — no detail key at all.
+        expect(body.dependencies.openemr).not.toHaveProperty('detail');
+    });
+
+    // H.2: a rerank failure observed on real traffic must fail readiness (503) with the
+    // failure surfaced — key presence alone can no longer keep the reranker green.
+    it('GET /ready flips reranker to failed when the last observed real rerank failed', async () => {
+        const { default: Fastify } = await import('fastify');
+        const { registerHealthRoutes } = await import('../src/routes/health.js');
+        const app = Fastify();
+        registerHealthRoutes(app, loadConfig({ NODE_ENV: 'test' }), {
+            checkPostgres: async () => {},
+            checkReranker: async () => {
+                throw new Error('last real rerank failed at 2026-07-15T00:00:00.000Z — cohere rerank failed with status 429');
+            },
+        });
+        const res = await app.inject({ method: 'GET', url: '/ready' });
+        expect(res.statusCode).toBe(503);
+        const body = res.json();
+        expect(body.dependencies.reranker.status).toBe('failed');
+        expect(body.dependencies.reranker.error).toContain('status 429');
+        expect(body.dependencies.postgres.status).toBe('ok');
+    });
 });
 
 describe('scan images route', () => {
