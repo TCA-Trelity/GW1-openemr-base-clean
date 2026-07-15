@@ -241,9 +241,10 @@ cd sidecar</code></pre>
 ];
 
 const ACTIVE_ITEMS = [
-{ id:'b9', order:'live · optional', title:'9 · Widen the Claude Code environment network policy', sub:'Optional but unblocking — the plan-executing session cannot reach Railway/Langfuse (proxy 403, verified 2026-07-15). H.4 still runs via CI dispatch without this.', body:`
-<p><b>Where:</b> claude.ai → Code → the environment this session runs in → Environment settings → Network policy
-(<a href="https://code.claude.com/docs/en/claude-code-on-the-web" target="_blank" rel="noopener">docs</a>). Add to the allowlist:</p>
+{ id:'b9', order:'live · optional', title:'9 · Widen the Claude Code environment network policy', sub:'Attempted 07-15: domains went into the desktop Browser-tools "Allowed sites" — a different control; the cloud container still 403s. Correct path below; applies on a NEW session. Optional — CI dispatch covers live checks.', body:`
+<div class="warnbox"><b>What happened 07-15:</b> the four domains were added under desktop Settings → Claude Code → <i>Allowed sites</i>, which governs Claude's <b>Browser tools</b> on your machine — it does not change this cloud session's egress (proxy re-verified CONNECT 403). The control that matters is the <b>environment's network policy</b>, and it takes effect when a new session/container starts.</div>
+<p><b>Where:</b> claude.ai → Code → <b>Environments</b> → the environment this session runs in → <b>Network policy / allowed domains</b>
+(<a href="https://code.claude.com/docs/en/claude-code-on-the-web" target="_blank" rel="noopener">docs</a>). Add to the allowlist, then start a fresh session:</p>
 <table><tr><th>Domain</th><th>Why</th></tr>
 <tr><td><code>enchanting-mercy-production-5d32.up.railway.app</code></td><td>deployed sidecar + panel</td></tr>
 <tr><td><code>gw1-openemr-base-clean-production.up.railway.app</code></td><td>deployed EHR</td></tr>

@@ -18,10 +18,19 @@ behind a network policy that **denies** the deployed app and Langfuse
 runners reach Railway fine). Widening the policy additionally lets the agent
 run live checks directly in-session (and later, CT6's trace-fetch script).
 
-**Where:** claude.ai → Code → the environment this session runs in →
-Environment settings → Network policy (docs:
-https://code.claude.com/docs/en/claude-code-on-the-web). Add these domains
-to the allowlist:
+> **Status 2026-07-15:** attempted — the domains were added to the desktop
+> app's **"Allowed sites"** list, which governs Claude's *Browser tools* on
+> your machine, not this cloud container's egress. The proxy still denies
+> the hosts (re-verified CONNECT 403). The control that matters is below,
+> and it applies when a **new session/container starts** — the current
+> session keeps its policy either way. Optional: nothing is blocked on
+> this (live checks route through the live-smoke CI dispatch).
+
+**Where:** claude.ai → Code → **Environments** → the environment this
+session runs in → **Network policy / allowed domains** (docs:
+https://code.claude.com/docs/en/claude-code-on-the-web) — not the desktop
+app's Settings → Claude Code → Allowed sites. Add these domains to the
+allowlist, then start a fresh session on that environment:
 
 | Domain | Why |
 |---|---|
