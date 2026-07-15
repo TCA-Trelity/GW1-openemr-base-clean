@@ -451,7 +451,7 @@ const DATA = {
         { id: "H.6", t: "Citation-gate reject-path unit tests for the v2 citation types SHIPPED: 7 reject + 2 accept gate-unit cases (page/page_bbox fabrication + paraphrase + page fallback; guideline_evidence fabrication + paraphrase + unretrieved chunk) — gate rejected both types on first run, no product fix needed", reqs: ["E1","S4/R6"], deps: "—", s: "done" },
         { id: "H.7", t: "Span nesting (worker ⊂ supervisor ⊂ trace): spec-verified that graphTracer emits FLAT sibling spans today (merged plan's 'likely already working' was wrong) — implement child-capable spans + tree-shape tests; Langfuse visual = user action 10 (closes G13)", reqs: ["G13"], deps: "—", s: "pending" },
         { id: "H.8", t: "Correlation-ID walk: one ID survives all 7 boundaries per docs/w2/trace-example.md; fix any drop/regenerate (closes G4's open box)", reqs: ["G4"], deps: "—", s: "pending" },
-        { id: "H.9", t: "attach_and_extract as a first-class graph tool object — NOT added to the sync read-only chat tool list (closes the S1/R1 open box)", reqs: ["S1/R1"], deps: "—", s: "pending" },
+        { id: "H.9", t: "attach_and_extract SHIPPED as a first-class async graph tool (src/graph/tools.ts AsyncGraphTool contract; intake_extractor invokes it; GraphContractError names the graph_tool boundary) — pinned by test to NEVER join the sync read-only chat tool list", reqs: ["S1/R1"], deps: "—", s: "done" },
         { id: "H.10", t: "Simple per-dependency circuit breaker (Cohere, LLM, OpenEMR): N consecutive failures → short cooldown; /ready reflects open state (hand-rolled per requirements — no library)", reqs: ["G2"], deps: "H.5", s: "pending" },
         { id: "H.11", t: "Zod on the 4 unchecked shapes: IngestionRecord/IngestionRecordStore (ingest/service.ts:38/59), RetrievalResult/SearchOptions + QueryContext/BuiltQuery (retriever.ts:36/45, queryPolicy.ts:64/71), EhrVitalPayload (standardApi.ts:97), upload ext+size checks (doc_type already zod)", reqs: ["G1","R2"], deps: "—", s: "pending" },
         { id: "H.12", t: "Trace-reconstruction tool: everything about one request from its correlation ID + PHI re-audit of log lines added since the last sweep", reqs: ["G4","G18"], deps: "H.8", s: "pending" },
@@ -500,7 +500,7 @@ const DATA = {
   // Requirements matrix — acceptance counts mirror docs/w2/requirements.md checkboxes.
   reqGroups: [
     { name: "Core (MVP stages + agent requirements)", rows: [
-      { id: "S1/R1", t: "Document ingestion & extraction (attach_and_extract, OpenEMR round-trip, no dupes)", plan: "A.3–A.7, E.1", done: 5, total: 7, s: "active" },
+      { id: "S1/R1", t: "Document ingestion & extraction (attach_and_extract, OpenEMR round-trip, no dupes) — H.9 closed the graph-tool box", plan: "A.3–A.7, E.1, H.9", done: 6, total: 7, s: "active" },
       { id: "R2", t: "Strict Zod schemas (lab_pdf 7 fields · intake 6+goals)", plan: "A.1", done: 4, total: 5, s: "active" },
       { id: "S2/R3", t: "Hybrid RAG + rerank — COMPLETE incl. pgvector-PERSISTED dense index (migration 005, content-hash sync, corpus:index CLI, fallback proven); keyword re-scoped to in-process BM25", plan: "0.1, 0.4, B.1–B.6, B.3-live", done: 9, total: 9, s: "done" },
       { id: "S3/R4", t: "Supervisor + intake-extractor + evidence-retriever (LangGraph, logged handoffs)", plan: "C.1–C.6", done: 4, total: 7, s: "active" },

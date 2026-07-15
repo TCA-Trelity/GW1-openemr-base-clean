@@ -61,8 +61,13 @@ requires password-grant token + `user/document.write` scope (sidecar does
   accepts `doc_type ∈ {lab_pdf, intake_form}` for PDF/PNG/JPEG; returns `202`
   with `{ingestion_id, correlation_id}`; rejects other types/oversize with a
   structured 4xx.
-- [ ] Equivalent chat/graph tool `attach_and_extract(patient_id, file_path,
+- [x] Equivalent chat/graph tool `attach_and_extract(patient_id, file_path,
   doc_type)` wraps the same service path (name preserved from spec).
+  *(H.9: async graph-tool object `src/graph/tools.ts` wrapping
+  `IngestionService.attachAndExtract`; the `intake_extractor` node invokes
+  it by name; deliberately NOT on the sync read-only chat tool list —
+  pinned by test; `file_path` ≙ `{filename, mimeType, bytes}` — uploads
+  are multipart bytes by design.)*
 - [x] Original file is stored in OpenEMR Documents under a per-doc-type
   category, associated to the correct patient (`documents.foreign_id = pid`),
   before extraction begins. OpenEMR remains the system of record for the file.

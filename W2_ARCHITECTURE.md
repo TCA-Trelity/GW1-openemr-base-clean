@@ -72,7 +72,7 @@ both scopes still hold:
   can be called a graph, its nodes wrap services that already exist, and the
   fast path pays only a bounded ~200–400 ms routing decision (REQ: S3/R4).
 
-## 3. Document ingestion flow (REQ: S1/R1, R2, G3) — [SHIPPED: upload route + attach_and_extract service, VLM extractor w/ feedback retry, geometric grounding on real fixtures, fact persistence w/ page_bbox citations, patient-mismatch block, dedupe idempotency, renal→HCQ re-tier, evidence pinning at prep time (C.6) · TARGET: chat tool wrapper, live EHR write + vitals row (deploy), brief refresh]
+## 3. Document ingestion flow (REQ: S1/R1, R2, G3) — [SHIPPED: upload route + attach_and_extract service, VLM extractor w/ feedback retry, geometric grounding on real fixtures, fact persistence w/ page_bbox citations, patient-mismatch block, dedupe idempotency, renal→HCQ re-tier, evidence pinning at prep time (C.6), attach_and_extract graph tool (H.9) · TARGET: live EHR write + vitals row (deploy), brief refresh]
 
 ```
 panel upload (front-desk role)                    chat/graph tool

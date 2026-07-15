@@ -7,7 +7,7 @@ import { z } from 'zod';
 /** Raised when a graph boundary payload fails its contract. Names the interface. */
 export class GraphContractError extends Error {
     constructor(
-        public readonly boundary: 'graph_entry' | 'evidence_retriever',
+        public readonly boundary: 'graph_entry' | 'evidence_retriever' | 'graph_tool',
         public readonly issues: string[],
     ) {
         super(`graph contract violation at ${boundary}: ${issues.join('; ')}`);
@@ -15,7 +15,9 @@ export class GraphContractError extends Error {
     }
 }
 
-const GraphUploadSchema = z
+// Shared upload shape: the entry contract composes it below, and the attach_and_extract
+// graph tool (tools.ts, H.9) reuses it as its input boundary — one schema, two seams.
+export const GraphUploadSchema = z
     .object({
         docType: z.enum(['lab_pdf', 'intake_form']),
         filename: z.string().min(1),
