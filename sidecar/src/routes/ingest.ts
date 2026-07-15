@@ -12,6 +12,7 @@ import { capabilitiesFor } from '../auth/principal.js';
 import { DocTypeSchema } from '../schemas/extraction.js';
 import { UploadFileMetaSchema } from '../schemas/ingestion.js';
 import { ingestionIdOf, type AttachAndExtractInput, type IngestionRecordStore, type IngestionService } from '../ingest/service.js';
+import type { CircuitBreaker } from '../lib/circuitBreaker.js';
 import type { HybridRetriever } from '../retrieval/retriever.js';
 import type { HealthProbe } from './health.js';
 
@@ -167,6 +168,11 @@ export interface EvidenceRouteDeps {
      *  observed traffic outcome (never a per-poll Cohere call); absent when the
      *  PassthroughReranker fallback is active. registerEvidenceRoutes ignores it. */
     checkReranker?: HealthProbe;
+    /** H.10: the 'cohere' circuit breaker created beside the providers in buildEvidenceDeps,
+     *  exposed so buildServer can reflect its state on /ready under the `reranker` dep name
+     *  (open wins over the H.2 probe). Absent on keyless deployments (PassthroughReranker —
+     *  no vendor to break on). registerEvidenceRoutes ignores it. */
+    cohereBreaker?: CircuitBreaker;
 }
 
 export function registerEvidenceRoutes(app: FastifyInstance, deps?: EvidenceRouteDeps): void {

@@ -1,6 +1,7 @@
 // FHIR R4 read-only client for OpenEMR: GET /apis/default/fhir/<Resource> with bearer auth
 // (API_README.md:36-38,96-107) and per-patient search via ?patient=<uuid>
 // (Documentation/api/FHIR_API.md:116,982-1037). Every request carries the caller's x-correlation-id.
+import { guardedBy, type CircuitBreaker } from '../lib/circuitBreaker.js';
 import { withTimeoutAndRetry } from '../lib/httpRetry.js';
 import type { FetchLike } from './auth.js';
 
@@ -56,6 +57,10 @@ export interface FhirClientOptions {
     fetchImpl?: FetchLike;
     /** Per-attempt request ceiling; tests shorten it (same shape as rerank's options.timeoutMs). */
     timeoutMs?: number;
+    /** H.10: the shared 'openemr' circuit breaker (same instance as the standard-API + auth
+     *  clients — one host, one dependency, one counter). Sits OUTSIDE the H.5 retry wrapper:
+     *  one request = one logical call = one breaker failure. */
+    breaker?: CircuitBreaker;
 }
 
 export class FhirClient {
@@ -63,12 +68,14 @@ export class FhirClient {
     private readonly tokenProvider: TokenProvider;
     private readonly fetchImpl: FetchLike;
     private readonly timeoutMs: number;
+    private readonly breaker: CircuitBreaker | undefined;
 
     constructor(options: FhirClientOptions) {
         this.fhirBase = `${options.baseUrl.replace(/\/+$/, '')}/apis/default/fhir`;
         this.tokenProvider = options.tokenProvider;
         this.fetchImpl = options.fetchImpl ?? globalThis.fetch;
         this.timeoutMs = options.timeoutMs ?? FHIR_READ_TIMEOUT_MS;
+        this.breaker = options.breaker;
     }
 
     async getPatient(patientId: string, correlationId: string): Promise<Record<string, unknown>> {
@@ -98,7 +105,9 @@ export class FhirClient {
         const token = await this.tokenProvider.getAccessToken();
         // Read-only client — every request is an idempotent GET, so the helper's one bounded
         // retry on transient statuses is always safe here (REQ G2).
-        return withTimeoutAndRetry(`FHIR GET ${path}`, this.timeoutMs, async (signal) => {
+        // H.10: breaker OUTSIDE the retry pair — a timed-out-and-retried call that still
+        // failed counts as ONE breaker failure, never one per attempt.
+        return guardedBy(this.breaker, () => withTimeoutAndRetry(`FHIR GET ${path}`, this.timeoutMs, async (signal) => {
             const response = await this.fetchImpl(`${this.fhirBase}${path}`, {
                 method: 'GET',
                 headers: {
@@ -119,7 +128,7 @@ export class FhirClient {
         }, {
             // Timeouts stay in the FHIR error family so callers' instanceof handling keeps working.
             onTimeout: (operation, timeoutMs) => new FhirRequestError(path, 408, `${operation} timed out after ${timeoutMs}ms`),
-        });
+        }));
     }
 }
 

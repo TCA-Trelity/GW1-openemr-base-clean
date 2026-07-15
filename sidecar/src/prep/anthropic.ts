@@ -4,6 +4,8 @@
 // wedging the prep run forever. Sampling params are deliberately omitted: claude-sonnet-5
 // rejects non-default temperature/top_p/top_k with a 400; determinism comes from the
 // prompt + Zod validation.
+import type { CircuitBreaker } from '../lib/circuitBreaker.js';
+
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
 /** Loose content-block shape (document blocks for the Citations API, text blocks, ...). */
@@ -97,6 +99,10 @@ export interface AnthropicClientOptions {
     totalTimeoutMs?: number;
     /** Cadence of onProgress heartbeats while streaming. */
     heartbeatMs?: number;
+    /** H.10: the shared 'anthropic' circuit breaker — ONE instance across every client of
+     *  this dependency (prep, chat, router, composer). complete() runs through breaker.exec:
+     *  one complete = one logical call = one breaker failure. */
+    breaker?: CircuitBreaker;
 }
 
 const DEFAULT_BASE_URL = 'https://api.anthropic.com';
@@ -116,6 +122,7 @@ export class AnthropicClient {
     private readonly idleTimeoutMs: number;
     private readonly totalTimeoutMs: number;
     private readonly heartbeatMs: number;
+    private readonly breaker: CircuitBreaker | undefined;
 
     constructor(options: AnthropicClientOptions) {
         this.apiKey = options.apiKey;
@@ -126,6 +133,7 @@ export class AnthropicClient {
         this.idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
         this.totalTimeoutMs = options.totalTimeoutMs ?? DEFAULT_TOTAL_TIMEOUT_MS;
         this.heartbeatMs = options.heartbeatMs ?? DEFAULT_HEARTBEAT_MS;
+        this.breaker = options.breaker;
     }
 
     async complete(
@@ -135,10 +143,29 @@ export class AnthropicClient {
         hooks?: CompleteHooks,
         tools?: AnthropicTool[],
     ): Promise<AnthropicCompletion> {
-        const onProgress = hooks?.onProgress;
+        // Config absence is not a dependency failure — surface it without consulting
+        // (or feeding) the circuit.
         if (this.apiKey === '') {
             throw new AnthropicApiError(0, 'not_configured', 'ANTHROPIC_API_KEY is not configured');
         }
+        // H.10: the breaker wraps the whole attempt — one complete() = one logical call =
+        // ONE breaker failure. When open, CircuitOpenError propagates to the caller's
+        // existing fallback lane (router → fast_path, composer/chat → Week 1 loop or error
+        // event, extractor → failed_extraction): a fast throw IS the degraded behavior.
+        if (this.breaker === undefined) {
+            return this.streamCompletion(system, messages, correlationId, hooks, tools);
+        }
+        return this.breaker.exec(() => this.streamCompletion(system, messages, correlationId, hooks, tools));
+    }
+
+    private async streamCompletion(
+        system: string,
+        messages: AnthropicMessage[],
+        correlationId: string,
+        hooks?: CompleteHooks,
+        tools?: AnthropicTool[],
+    ): Promise<AnthropicCompletion> {
+        const onProgress = hooks?.onProgress;
         const startedAt = Date.now();
         const controller = new AbortController();
         let abortReason = '';

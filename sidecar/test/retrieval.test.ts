@@ -4,9 +4,11 @@
 // the hybrid pipeline silently skipping rerank without saying so.
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
+import { CircuitBreaker } from '../src/lib/circuitBreaker.js';
 import { Bm25Index, tokenize } from '../src/retrieval/bm25.js';
+import { CircuitGuardedEmbeddings, CircuitGuardedReranker } from '../src/retrieval/circuitGuards.js';
 import { CohereEmbeddings, HashEmbeddings, RetrievalProviderError } from '../src/retrieval/embeddings.js';
-import { CohereReranker, PassthroughReranker } from '../src/retrieval/rerank.js';
+import { CohereReranker, PassthroughReranker, type RerankOutcome } from '../src/retrieval/rerank.js';
 import { rewriteQuery, scrubQuery } from '../src/retrieval/queryPolicy.js';
 import { HybridRetriever, loadCorpusChunks, reciprocalRankFusion } from '../src/retrieval/retriever.js';
 import { RetrievalResultSchema } from '../src/schemas/retrieval.js';
@@ -273,5 +275,67 @@ describe('Cohere providers (mocked fetch — contract, timeout, retry)', () => {
         status = 200;
         await reranker.rerank('q', [{ id: 'a', text: 'A' }], 1, 'corr');
         expect(reranker.lastOutcome?.ok).toBe(true);
+    });
+});
+
+describe('circuit-guarded Cohere providers (H.10)', () => {
+    // Guards THE degrade requirement: an open cohere breaker must never fail a search.
+    // The guarded embed returns [] (the retriever's dense-leg guard skips to keyword+
+    // fusion) and the guarded rerank returns the passthrough-shaped order with
+    // rerank_applied=false — while the vendor is never touched.
+    it('an open cohere breaker degrades search to keyword-only + passthrough order instead of failing the query', async () => {
+        // A breaker already tripped open, on a frozen clock so the cooldown never elapses.
+        const breaker = new CircuitBreaker({ name: 'cohere', failureThreshold: 1, cooldownMs: 30_000, now: () => 0 });
+        await breaker.exec(() => Promise.reject(new Error('cohere down'))).catch(() => undefined);
+        expect(breaker.state).toBe('open');
+
+        // Inner providers that PROVE the short-circuit: reaching the vendor is a test failure.
+        const innerEmbed = {
+            id: 'cohere:embed-english-v3.0',
+            dims: 4,
+            embed: vi.fn<() => Promise<number[][]>>(async () => {
+                throw new Error('vendor must not be reached while the circuit is open');
+            }),
+        };
+        const innerRerank = {
+            id: 'cohere:rerank-english-v3.0',
+            rerank: vi.fn<() => Promise<RerankOutcome>>(async () => {
+                throw new Error('vendor must not be reached while the circuit is open');
+            }),
+        };
+        const warns: string[] = [];
+        const logger = { warn: (_obj: Record<string, unknown>, msg: string) => warns.push(msg) };
+
+        const retriever = await HybridRetriever.build(loadCorpusChunks(CORPUS_DIR), {
+            embeddings: new CircuitGuardedEmbeddings(innerEmbed, breaker, logger),
+            reranker: new CircuitGuardedReranker(innerRerank, breaker, logger),
+        });
+        const result = await retriever.search('hydroxychloroquine daily dose threshold real body weight screening');
+
+        expect(result.empty).toBe(false); // the query still gets an answer — keyword leg serves
+        expect(result.snippets[0]?.doc_id).toBe('hcq-screening');
+        expect(result.rerank_applied).toBe(false); // degradation visible, never silent
+        expect(innerEmbed.embed).not.toHaveBeenCalled();
+        expect(innerRerank.rerank).not.toHaveBeenCalled();
+        expect(warns).toContain('circuit_open_degraded');
+    });
+
+    // Guards the decorators swallowing REAL vendor errors: only CircuitOpenError degrades;
+    // everything else propagates unchanged — those failures are what feeds the breaker.
+    it('a closed breaker passes real provider errors through unchanged (they feed the counter)', async () => {
+        const breaker = new CircuitBreaker({ name: 'cohere', now: () => 0 });
+        const upstream = new RetrievalProviderError('cohere', 'rerank', 429);
+        const guarded = new CircuitGuardedReranker(
+            {
+                id: 'cohere:rerank-english-v3.0',
+                rerank: async () => {
+                    throw upstream;
+                },
+            },
+            breaker,
+        );
+        const caught = await guarded.rerank('q', [{ id: 'a', text: 'A' }], 1, 'corr').catch((error: unknown) => error);
+        expect(caught).toBe(upstream); // exact instance — never wrapped, never degraded
+        expect(breaker.state).toBe('closed'); // one failure counted, threshold (5) not reached
     });
 });

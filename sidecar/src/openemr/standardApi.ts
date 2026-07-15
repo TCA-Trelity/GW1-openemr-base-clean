@@ -7,6 +7,7 @@
 // (RestControllerHelper::responseHandler, :156-169).
 import { createHash } from 'node:crypto';
 import type { z } from 'zod';
+import { guardedBy, type CircuitBreaker } from '../lib/circuitBreaker.js';
 import { withTimeoutAndRetry } from '../lib/httpRetry.js';
 import { EhrVitalPayloadSchema } from '../schemas/ehrWrites.js';
 import type { FetchLike } from './auth.js';
@@ -199,6 +200,10 @@ export interface StandardApiClientOptions {
     timeoutMs?: number;
     /** Per-attempt ceiling for the multipart document POST (larger: PDF payloads). */
     uploadTimeoutMs?: number;
+    /** H.10: the shared 'openemr' circuit breaker (same instance as the FHIR + auth clients —
+     *  one host, one dependency, one counter). Sits OUTSIDE the H.5 retry wrapper: one
+     *  request = one logical call = one breaker failure, however many attempts ran inside. */
+    breaker?: CircuitBreaker;
 }
 
 export class StandardApiClient {
@@ -208,6 +213,7 @@ export class StandardApiClient {
     private readonly correlationId: string;
     private readonly timeoutMs: number;
     private readonly uploadTimeoutMs: number;
+    private readonly breaker: CircuitBreaker | undefined;
 
     constructor(options: StandardApiClientOptions) {
         this.apiBase = `${options.baseUrl.replace(/\/+$/, '')}/apis/default/api`;
@@ -216,6 +222,7 @@ export class StandardApiClient {
         this.correlationId = options.correlationId ?? crypto.randomUUID();
         this.timeoutMs = options.timeoutMs ?? STANDARD_API_TIMEOUT_MS;
         this.uploadTimeoutMs = options.uploadTimeoutMs ?? DOCUMENT_UPLOAD_TIMEOUT_MS;
+        this.breaker = options.breaker;
     }
 
     // GET /api/patient with fname/lname/DOB, all in PatientRestController::SUPPORTED_SEARCH_FIELDS
@@ -465,7 +472,9 @@ export class StandardApiClient {
         }
         // Method-aware retry policy (REQ G2): a retried write can double-file a document; the A.3 post-write verification re-lists by content hash but guards absence, not duplicates — so only idempotent GETs get the helper's one bounded retry.
         const retries = method === 'GET' ? 1 : 0;
-        return withTimeoutAndRetry(`standard API ${method} ${path}`, this.timeoutMs, async (signal) => {
+        // H.10: breaker OUTSIDE the retry pair — a timed-out-and-retried call that still
+        // failed counts as ONE breaker failure, never one per attempt.
+        return guardedBy(this.breaker, () => withTimeoutAndRetry(`standard API ${method} ${path}`, this.timeoutMs, async (signal) => {
             const response = await this.fetchImpl(`${this.apiBase}${path}`, { ...init, signal });
             const body = await parseJson(response);
             if (!response.ok) {
@@ -477,7 +486,7 @@ export class StandardApiClient {
             // Timeouts stay in the standard-API error family so callers' instanceof handling
             // (e.g. ehrSeed's degrade-to-skipped depth sections) keeps working.
             onTimeout: (operation, timeoutMs) => new StandardApiError(path, 408, `${operation} timed out after ${timeoutMs}ms`),
-        });
+        }));
     }
 
     // ---- Week 2 documents (Wave 0.2, REQ S1/R1) ----
@@ -630,7 +639,8 @@ export class StandardApiClient {
         form.append('document', new Blob([payload.buffer as ArrayBuffer], { type: mimeType }), filename);
         // No manual content-type: fetch sets the multipart boundary itself.
         // Non-idempotent write — timeout only, retries: 0: a retried write can double-file a document; the A.3 post-write verification below re-lists by content hash but guards absence, not duplicates.
-        await withTimeoutAndRetry(`standard API POST ${path} (document upload)`, this.uploadTimeoutMs, async (signal) => {
+        // H.10: breaker OUTSIDE the (no-retry) timeout wrapper — one upload, one logical call.
+        await guardedBy(this.breaker, () => withTimeoutAndRetry(`standard API POST ${path} (document upload)`, this.uploadTimeoutMs, async (signal) => {
             const response = await this.fetchImpl(`${this.apiBase}${path}`, {
                 method: 'POST',
                 headers: {
@@ -648,7 +658,7 @@ export class StandardApiClient {
         }, {
             retries: 0,
             onTimeout: (operation, timeoutMs) => new StandardApiError(path, 408, `${operation} timed out after ${timeoutMs}ms`),
-        });
+        }));
 
         // Post-write verification: the write is only real if the document is now listed
         // under the category with our hash (REQ G1 "no untraceable records") — this is

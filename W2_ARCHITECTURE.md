@@ -332,7 +332,7 @@ and cost reports contain no patient identifiers, no raw document text, and no
 extracted clinical values — identifiers and hashes only, verified by the CI
 canary check (REQ: G18).
 
-## 9. SLOs, resilience, readiness (REQ: G2, G14) — [SHIPPED: /ready W2 probes (document storage via cached token mint, retriever index fails-on-empty, reranker last-observed-traffic-outcome (H.2: ok + detail "keyed (unverified since boot)" until first use, failed after a rerank failure newer than the last success; never a per-poll Cohere call)) with degraded not_configured semantics; timeouts/retries on Cohere + VLM + all OpenEMR legs (H.5: FHIR/standard-API reads retry once, writes + uploads + registration never auto-retry, token mints retry with fresh jti); ≤5 s evidence budget w/ honest degrade ; measured stub-backend baselines + W1 byte-identical regression evidence (F.1) · TARGET: live-backend numbers post key-drop, circuit-breaker documentation per dependency (H.10)]
+## 9. SLOs, resilience, readiness (REQ: G2, G14) — [SHIPPED: /ready W2 probes (document storage via cached token mint, retriever index fails-on-empty, reranker last-observed-traffic-outcome (H.2: ok + detail "keyed (unverified since boot)" until first use, failed after a rerank failure newer than the last success; never a per-poll Cohere call)) with degraded not_configured semantics; timeouts/retries on Cohere + VLM + all OpenEMR legs (H.5: FHIR/standard-API reads retry once, writes + uploads + registration never auto-retry, token mints retry with fresh jti); ≤5 s evidence budget w/ honest degrade ; measured stub-backend baselines + W1 byte-identical regression evidence (F.1); hand-rolled per-dependency circuit breakers w/ /ready circuit_open reflection (H.10) · TARGET: live-backend numbers post key-drop]
 
 | Flow | SLO (p95) | Measured (stub backends, 2026-07-13) | Where the budget lives |
 |---|---|---|---|
@@ -348,9 +348,14 @@ canary check (REQ: G18).
   FHIR, vitals write (closing the Week 1 gap where the FHIR client had no
   timeout and chat had no retry: new calls all get the
   transient-classification retry pattern).
-- **Circuit behavior:** after N consecutive failures of a dependency, the
-  caller short-circuits to its degraded path and `/ready` reflects the
-  dependency as degraded (no silent hammering, no binary up/down — G14).
+- **Circuit behavior (shipped, H.10):** after 5 consecutive failures of a
+  dependency its breaker opens for a 30 s cooldown, then admits exactly one
+  half-open probe; while open, callers short-circuit to their degraded path
+  (embed → keyword-only, rerank → passthrough, LLM → fallback lanes) and
+  `/ready` reports `failed: circuit_open` with the live check suppressed —
+  no silent hammering, no binary up/down (G14). One hand-rolled breaker
+  instance per dependency (openemr, anthropic, cohere), composed outside
+  H.5's timeout/retry so one logical call counts one failure.
 - **`/ready` additions:** document storage (write-scoped OpenEMR client),
   vector index (extension/table presence + chunk count), reranker (Cohere
   reachability) — joining the existing OpenEMR/Anthropic/Langfuse/Postgres

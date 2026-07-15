@@ -20,6 +20,7 @@ import { EhrSyncService } from './openemr/ehrSync.js';
 import { OpenEmrAuthClient } from './openemr/auth.js';
 import { FhirClient } from './openemr/fhir.js';
 import { loadConfig, type Config } from './config.js';
+import { CircuitBreaker, type BreakerState } from './lib/circuitBreaker.js';
 import { LangfuseTracer } from './obs/langfuse.js';
 import { tracingGraphLogger } from './obs/graphTracer.js';
 import { AnthropicClient } from './prep/anthropic.js';
@@ -41,8 +42,9 @@ import { createPool, FactStore } from './store/index.js';
 import { migrate } from './store/migrate.js';
 import { IngestionService, MemoryIngestionRecordStore } from './ingest/service.js';
 import { VlmExtractor } from './ingest/extractor.js';
-import { CohereEmbeddings, HashEmbeddings } from './retrieval/embeddings.js';
-import { CohereReranker, PassthroughReranker } from './retrieval/rerank.js';
+import { CircuitGuardedEmbeddings, CircuitGuardedReranker } from './retrieval/circuitGuards.js';
+import { CohereEmbeddings, HashEmbeddings, type EmbeddingsProvider } from './retrieval/embeddings.js';
+import { CohereReranker, PassthroughReranker, type Reranker } from './retrieval/rerank.js';
 import { HybridRetriever, loadCorpusChunks, type RetrievalLogger } from './retrieval/retriever.js';
 import { PgVectorDenseIndex, type DenseIndex, type PgQueryable } from './retrieval/denseIndex.js';
 import { OpenEmrPasswordAuthClient } from './openemr/auth.js';
@@ -74,6 +76,18 @@ export interface AppDeps {
     ingest?: IngestRouteDeps;
     /** Week 2 B.4: hybrid guideline retrieval — built async at boot (embeds the corpus). */
     evidence?: EvidenceRouteDeps;
+    /** H.10: ONE circuit breaker per dependency, created once in buildDeps and shared by
+     *  every client of that dependency (the 'cohere' breaker lives on `evidence`, built in
+     *  buildEvidenceDeps). Always present from buildDeps; optional only so scaffold test
+     *  doubles stay minimal. buildServer reflects their states on /ready. */
+    breakers?: { openemr: CircuitBreaker; anthropic: CircuitBreaker };
+}
+
+/** H.10: circuit-breaker transition hook — structured console JSON (same shape as the app's
+ *  pino stream), dependency name + states only: PHI-free by construction (G18/P5). */
+function breakerTransitionLog(dependency: string): (from: BreakerState, to: BreakerState) => void {
+    return (from, to) =>
+        console.warn(JSON.stringify({ level: 'warn', msg: 'circuit_breaker_transition', dependency, from, to }));
 }
 
 /** One resolution for the scan-pixels directory: /api/images static route + chat's loader. */
@@ -120,10 +134,16 @@ export function buildDeps(config: Config): AppDeps | undefined {
     }
     const pool = createPool(config);
     const store = new FactStore(pool);
+    // H.10 (REQ G2): ONE breaker per dependency, created once at boot and threaded into
+    // every client of that dependency. 5 consecutive failures → 30 s cooldown → one
+    // half-open probe (circuitBreaker.ts defaults); /ready reflects the open state.
+    const openemrBreaker = new CircuitBreaker({ name: 'openemr', onTransition: breakerTransitionLog('openemr') });
+    const anthropicBreaker = new CircuitBreaker({ name: 'anthropic', onTransition: breakerTransitionLog('anthropic') });
     const prepLlmClient = new AnthropicClient({
         apiKey: config.ANTHROPIC_API_KEY ?? '',
         model: config.ANTHROPIC_MODEL_PREP,
         maxTokens: config.LLM_MAX_OUTPUT_TOKENS,
+        breaker: anthropicBreaker,
     });
     const extractor = new FactExtractor(prepLlmClient);
     // Q3: the game-plan composer shares the prep model/budget — one extra bounded call per prep.
@@ -186,6 +206,7 @@ export function buildDeps(config: Config): AppDeps | undefined {
                   clientId: config.OPENEMR_CLIENT_ID,
                   username: config.OPENEMR_API_USERNAME,
                   password: config.OPENEMR_API_PASSWORD,
+                  breaker: openemrBreaker,
               })
             : undefined;
     const ehrDocsClient =
@@ -193,6 +214,7 @@ export function buildDeps(config: Config): AppDeps | undefined {
             ? new StandardApiClient({
                   baseUrl: config.OPENEMR_BASE_URL,
                   tokenProvider: ehrTokenProvider,
+                  breaker: openemrBreaker,
               })
             : undefined;
     // H.7 (step 5, H.8 seam): ingestion stage events (`ingestion_*`,
@@ -264,7 +286,9 @@ export function buildDeps(config: Config): AppDeps | undefined {
                                   baseUrl: config.OPENEMR_BASE_URL,
                                   clientId: config.OPENEMR_CLIENT_ID,
                                   privateKeyPem: config.OPENEMR_CLIENT_KEY,
+                                  breaker: openemrBreaker,
                               }),
+                              breaker: openemrBreaker,
                           }),
                           store,
                       ),
@@ -278,6 +302,7 @@ export function buildDeps(config: Config): AppDeps | undefined {
                     apiKey: config.ANTHROPIC_API_KEY ?? '',
                     model: config.ANTHROPIC_MODEL_CHAT,
                     maxTokens: config.LLM_CHAT_MAX_OUTPUT_TOKENS,
+                    breaker: anthropicBreaker,
                 }),
                 store,
                 spendGuard,
@@ -301,6 +326,7 @@ export function buildDeps(config: Config): AppDeps | undefined {
                 return bundle === null ? undefined : { name: bundle.patient.name };
             },
         },
+        breakers: { openemr: openemrBreaker, anthropic: anthropicBreaker },
     };
 }
 
@@ -347,6 +373,18 @@ export function buildServer(config: Config, deps?: AppDeps): FastifyInstance {
                   // PassthroughReranker with no probe → not_configured (degraded, accurate —
                   // fused order still serves).
                   ...(deps.evidence?.checkReranker === undefined ? {} : { checkReranker: deps.evidence.checkReranker }),
+                  // H.10: /ready reflects circuit state — an OPEN dependency reports failed
+                  // with circuit_open and its live check is suppressed (no hammering, not
+                  // even from readiness). The cohere breaker surfaces under the `reranker`
+                  // dep name, composing with H.2's probe: open wins; otherwise the probe
+                  // answers exactly as it does today. Evaluated per poll, so the evidence
+                  // deps (attached after buildDeps at boot) are picked up late.
+                  breakerStates: (): Record<string, BreakerState> => ({
+                      ...(deps.breakers === undefined
+                          ? {}
+                          : { openemr: deps.breakers.openemr.state, anthropic: deps.breakers.anthropic.state }),
+                      ...(deps.evidence?.cohereBreaker === undefined ? {} : { reranker: deps.evidence.cohereBreaker.state }),
+                  }),
               },
     );
     registerAuthRoutes(app, deps?.authRoutes);
@@ -408,32 +446,50 @@ export async function buildEvidenceDeps(
     }
     const chunks = loadCorpusChunks(corpusDir);
     const onUsage = options?.onCohereUsage;
-    const embeddings =
-        config.COHERE_API_KEY !== undefined
-            ? new CohereEmbeddings({
-                  apiKey: config.COHERE_API_KEY,
-                  model: config.COHERE_EMBED_MODEL,
-                  ...(onUsage === undefined
-                      ? {}
-                      : {
-                            onUsage: (units: number, correlationId: string) =>
-                                onUsage({ purpose: 'cohere_embed', model: config.COHERE_EMBED_MODEL, units, correlationId }),
-                        }),
-              })
-            : new HashEmbeddings();
-    const reranker =
-        config.COHERE_API_KEY !== undefined
-            ? new CohereReranker({
-                  apiKey: config.COHERE_API_KEY,
-                  model: config.COHERE_RERANK_MODEL,
-                  ...(onUsage === undefined
-                      ? {}
-                      : {
-                            onUsage: (units: number, correlationId: string) =>
-                                onUsage({ purpose: 'cohere_rerank', model: config.COHERE_RERANK_MODEL, units, correlationId }),
-                        }),
-              })
-            : new PassthroughReranker();
+    // H.10: ONE 'cohere' breaker shared by both providers (one vendor, one counter),
+    // existing only when the vendor does. The decorators catch ONLY CircuitOpenError and
+    // degrade honestly — embed → [] (dense leg skips; keyword+fusion serves), rerank →
+    // passthrough order with rerank_applied=false. Real errors propagate: they feed the
+    // breaker. Keyless deployments keep the Week 1 offline backends, no breaker at all.
+    let embeddings: EmbeddingsProvider = new HashEmbeddings();
+    let reranker: Reranker = new PassthroughReranker();
+    let cohereBreakerMaybe: CircuitBreaker | undefined;
+    let cohereRerankerMaybe: CohereReranker | undefined;
+    if (config.COHERE_API_KEY !== undefined) {
+        const degradeLogger = {
+            warn: (obj: Record<string, unknown>, msg: string): void =>
+                console.warn(JSON.stringify({ level: 'warn', msg, ...obj })),
+        };
+        cohereBreakerMaybe = new CircuitBreaker({ name: 'cohere', onTransition: breakerTransitionLog('cohere') });
+        cohereRerankerMaybe = new CohereReranker({
+            apiKey: config.COHERE_API_KEY,
+            model: config.COHERE_RERANK_MODEL,
+            ...(onUsage === undefined
+                ? {}
+                : {
+                      onUsage: (units: number, correlationId: string) =>
+                          onUsage({ purpose: 'cohere_rerank', model: config.COHERE_RERANK_MODEL, units, correlationId }),
+                  }),
+        });
+        embeddings = new CircuitGuardedEmbeddings(
+            new CohereEmbeddings({
+                apiKey: config.COHERE_API_KEY,
+                model: config.COHERE_EMBED_MODEL,
+                ...(onUsage === undefined
+                    ? {}
+                    : {
+                          onUsage: (units: number, correlationId: string) =>
+                              onUsage({ purpose: 'cohere_embed', model: config.COHERE_EMBED_MODEL, units, correlationId }),
+                      }),
+            }),
+            cohereBreakerMaybe,
+            degradeLogger,
+        );
+        reranker = new CircuitGuardedReranker(cohereRerankerMaybe, cohereBreakerMaybe, degradeLogger);
+    }
+    // Const captures so narrowing flows into the closures below.
+    const cohereBreaker = cohereBreakerMaybe;
+    const cohereReranker = cohereRerankerMaybe;
 
     // B.3-live: RETRIEVER_DENSE_BACKEND finally branches. pgvector engages when a database
     // is wired AND Cohere is keyed (the table is vector(1024) = embed-english-v3.0 dims);
@@ -458,14 +514,15 @@ export async function buildEvidenceDeps(
             ...(denseIndex === undefined ? {} : { denseIndex }),
         }),
         // H.2: /ready's reranker probe. Reports the outcome of the LAST real rerank made
-        // by traffic (CohereReranker records it) — never a per-poll Cohere call: trial
-        // keys are rate-limited and every rerank costs money. Keyed but not yet exercised
-        // is ok with an explicit "unverified" detail; a failure more recent than the last
+        // by traffic (the inner CohereReranker records it — the H.10 guard wrapping it
+        // never touches the observation) — never a per-poll Cohere call: trial keys are
+        // rate-limited and every rerank costs money. Keyed but not yet exercised is ok
+        // with an explicit "unverified" detail; a failure more recent than the last
         // success reports failed until traffic succeeds again.
-        ...(reranker instanceof CohereReranker
+        ...(cohereReranker !== undefined
             ? {
                   checkReranker: async (): Promise<string> => {
-                      const observed = reranker.lastOutcome;
+                      const observed = cohereReranker.lastOutcome;
                       if (observed === undefined) {
                           return 'keyed (unverified since boot — no rerank traffic yet)';
                       }
@@ -478,6 +535,9 @@ export async function buildEvidenceDeps(
                   },
               }
             : {}),
+        // H.10: buildServer reflects this breaker's state on /ready under the `reranker`
+        // dep name (open wins over the H.2 probe above).
+        ...(cohereBreaker === undefined ? {} : { cohereBreaker }),
     };
 }
 
@@ -530,6 +590,12 @@ if (process.argv[1]?.endsWith('server.js') || process.argv[1]?.endsWith('server.
                 info: (obj: Record<string, unknown>, msg: string) => console.log(JSON.stringify({ level: 'info', msg, ...obj })),
                 warn: (obj: Record<string, unknown>, msg: string) => console.warn(JSON.stringify({ level: 'warn', msg, ...obj })),
             };
+            // H.10: router + composer share buildDeps' 'anthropic' breaker — one dependency,
+            // one counter across prep/chat/router/composer. (H.4b's pre-check retry means up
+            // to two exec calls per compose; each is its own logical call by design.) When
+            // the circuit opens, CircuitOpenError rides the existing fallback lanes: router
+            // → fast_path, composer → Week 1 loop.
+            const anthropicBreakerSpread = deps.breakers === undefined ? {} : { breaker: deps.breakers.anthropic };
             const routerModel = new LlmRouterModel(
                 new AnthropicClient({
                     apiKey: config.ANTHROPIC_API_KEY,
@@ -537,6 +603,7 @@ if (process.argv[1]?.endsWith('server.js') || process.argv[1]?.endsWith('server.
                     maxTokens: 16,
                     idleTimeoutMs: 3_000,
                     totalTimeoutMs: 5_000,
+                    ...anthropicBreakerSpread,
                 }),
                 graphLogBase,
             );
@@ -547,6 +614,7 @@ if (process.argv[1]?.endsWith('server.js') || process.argv[1]?.endsWith('server.
                     maxTokens: 1500,
                     idleTimeoutMs: 10_000,
                     totalTimeoutMs: 20_000,
+                    ...anthropicBreakerSpread,
                 }),
                 deps.chat.spendGuard,
                 graphLogBase,

@@ -5,6 +5,7 @@
 // required dependencies must be configured at all.
 import type { FastifyInstance } from 'fastify';
 import type { Config } from '../config.js';
+import type { BreakerState } from '../lib/circuitBreaker.js';
 
 type DepStatus = 'ok' | 'failed' | 'not_configured';
 
@@ -46,6 +47,12 @@ export interface HealthProbes {
      *  recent than the last success throws (→ failed). Absent probe = PassthroughReranker
      *  fallback (degraded is accurate — fusion order still serves). */
     checkReranker?: HealthProbe;
+    /** H.10: per-dependency circuit-breaker states keyed by dep name (`openemr`,
+     *  `anthropic`, `reranker` ← the cohere breaker). A configured dep whose breaker is
+     *  `open` reports failed with `circuit_open` WITHOUT its live check running — the
+     *  whole point is no hammering, not even from readiness. `half_open`/`closed` leave
+     *  the dep's own probe in charge (H.2's traffic-outcome reranker probe included). */
+    breakerStates?: () => Record<string, BreakerState>;
 }
 
 function buildChecks(config: Config, probes?: HealthProbes): DepCheck[] {
@@ -120,12 +127,25 @@ export function registerHealthRoutes(app: FastifyInstance, config: Config, probe
 
     app.get('/ready', async (request, reply) => {
         const checks = buildChecks(config, probes);
+        // H.10: one breaker-state snapshot per poll; an OPEN breaker wins over the live check.
+        const breakerStates = probes?.breakerStates?.() ?? {};
         const results: Record<string, { status: DepStatus; error?: string; detail?: string }> = {};
 
         await Promise.all(
             checks.map(async (dep) => {
                 if (!dep.configured) {
                     results[dep.name] = { status: 'not_configured' };
+                    return;
+                }
+                if (breakerStates[dep.name] === 'open') {
+                    // Failed WITHOUT invoking dep.check() — an open circuit means consecutive
+                    // real failures already proved the dependency down; probing it again is
+                    // exactly the hammering the breaker exists to stop.
+                    request.log.warn({ dep: dep.name }, 'readiness check suppressed — circuit open');
+                    results[dep.name] = {
+                        status: 'failed',
+                        error: 'circuit_open (consecutive failures tripped the breaker; cooling down — live check suppressed)',
+                    };
                     return;
                 }
                 try {

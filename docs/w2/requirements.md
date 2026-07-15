@@ -508,9 +508,15 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
   retry; writes, uploads (30 s), and client registration get timeouts with
   NO auto-retry — a retried write can double-file a document; JWKS/
   introspection and the doc-write diagnostic script covered too).*
-- [ ] Circuit-breaking behavior per dependency: after N consecutive failures,
+- [x] Circuit-breaking behavior per dependency: after N consecutive failures,
   short-circuit with degraded response + `/ready` reflects it (simple breaker
-  or documented equivalent fallback — no silent hammering).
+  or documented equivalent fallback — no silent hammering). *(H.10:
+  hand-rolled CircuitBreaker — 5 consecutive failures → 30 s cooldown →
+  one half-open probe; one instance per dependency (openemr, anthropic,
+  cohere), composed OUTSIDE H.5's retry so one logical call = one failure;
+  degrades embed→keyword-only, rerank→passthrough; `/ready` reports
+  `failed: circuit_open` with the live check suppressed. Full lifecycle
+  verified against a booted server + stub OpenEMR at the /ready surface.)*
 
 ### G3 — Schemas are canonical
 - [x] Raw VLM output never bypasses validation: the only path from model

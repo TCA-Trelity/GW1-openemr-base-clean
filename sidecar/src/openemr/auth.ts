@@ -11,6 +11,7 @@ import {
     sign as cryptoSign,
     type KeyObject,
 } from 'node:crypto';
+import { guardedBy, type CircuitBreaker } from '../lib/circuitBreaker.js';
 import { withTimeoutAndRetry } from '../lib/httpRetry.js';
 
 // Minimal fetch shape so tests inject a mock and Railway scripts use globalThis.fetch.
@@ -227,6 +228,10 @@ export interface OpenEmrAuthClientOptions {
     now?: () => number;
     /** Per-attempt request ceiling; tests shorten it (same shape as rerank's options.timeoutMs). */
     timeoutMs?: number;
+    /** H.10: the shared 'openemr' circuit breaker (same instance as the FHIR + standard-API
+     *  clients — one host, one dependency, one counter). Guards the token mint, OUTSIDE the
+     *  H.5 retry wrapper: one mint = one logical call = one breaker failure. */
+    breaker?: CircuitBreaker;
 }
 
 // Docs cap assertion exp at iat + 5 minutes (Documentation/api/AUTHENTICATION.md:543); the server
@@ -244,6 +249,7 @@ export class OpenEmrAuthClient {
     private readonly privateKey: KeyObject;
     private readonly kid: string;
     private readonly timeoutMs: number;
+    private readonly breaker: CircuitBreaker | undefined;
     private cached: { token: string; expiresAtMs: number } | undefined;
 
     constructor(options: OpenEmrAuthClientOptions) {
@@ -253,6 +259,7 @@ export class OpenEmrAuthClient {
         this.clientId = options.clientId;
         this.scopes = options.scopes ?? SYSTEM_SCOPES;
         this.timeoutMs = options.timeoutMs ?? OAUTH_REQUEST_TIMEOUT_MS;
+        this.breaker = options.breaker;
         this.privateKey = createPrivateKey(normalizePem(options.privateKeyPem));
         // Recompute the RFC 7638 kid; the assertion header kid must match the registered JWK
         // (src/Common/Auth/OpenIDConnect/JWT/JsonWebKeySet.php:86-90).
@@ -266,7 +273,8 @@ export class OpenEmrAuthClient {
         }
         // Token mint: not a data write (worst case is an extra token row), so the helper's one
         // bounded retry on transient failures is safe (REQ G2).
-        const { status, payload } = await withTimeoutAndRetry('token request', this.timeoutMs, async (signal) => {
+        // H.10: breaker OUTSIDE the retry pair — one mint = one logical call = one breaker failure.
+        const { status, payload } = await guardedBy(this.breaker, () => withTimeoutAndRetry('token request', this.timeoutMs, async (signal) => {
             // Form parameters per Documentation/api/AUTHENTICATION.md:549-557; the server only accepts
             // JWT client assertions on this grant (CustomClientCredentialsGrant.php:159-175) and the
             // exact assertion-type URN is required (JWTClientAuthenticationService.php:57,128-135).
@@ -290,7 +298,7 @@ export class OpenEmrAuthClient {
             return { status: response.status, payload: parsed };
         }, {
             onTimeout: (operation, timeoutMs) => new OpenEmrAuthError(operation, 408, undefined, `timed out after ${timeoutMs}ms`),
-        });
+        }));
         const token = payload?.['access_token'];
         if (typeof token !== 'string' || token === '') {
             throw new OpenEmrAuthError('token request', status, undefined, 'response missing access_token');
@@ -331,6 +339,10 @@ export interface OpenEmrPasswordAuthClientOptions {
     now?: () => number;
     /** Per-attempt request ceiling; tests shorten it (same shape as rerank's options.timeoutMs). */
     timeoutMs?: number;
+    /** H.10: the shared 'openemr' circuit breaker (same instance as the FHIR + standard-API
+     *  clients — one host, one dependency, one counter). Guards the token mint, OUTSIDE the
+     *  H.5 retry wrapper: one mint = one logical call = one breaker failure. */
+    breaker?: CircuitBreaker;
 }
 
 // OAuth2 password grant for a *user-role* token — the only headless path to the standard
@@ -350,6 +362,7 @@ export class OpenEmrPasswordAuthClient {
     private readonly password: string;
     private readonly scopes: readonly string[];
     private readonly timeoutMs: number;
+    private readonly breaker: CircuitBreaker | undefined;
     private cached: { token: string; expiresAtMs: number } | undefined;
 
     constructor(options: OpenEmrPasswordAuthClientOptions) {
@@ -361,6 +374,7 @@ export class OpenEmrPasswordAuthClient {
         this.password = options.password;
         this.scopes = options.scopes ?? STANDARD_API_SEED_SCOPES;
         this.timeoutMs = options.timeoutMs ?? OAUTH_REQUEST_TIMEOUT_MS;
+        this.breaker = options.breaker;
     }
 
     // Returns a valid user-role bearer token, reusing the cached one until near expiry.
@@ -381,7 +395,8 @@ export class OpenEmrPasswordAuthClient {
         });
         // Token mint: not a data write (worst case is an extra token row), so the helper's one
         // bounded retry on transient failures is safe (REQ G2).
-        const { status, payload } = await withTimeoutAndRetry('password token request', this.timeoutMs, async (signal) => {
+        // H.10: breaker OUTSIDE the retry pair — one mint = one logical call = one breaker failure.
+        const { status, payload } = await guardedBy(this.breaker, () => withTimeoutAndRetry('password token request', this.timeoutMs, async (signal) => {
             const response = await this.fetchImpl(this.tokenUrl, {
                 method: 'POST',
                 headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -395,7 +410,7 @@ export class OpenEmrPasswordAuthClient {
             return { status: response.status, payload: parsed };
         }, {
             onTimeout: (operation, timeoutMs) => new OpenEmrAuthError(operation, 408, undefined, `timed out after ${timeoutMs}ms`),
-        });
+        }));
         const token = payload?.['access_token'];
         if (typeof token !== 'string' || token === '') {
             throw new OpenEmrAuthError('password token request', status, undefined, 'response missing access_token');
