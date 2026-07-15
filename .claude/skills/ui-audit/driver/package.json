@@ -1,0 +1,14 @@
+{
+  "name": "ui-audit-driver",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone Playwright crawler for the ui-audit skill. Not part of the host repo's app or test suite.",
+  "main": "run.js",
+  "scripts": {
+    "start": "node run.js"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

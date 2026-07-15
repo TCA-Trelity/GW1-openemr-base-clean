@@ -1,0 +1,2 @@
+This is a plain text file deliberately mislabeled as an upload fixture.
+Used by the ui-audit skill to test wrong-file-type validation handling.
