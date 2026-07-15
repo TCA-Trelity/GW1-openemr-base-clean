@@ -34,21 +34,37 @@ to the allowlist:
 `curl -s https://enchanting-mercy-production-5d32.up.railway.app/ready` and
 reports the probe JSON in chat.
 
-## 10. Langfuse eyeball: H.4's live-run trace + H.7's span nesting (~2 min)
+## 10. Langfuse eyeball + Railway log read for the two live findings (~5 min)
 
-Wait until the agent posts an `x-correlation-id` from the H.4 live-smoke
-run (it lands in chat and on the build board's T1 section).
+The H.4 live-smoke runs are done (runs #28–#30, 2026-07-15). The document
+pipeline verified live; two findings need the server-side views only you
+can open:
 
-1. Open your Langfuse project (cloud.langfuse.com) → **Traces** → search the
-   posted correlation id.
-2. Confirm: the trace exists and opens; the graph turn shows
-   `supervisor` with `evidence_retriever` (and critic) as **children inside
-   it** — nested, not siblings (this is H.7/G13's visual half).
-3. Spot-check privacy: spans carry ids/hashes/counts — no patient names, no
+**A. Langfuse (cloud.langfuse.com → Traces):**
+
+1. Search `839a5e0f-c334-46b2-b7d9-1e850f98fd4d` (run #30's renal upload) —
+   trace exists and opens.
+2. Find the graph/chat trace from ~15:33:50 UTC 2026-07-15 (conversation
+   `cf4bfa54-edd3-4c02-a7be-0a8bc3466acc`): check whether `supervisor` shows
+   `evidence_retriever` (and critic) as **children nested inside it**.
+   **Expected today: flat siblings** — spec-verification found the tracer
+   emits flat spans; H.7 is the fix ticket. Your look confirms the
+   before-state (H.7/G13's visual half).
+3. Privacy spot-check: spans carry ids/hashes/counts — no patient names, no
    document text.
 
-**Report in chat:** "trace visible, nested, clean" (or paste what you see
-instead — a flat/sibling layout means H.7's code half has a bug to fix).
+**B. Railway → sidecar service → Deployments → View logs (same ~5 min):**
+
+1. Search `blockedFacts` around **15:01–15:07 UTC** (prep correlation
+   `e0b043a1-1eaa-400d-813c-a5299b16cc63`) — paste the log line(s) in chat.
+   This names exactly which 5 prep claims got blocked and why (finding 1).
+2. Search the critic/gate rejection logged around **15:33:50–54 UTC** for
+   the chat turn above — paste it too. This shows why the live evidence
+   answer released zero citations (finding 2).
+
+**Report in chat:** the two pasted log lines + "trace visible, nested,
+clean" (or what you actually see). The agent turns them into either a
+one-time live-data cleanup or a product ticket.
 
 ## 11. (Parked — post-grading, J.1) Alert notification destination
 
