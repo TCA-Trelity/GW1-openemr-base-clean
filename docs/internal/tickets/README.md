@@ -77,10 +77,16 @@ Then:
    trailer**: `git commit --trailer "Assisted-by: Claude Code" -m "..."` —
    tracker edits (requirements.md, build-status.html, W2_ARCHITECTURE.md) ride
    the SAME commit as the code.
-2. `git push -u origin claude/openemr-rag-requirements-x25vzm`
-3. Update the PR #9 body (checklist line for the ticket).
+2. `git push -u origin claude/merged-eval-course-plan-ky6ulh`
+3. Update the PR #16 body (checklist line for the ticket).
 4. Send the user the refreshed dashboard: SendUserFile
    `docs/internal/build-status.html` (rendered inline).
+
+> Branch history note: the E.*/F.* specs below were executed on
+> `claude/openemr-rag-requirements-x25vzm` (PR #9, since merged as #15).
+> That branch is finished history — all new ticket work (the H/J/K/CT specs)
+> pushes to `claude/merged-eval-course-plan-ky6ulh` and tracks on PR #16,
+> regardless of what an older spec's ritual block says.
 
 ---
 
@@ -134,3 +140,35 @@ Then:
 > execution-plan wave-F numbering settled; the **Plan ticket** column above is
 > authoritative for requirements/tracker references. Each spec's metadata line
 > repeats its plan ticket id.
+
+### Merged follow-on plan specs (docs/internal/merged-plan.md · board sections T1/T2)
+
+Executed-in-session P0s (H.1–H.6, H.4, CT1–CT4) have no specs — they shipped
+directly; the board + PR #16 are their record. Cold-executable specs for the
+rest:
+
+| Spec file | Ticket | Priority | One-liner |
+|---|---|---|---|
+| [H.7-span-nesting.md](H.7-span-nesting.md) | H.7 | P1 | Span-tree shape test + Langfuse visual confirm (G13) |
+| [H.8-correlation-id-walk.md](H.8-correlation-id-walk.md) | H.8 | P1 | One correlation ID through all 7 boundaries (G4) |
+| [H.9-attach-extract-tool.md](H.9-attach-extract-tool.md) | H.9 | P1 | attach_and_extract as a first-class graph tool |
+| [H.10-circuit-breaker.md](H.10-circuit-breaker.md) | H.10 | P1 | Hand-rolled per-dependency circuit breaker (G2) |
+| [H.11-zod-shapes.md](H.11-zod-shapes.md) | H.11 | P1 | Zod on the four unchecked data shapes (G1/R2) |
+| [H.12-trace-reconstruction.md](H.12-trace-reconstruction.md) | H.12 | P2 | Rebuild one request's story from its correlation ID |
+| [H.13-data-authority-adr.md](H.13-data-authority-adr.md) | H.13 | P2 | Data-authority ADR + lab-fact-never-writes-EHR test |
+| [H.14-shared-extraction-schema.md](H.14-shared-extraction-schema.md) | H.14 | P2 | Panel + evals consume the shared extraction schema |
+| [H.15-router-latency.md](H.15-router-latency.md) | H.15 | P2 | Measure supervisor routing vs the 200–400 ms target |
+| [H.16-pinned-evidence-fast-path.md](H.16-pinned-evidence-fast-path.md) | H.16 | P2 | Chat Tier-0 read of the ingestion-time pin store |
+| [H.17-test-failure-names.md](H.17-test-failure-names.md) | H.17 | P2 | Test titles name the failure mode they guard (G8) |
+| [J.1-alert-notifications.md](J.1-alert-notifications.md) | J.1 | P0 post-grading | A1–A6 alerts notify a human (Langfuse webhook first) |
+| [J.2-rate-limiting.md](J.2-rate-limiting.md) | J.2 | P0 post-grading | @fastify/rate-limit on upload + chat SSE |
+| [J.3-staging-promote.md](J.3-staging-promote.md) | J.3 | P0 post-grading | Railway staging + manual promote-to-prod |
+| [J.4-php-ci-retarget.md](J.4-php-ci-retarget.md) | J.4 | P1 post-grading | Retarget 2 inherited PHP workflows to this fork's main |
+| [J.5-dev-login-off-runbook.md](J.5-dev-login-off-runbook.md) | J.5 | P1 | RUNBOOK steps to disable dev-login for a pilot |
+| [K.1-stay-narrow-decision.md](K.1-stay-narrow-decision.md) | K.1 | P1 | Lock "stay narrow (retina)" in DECISIONS.md |
+| [K.4-ophthalmology-menu.md](K.4-ophthalmology-menu.md) | K.4 | P0 (cheap) | Ophthalmology/Retina scoping via the dashboard-context module |
+| [K.5-module-toggles.md](K.5-module-toggles.md) | K.5 | P1 | Toggle off the 7 non-applicable modules (reversible) |
+| [CT5-pre-push-checklist.md](CT5-pre-push-checklist.md) | CT5 | P1 | Before-you-push checklist skill + eval-maintenance rules |
+| [CT6-error-analysis-habit.md](CT6-error-analysis-habit.md) | CT6 | P2 | Recurring first-failure error-analysis habit + log |
+| [CT7-llm-judge-scorecard.md](CT7-llm-judge-scorecard.md) | CT7 | P2 | Informational-only LLM-judge scorecard (never gates) |
+| [CT8-replay-harness.md](CT8-replay-harness.md) | CT8 | backlog | Replay harness over scrubbed real traffic (unscheduled) |
