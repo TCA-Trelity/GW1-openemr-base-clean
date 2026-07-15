@@ -68,6 +68,7 @@ describe('calculator-goldens', () => {
                     : `severity=${hcq.severity}; ${hcq.details?.duration_years ?? '?'}y @ ${hcq.details?.daily_dose_mg ?? '?'}mg = ${hcq.details?.cumulative_dose_grams ?? '?'}g cumulative`,
             threshold: 'severity=high; 5y @ 200mg = 365g (AAO 2016 rev. 2020 golden)',
             pass,
+            difficulty: 'straightforward',
         });
     });
 
@@ -94,6 +95,7 @@ describe('calculator-goldens', () => {
             value: `alert_level=${result.alert_level} (non-null); GC ${first?.value ?? '?'}→${last?.value ?? '?'} microns over ${result.gc_thickness_trend.length} images; detected=${result.progression_detected}`,
             threshold: 'alert_level=high; 12-micron decline detected; rheumatology-consult recommendation',
             pass,
+            difficulty: 'straightforward',
         });
     });
 
@@ -134,6 +136,9 @@ describe('calculator-goldens', () => {
             value: `gaps=${gapDays.join('/')}d; authored over-extension scan: ${String(authoredDaysSince)}d post-injection, ${String(authoredAssessment)}; engine: ${analysis.pattern_summary.poor_response_count} worsened of ${analysis.pattern_summary.total_cycles} cycles, optimal_interval=${String(analysis.optimal_interval)}wk (confidence=${analysis.confidence})`,
             threshold: 'gaps 49/49/71d; worsened cycle flagged; optimal_interval=7wk at high confidence',
             pass,
+            // Same-day post-injection scans force an interval-attribution tie-break (the
+            // engine/corpus seam the notes describe) — judgment, not a clean happy path.
+            difficulty: 'ambiguous',
             notes:
                 'Engine/corpus seam surfaced by this eval: three OCTs are captured hours AFTER a same-day injection, and the engine (dates-only treatment timestamps, strict `<` match) attributes them to that same-day injection at a 0-week interval — including the worsened 71-day-extension scan. The worsened cycle IS flagged (poor_response_count=1) and the 7-week optimal interval IS derived, but the headline recommendation string comes from the "consistently stable" branch rather than the "leaked at 10 weeks" branch the synthetic unit-test series produces. Recorded honestly rather than patched around; candidate fix tracked as future work (match scans to the last treatment strictly before the capture DATE, not datetime).',
         });

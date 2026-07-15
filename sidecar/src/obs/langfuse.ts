@@ -14,15 +14,29 @@ export interface LangfuseLike {
     flushAsync(): Promise<unknown>;
 }
 
+/** The body accepted by every span-creating call (trace-level and nested). */
+export interface LangfuseSpanBody {
+    name: string;
+    startTime?: Date;
+    endTime?: Date;
+    metadata?: Record<string, unknown>;
+    level?: 'DEBUG' | 'DEFAULT' | 'WARNING' | 'ERROR';
+    statusMessage?: string;
+}
+
+/**
+ * A child-capable span client (H.7): `.span()` nests a child span, `.end()` closes it.
+ * The real langfuse SDK's span client structurally satisfies this — note its
+ * `end(body?)` omits `endTime` from the body (the SDK stamps the end time itself),
+ * so the seam takes no arguments; callers use `.end?.()`.
+ */
+export interface LangfuseSpanLike {
+    span(body: LangfuseSpanBody): LangfuseSpanLike;
+    end?(): unknown;
+}
+
 export interface LangfuseTraceLike {
-    span(body: {
-        name: string;
-        startTime?: Date;
-        endTime?: Date;
-        metadata?: Record<string, unknown>;
-        level?: 'DEBUG' | 'DEFAULT' | 'WARNING' | 'ERROR';
-        statusMessage?: string;
-    }): unknown;
+    span(body: LangfuseSpanBody): LangfuseSpanLike;
     generation(body: {
         name: string;
         model?: string;

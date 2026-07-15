@@ -22,6 +22,7 @@ import type { CitationRef } from '../schemas/citations.js';
 import { parseEvidencePayload, parseGraphAsk } from './contracts.js';
 import type { PinnedEvidenceStore } from './pins.js';
 import { routeAsk, type RouterModel, type RoutingDecision } from './router.js';
+import { attachAndExtractTool } from './tools.js';
 
 export interface HandoffEvent {
     from: string;
@@ -111,6 +112,11 @@ export function buildClinicalGraph(deps: ClinicalGraphDeps) {
         return [event];
     };
 
+    // H.9 (S1/R1): ingestion enters the graph as a named, first-class async tool —
+    // the intake_extractor node invokes it by name, and the tool's Zod boundary
+    // (tools.ts) is the contract between node and service.
+    const attachAndExtract = attachAndExtractTool(deps.ingestion);
+
     const graph = new StateGraph(GraphAnnotation)
         .addNode('supervisor', async (state) => {
             const routeInput: Parameters<typeof routeAsk>[0] = { kind: state.ask.kind };
@@ -132,17 +138,16 @@ export function buildClinicalGraph(deps: ClinicalGraphDeps) {
             if (state.ask.upload === undefined) {
                 throw new Error('needs_extraction route without an upload payload');
             }
-            const record = await deps.ingestion.attachAndExtract({
-                ...state.ask.upload,
-                patientId: state.ask.patientId,
-                correlationId: state.correlationId,
-            });
+            const record = await attachAndExtract.run(
+                { patient_id: state.ask.patientId, upload: state.ask.upload },
+                { correlationId: state.correlationId },
+            );
             // Evidence pinning (C.6): extraction findings become retrieval concepts so the
             // evidence lands NOW, at prep time — most in-visit guideline asks then read it
             // as a Tier-0 lookup instead of a live search.
             return {
                 ingestion: record,
-                handoffs: handoff(state, 'intake_extractor', 'evidence_retriever', `extraction ${record.status}; pin protocol evidence for extracted findings`),
+                handoffs: handoff(state, 'intake_extractor', 'evidence_retriever', `attach_and_extract: extraction ${record.status}; pin protocol evidence for extracted findings`),
             };
         })
         .addNode('evidence_retriever', async (state) => {

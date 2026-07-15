@@ -64,6 +64,7 @@ describe('cross-patient-denial', () => {
                 : `NOT rejected — ${String(extractedCount)} facts accepted`,
             threshold: 'ExtractionError naming patient_id; 0 facts stored',
             pass: rejected && mentionsPatientId,
+            difficulty: 'edge-case',
         });
     });
 
@@ -115,6 +116,7 @@ describe('cross-patient-denial', () => {
             value: `${crossVerified.length}/${crossCitations.length} cross-patient spans verified; ${ownVerified.length}/${ownCitations.length} own spans verified`,
             threshold: '0 cross-patient spans verified; all own spans verified',
             pass,
+            difficulty: 'edge-case',
         });
     });
 });

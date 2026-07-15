@@ -1,9 +1,121 @@
 # USER-ACTIONS — the key-drop & click checklist (human-only steps)
 
-> **STATUS: ARCHIVE (2026-07-14).** Every item below is complete and verified
-> live (item 4 on hold by user decision). Nothing here requires action —
-> kept as reference for credential re-dos and troubleshooting. Remaining W2
-> work lives on the build board (manual test plan + open matrix rows).
+> **STATUS: REOPENED (2026-07-15) for the merged follow-on plan.** Items
+> **9–10** below are the live ones (item 9 optional-but-unblocking, item 10
+> a 2-minute eyeball once the agent posts a correlation id). Items **11–13**
+> are parked until after the grading window. Items **0–8** remain the
+> completed W2 archive (verified 2026-07-14; item 4 on hold by user
+> decision) — kept for credential re-dos and troubleshooting.
+
+---
+
+## 9. (Optional, unblocking) Widen the Claude Code environment's network policy
+
+The session executing the merged plan (`docs/internal/merged-plan.md`) sits
+behind a network policy that **denies** the deployed app and Langfuse
+(proxy CONNECT 403 — verified 2026-07-15). H.4's live re-verify still runs
+**without** this item, via the `live-smoke` GitHub Actions dispatch (CI
+runners reach Railway fine). Widening the policy additionally lets the agent
+run live checks directly in-session (and later, CT6's trace-fetch script).
+
+> **Status 2026-07-15:** attempted — the domains were added to the desktop
+> app's **"Allowed sites"** list, which governs Claude's *Browser tools* on
+> your machine, not this cloud container's egress. The proxy still denies
+> the hosts (re-verified CONNECT 403). The control that matters is below,
+> and it applies when a **new session/container starts** — the current
+> session keeps its policy either way. Optional: nothing is blocked on
+> this (live checks route through the live-smoke CI dispatch).
+
+**Where:** claude.ai → Code → **Environments** → the environment this
+session runs in → **Network policy / allowed domains** (docs:
+https://code.claude.com/docs/en/claude-code-on-the-web) — not the desktop
+app's Settings → Claude Code → Allowed sites. Add these domains to the
+allowlist, then start a fresh session on that environment:
+
+| Domain | Why |
+|---|---|
+| `enchanting-mercy-production-5d32.up.railway.app` | deployed sidecar + panel |
+| `gw1-openemr-base-clean-production.up.railway.app` | deployed EHR |
+| `cloud.langfuse.com` | Langfuse API (add `us.cloud.langfuse.com` too if your project shows the US host) |
+| `api.cohere.com` | only if you also want in-session Cohere probes |
+
+**Verify:** tell the agent "network policy updated" — it re-runs
+`curl -s https://enchanting-mercy-production-5d32.up.railway.app/ready` and
+reports the probe JSON in chat.
+
+## 10. Langfuse eyeball + Railway log read for the two live findings (~5 min)
+
+The H.4 live-smoke runs are done (runs #28–#30, 2026-07-15). The document
+pipeline verified live; two findings need the server-side views only you
+can open:
+
+**A. Langfuse (cloud.langfuse.com → Traces):**
+
+> **"Not seeing anything" troubleshooting (2026-07-15):** the sidecar's own
+> probe reports `langfuse: ok` (verified live), so traces ARE being
+> shipped. If the UI looks empty: (1) try the other region host —
+> `us.cloud.langfuse.com` vs `cloud.langfuse.com`; traces live wherever
+> the project whose keys sit on Railway was created; (2) check the
+> org/project picker top-left — pick the project whose API keys you
+> pasted; (3) widen the time filter to "Past 24 hours".
+
+1. Search `839a5e0f-c334-46b2-b7d9-1e850f98fd4d` (run #30's renal upload)
+   or `4a45d4d1-06ae-4b76-89cb-81914e315985` (the in-session live chat
+   repro) — trace exists and opens.
+2. Find the graph/chat trace from ~15:33:50 UTC 2026-07-15 (conversation
+   `cf4bfa54-edd3-4c02-a7be-0a8bc3466acc`): check whether `supervisor` shows
+   `evidence_retriever` (and critic) as **children nested inside it**.
+   **Expected today: flat siblings** — spec-verification found the tracer
+   emits flat spans; H.7 is the fix ticket. Your look confirms the
+   before-state (H.7/G13's visual half).
+3. Privacy spot-check: spans carry ids/hashes/counts — no patient names, no
+   document text.
+
+**B. Railway → the SIDECAR service → latest deployment → Deploy Logs:**
+
+> ⚠️ Two common misses (hit 2026-07-15): (1) the right card is the one
+> whose domain is `enchanting-mercy-production-5d32.up.railway.app` — NOT
+> the `gw1-openemr-…` card (that's OpenEMR itself; its logs never contain
+> `blockedFacts`); (2) the search goes in the **Deploy Logs** tab —
+> Build Logs only show the image build.
+
+1. ~~Search `blockedFacts`~~ **DONE (user, 2026-07-15, via `citation AND
+   gate`):** the 15:06 UTC prep blocked `med-001..med-005`, all reason
+   `citation_failed`; the 15:33 UTC prep verified 147/147 with
+   `blockedFacts: []`. Confirms intermittent live-model paraphrase in prep
+   extraction — fix is ticket H.4c on the branch. Nothing further needed
+   here.
+2. ~~Search the critic/gate rejection for the chat turn~~ **No longer
+   needed** — finding 2 was root-caused in-session by direct live repro
+   once network access opened (composer paraphrases; verbatim gate
+   strips). The fix is ticket H.4b on the branch.
+
+**Report in chat:** the two pasted log lines + "trace visible, nested,
+clean" (or what you actually see). The agent turns them into either a
+one-time live-data cleanup or a product ticket.
+
+## 11. (Parked — post-grading, J.1) Alert notification destination
+
+When J.1 starts you'll need ONE of: a Langfuse alert/webhook configured in
+the Langfuse UI, **or** a Slack incoming-webhook URL dropped as a sidecar
+Railway variable (name TBD by the J.1 spec, e.g. `ALERT_WEBHOOK_URL`). No
+action now — the J.1 ticket spec (docs/internal/tickets/J.1) carries the
+exact click path when it's time.
+
+## 12. (Parked — post-grading, J.3/J.4) Railway staging + PHP required checks
+
+J.3 needs Railway dashboard clicks (enable a staging/preview environment and
+a manual promote step). J.4 ends with two retargeted PHP workflows added as
+required checks in GitHub branch protection (same click path as item 7). No
+action now — the ticket specs carry the exact steps.
+
+## 13. (Parked — post-crunch, CT7) Domain-expert scoring batch (~30 min)
+
+CT7's LLM-judge scorecard needs a one-time human-scored batch for agreement
+stats: the script generates a scoring sheet; a clinical domain expert fills
+in scores for the full-answer cases. No action now.
+
+---
 
 > **Human surface: [`../user-actions.html`](../user-actions.html)** — the same
 > checklist as an interactive form (checkboxes persist in-browser, copy

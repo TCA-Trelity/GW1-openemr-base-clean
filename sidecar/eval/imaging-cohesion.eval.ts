@@ -90,6 +90,7 @@ describe('imaging-cohesion', () => {
             value: verdicts.map((v) => `${v.name}: cohesive=${v.cohesive}, ${String(v.scans)} scans golden=${v.goldens}`).join('; '),
             threshold: 'deep-equal on all three derived structures; margaret 6 scans, william 7',
             pass,
+            difficulty: 'straightforward',
         });
     });
 
@@ -136,6 +137,7 @@ describe('imaging-cohesion', () => {
             value: `tools_used=${result.tools_used.join(',') || 'none'}; verbatim=${fedBackVerbatim}; reply delivered=${result.reply.includes(finalReply)}`,
             threshold: 'get_imaging_overview runs once; tool_result deep-equals direct output; reply delivered',
             pass,
+            difficulty: 'straightforward',
         });
     });
 
@@ -201,6 +203,7 @@ describe('imaging-cohesion', () => {
             value: `loader calls=${String(loads.length)}; pixels attached=${String(pixelsAttached)}; quarantine pinned=${String(quarantinePinned)}; tools_used=${result.tools_used.join(',')}; citations=${String(result.citations.length)}`,
             threshold: 'one pixel load; tool_result = [json text, image block]; all quarantine pins present; prefixed reply with 0 citations',
             pass,
+            difficulty: 'straightforward',
         });
     });
 
@@ -239,6 +242,8 @@ describe('imaging-cohesion', () => {
             value: `tools_used=${result.tools_used.join(',') || 'none'}; imaging tool used=${usedImagingTool}; absence claim=${claimsAbsence}`,
             threshold: 'at least one of get_imaging_overview/get_measurement_trend/compare_scans runs; reply makes no absence claim',
             pass: usedImagingTool && !claimsAbsence && result.reply.trim().length > 0,
+            // Live tool-choice judgment: replays an observed real-model failure (false absence claim).
+            difficulty: 'ambiguous',
             notes: 'Behavioral case, runs only with LIVE_EVALS=1 + ANTHROPIC_API_KEY; spends real tokens. The committed report reflects the deterministic run unless a live run regenerated it.',
         });
     });

@@ -51,9 +51,20 @@ run_leg B "$REHEARSAL_DIR/b-schema-retry-skip.patch" "schema_valid"
 run_leg C "$REHEARSAL_DIR/c-phi-log-leak.patch" "no_phi_in_logs"
 
 echo ""
-if [ $FAILED -eq 0 ]; then
-    echo "=== rehearsal PASSED: all three injected regressions were caught by the gate ==="
-else
+if [ $FAILED -ne 0 ]; then
     echo "=== rehearsal FAILED: at least one injected regression slipped through ===" >&2
+    echo "rehearsal: docs/execution/eval-results.md left in place — it shows the failing run (diagnostic evidence)" >&2
+    exit 1
 fi
-exit $FAILED
+
+# All legs passed. Each leg's `npm run eval` rewrote docs/execution/eval-results.md
+# (eval/run.ts ALWAYS regenerates it), so the tree still holds leg C's deliberate
+# no_phi_in_logs failure — a fake alarm now that every injected fault is reversed.
+# Restore the committed deliverable; failure evidence is kept only for failed runs.
+if ! git -C "$REPO_ROOT" restore -- docs/execution/eval-results.md; then
+    echo "rehearsal: PASSED, but restoring docs/execution/eval-results.md failed — it still shows leg C's injected failure; run 'git restore docs/execution/eval-results.md' manually" >&2
+    exit 1
+fi
+echo "rehearsal: docs/execution/eval-results.md restored to its committed state (leg runs regenerate it; a passing rehearsal leaves no fake failure report behind)"
+echo "=== rehearsal PASSED: all three injected regressions were caught by the gate ==="
+exit 0

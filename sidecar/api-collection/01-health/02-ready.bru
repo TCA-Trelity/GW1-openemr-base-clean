@@ -18,9 +18,12 @@ assert {
 docs {
   # Readiness (real dependency checks)
 
-  **What it proves:** the sidecar's dependencies are actually reachable
-  right now — not just that the process booted. Each configured dependency
-  is probed live, in parallel, with a 5s timeout per check:
+  **What it proves:** the sidecar's dependencies are healthy right now — not
+  just that the process booted. Configured dependencies are checked in
+  parallel with a 5s timeout per check. Most are probed live per poll; the
+  `reranker` instead reports the outcome of the last real rerank made by
+  traffic (H.2) — a per-poll Cohere call would burn rate-limited quota and
+  cost money without proving anything traffic wouldn't:
 
   | Dependency  | Probe                                                        |
   |-------------|--------------------------------------------------------------|
@@ -29,6 +32,9 @@ docs {
   | `langfuse`  | `/api/public/health` on the configured Langfuse host          |
   | `postgres`  | `SELECT 1` through the live connection pool                   |
   | `redis`     | Placeholder — reports `not_configured` until a queue is adopted |
+  | `document_storage` | OpenEMR password-grant token mint (cached provider) |
+  | `retriever_index`  | Fails when the guideline index holds zero chunks |
+  | `reranker`  | Last observed real rerank outcome; `ok` + detail `keyed (unverified since boot — no rerank traffic yet)` until first use, `failed` after a failure more recent than the last success |
 
   **Expected response** — `200`:
 
@@ -45,8 +51,9 @@ docs {
   }
   ```
 
-  **Per-dependency statuses:** `ok` (probe passed), `failed` (configured
-  but the live check errored — an `error` string says why), or
+  **Per-dependency statuses:** `ok` (probe passed — may carry a `detail`
+  string, e.g. the reranker's `keyed (unverified since boot …)`), `failed`
+  (configured but the check errored — an `error` string says why), or
   `not_configured` (no credentials/URL set for it).
 
   **When it 503s:** any configured dependency reporting `failed` flips

@@ -11,9 +11,14 @@ import {
     sign as cryptoSign,
     type KeyObject,
 } from 'node:crypto';
+import { guardedBy, type CircuitBreaker } from '../lib/circuitBreaker.js';
+import { withTimeoutAndRetry } from '../lib/httpRetry.js';
 
 // Minimal fetch shape so tests inject a mock and Railway scripts use globalThis.fetch.
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
+
+// Hard per-attempt ceiling for OAuth round-trips (token mints, registration) — REQ G2.
+const OAUTH_REQUEST_TIMEOUT_MS = 10_000;
 
 export interface RsaPublicJwk {
     kty: 'RSA';
@@ -145,6 +150,8 @@ export interface RegisterSystemClientOptions {
     /** Defaults to ['client_credentials']; add 'password' when the client also seeds via the standard API. */
     grantTypes?: readonly string[];
     fetchImpl?: FetchLike;
+    /** Per-attempt request ceiling; tests shorten it (same shape as rerank's options.timeoutMs). */
+    timeoutMs?: number;
 }
 
 export interface RegisteredClient {
@@ -175,18 +182,27 @@ export async function registerSystemClient(options: RegisterSystemClientOptions)
         body['contacts'] = options.contacts;
     }
 
-    const response = await fetchImpl(`${base}/oauth2/default/registration`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
+    // Non-idempotent write — timeout only, retries: 0: every registration POST mints a brand-new
+    // client_id, so an automatic retry could register a duplicate (orphaned) client.
+    const { status, payload } = await withTimeoutAndRetry('client registration', options.timeoutMs ?? OAUTH_REQUEST_TIMEOUT_MS, async (signal) => {
+        const response = await fetchImpl(`${base}/oauth2/default/registration`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body),
+            signal,
+        });
+        const parsed = await parseJsonBody(response);
+        if (!response.ok) {
+            throw authErrorFrom('client registration', response.status, parsed);
+        }
+        return { status: response.status, payload: parsed };
+    }, {
+        retries: 0,
+        onTimeout: (operation, timeoutMs) => new OpenEmrAuthError(operation, 408, undefined, `timed out after ${timeoutMs}ms`),
     });
-    const payload = await parseJsonBody(response);
-    if (!response.ok) {
-        throw authErrorFrom('client registration', response.status, payload);
-    }
     const clientId = payload?.['client_id'];
     if (typeof clientId !== 'string' || clientId === '') {
-        throw new OpenEmrAuthError('client registration', response.status, undefined, 'response missing client_id');
+        throw new OpenEmrAuthError('client registration', status, undefined, 'response missing client_id');
     }
     const registered: RegisteredClient = { clientId };
     if (typeof payload?.['scope'] === 'string') {
@@ -210,6 +226,12 @@ export interface OpenEmrAuthClientOptions {
     fetchImpl?: FetchLike;
     /** Epoch-milliseconds clock, injectable for deterministic expiry tests. */
     now?: () => number;
+    /** Per-attempt request ceiling; tests shorten it (same shape as rerank's options.timeoutMs). */
+    timeoutMs?: number;
+    /** H.10: the shared 'openemr' circuit breaker (same instance as the FHIR + standard-API
+     *  clients — one host, one dependency, one counter). Guards the token mint, OUTSIDE the
+     *  H.5 retry wrapper: one mint = one logical call = one breaker failure. */
+    breaker?: CircuitBreaker;
 }
 
 // Docs cap assertion exp at iat + 5 minutes (Documentation/api/AUTHENTICATION.md:543); the server
@@ -226,6 +248,8 @@ export class OpenEmrAuthClient {
     private readonly scopes: readonly string[];
     private readonly privateKey: KeyObject;
     private readonly kid: string;
+    private readonly timeoutMs: number;
+    private readonly breaker: CircuitBreaker | undefined;
     private cached: { token: string; expiresAtMs: number } | undefined;
 
     constructor(options: OpenEmrAuthClientOptions) {
@@ -234,6 +258,8 @@ export class OpenEmrAuthClient {
         this.tokenUrl = `${options.baseUrl.replace(/\/+$/, '')}/oauth2/default/token`;
         this.clientId = options.clientId;
         this.scopes = options.scopes ?? SYSTEM_SCOPES;
+        this.timeoutMs = options.timeoutMs ?? OAUTH_REQUEST_TIMEOUT_MS;
+        this.breaker = options.breaker;
         this.privateKey = createPrivateKey(normalizePem(options.privateKeyPem));
         // Recompute the RFC 7638 kid; the assertion header kid must match the registered JWK
         // (src/Common/Auth/OpenIDConnect/JWT/JsonWebKeySet.php:86-90).
@@ -245,27 +271,37 @@ export class OpenEmrAuthClient {
         if (this.cached !== undefined && this.now() < this.cached.expiresAtMs) {
             return this.cached.token;
         }
-        // Form parameters per Documentation/api/AUTHENTICATION.md:549-557; the server only accepts
-        // JWT client assertions on this grant (CustomClientCredentialsGrant.php:159-175) and the
-        // exact assertion-type URN is required (JWTClientAuthenticationService.php:57,128-135).
-        const form = new URLSearchParams({
-            grant_type: 'client_credentials',
-            client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
-            client_assertion: this.buildClientAssertion(),
-            scope: this.scopes.join(' '),
-        });
-        const response = await this.fetchImpl(this.tokenUrl, {
-            method: 'POST',
-            headers: { 'content-type': 'application/x-www-form-urlencoded' },
-            body: form.toString(),
-        });
-        const payload = await parseJsonBody(response);
-        if (!response.ok) {
-            throw authErrorFrom('token request', response.status, payload);
-        }
+        // Token mint: not a data write (worst case is an extra token row), so the helper's one
+        // bounded retry on transient failures is safe (REQ G2).
+        // H.10: breaker OUTSIDE the retry pair — one mint = one logical call = one breaker failure.
+        const { status, payload } = await guardedBy(this.breaker, () => withTimeoutAndRetry('token request', this.timeoutMs, async (signal) => {
+            // Form parameters per Documentation/api/AUTHENTICATION.md:549-557; the server only accepts
+            // JWT client assertions on this grant (CustomClientCredentialsGrant.php:159-175) and the
+            // exact assertion-type URN is required (JWTClientAuthenticationService.php:57,128-135).
+            // Built per attempt: a retry must carry a fresh jti, never replay the first assertion.
+            const form = new URLSearchParams({
+                grant_type: 'client_credentials',
+                client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+                client_assertion: this.buildClientAssertion(),
+                scope: this.scopes.join(' '),
+            });
+            const response = await this.fetchImpl(this.tokenUrl, {
+                method: 'POST',
+                headers: { 'content-type': 'application/x-www-form-urlencoded' },
+                body: form.toString(),
+                signal,
+            });
+            const parsed = await parseJsonBody(response);
+            if (!response.ok) {
+                throw authErrorFrom('token request', response.status, parsed);
+            }
+            return { status: response.status, payload: parsed };
+        }, {
+            onTimeout: (operation, timeoutMs) => new OpenEmrAuthError(operation, 408, undefined, `timed out after ${timeoutMs}ms`),
+        }));
         const token = payload?.['access_token'];
         if (typeof token !== 'string' || token === '') {
-            throw new OpenEmrAuthError('token request', response.status, undefined, 'response missing access_token');
+            throw new OpenEmrAuthError('token request', status, undefined, 'response missing access_token');
         }
         const expiresIn = typeof payload?.['expires_in'] === 'number' ? payload['expires_in'] : 60;
         this.cached = { token, expiresAtMs: this.now() + expiresIn * 1000 - TOKEN_EXPIRY_SKEW_MS };
@@ -301,6 +337,12 @@ export interface OpenEmrPasswordAuthClientOptions {
     fetchImpl?: FetchLike;
     /** Epoch-milliseconds clock, injectable for deterministic expiry tests. */
     now?: () => number;
+    /** Per-attempt request ceiling; tests shorten it (same shape as rerank's options.timeoutMs). */
+    timeoutMs?: number;
+    /** H.10: the shared 'openemr' circuit breaker (same instance as the FHIR + standard-API
+     *  clients — one host, one dependency, one counter). Guards the token mint, OUTSIDE the
+     *  H.5 retry wrapper: one mint = one logical call = one breaker failure. */
+    breaker?: CircuitBreaker;
 }
 
 // OAuth2 password grant for a *user-role* token — the only headless path to the standard
@@ -319,6 +361,8 @@ export class OpenEmrPasswordAuthClient {
     private readonly username: string;
     private readonly password: string;
     private readonly scopes: readonly string[];
+    private readonly timeoutMs: number;
+    private readonly breaker: CircuitBreaker | undefined;
     private cached: { token: string; expiresAtMs: number } | undefined;
 
     constructor(options: OpenEmrPasswordAuthClientOptions) {
@@ -329,6 +373,8 @@ export class OpenEmrPasswordAuthClient {
         this.username = options.username;
         this.password = options.password;
         this.scopes = options.scopes ?? STANDARD_API_SEED_SCOPES;
+        this.timeoutMs = options.timeoutMs ?? OAUTH_REQUEST_TIMEOUT_MS;
+        this.breaker = options.breaker;
     }
 
     // Returns a valid user-role bearer token, reusing the cached one until near expiry.
@@ -347,18 +393,27 @@ export class OpenEmrPasswordAuthClient {
             password: this.password,
             scope: this.scopes.join(' '),
         });
-        const response = await this.fetchImpl(this.tokenUrl, {
-            method: 'POST',
-            headers: { 'content-type': 'application/x-www-form-urlencoded' },
-            body: form.toString(),
-        });
-        const payload = await parseJsonBody(response);
-        if (!response.ok) {
-            throw authErrorFrom('password token request', response.status, payload);
-        }
+        // Token mint: not a data write (worst case is an extra token row), so the helper's one
+        // bounded retry on transient failures is safe (REQ G2).
+        // H.10: breaker OUTSIDE the retry pair — one mint = one logical call = one breaker failure.
+        const { status, payload } = await guardedBy(this.breaker, () => withTimeoutAndRetry('password token request', this.timeoutMs, async (signal) => {
+            const response = await this.fetchImpl(this.tokenUrl, {
+                method: 'POST',
+                headers: { 'content-type': 'application/x-www-form-urlencoded' },
+                body: form.toString(),
+                signal,
+            });
+            const parsed = await parseJsonBody(response);
+            if (!response.ok) {
+                throw authErrorFrom('password token request', response.status, parsed);
+            }
+            return { status: response.status, payload: parsed };
+        }, {
+            onTimeout: (operation, timeoutMs) => new OpenEmrAuthError(operation, 408, undefined, `timed out after ${timeoutMs}ms`),
+        }));
         const token = payload?.['access_token'];
         if (typeof token !== 'string' || token === '') {
-            throw new OpenEmrAuthError('password token request', response.status, undefined, 'response missing access_token');
+            throw new OpenEmrAuthError('password token request', status, undefined, 'response missing access_token');
         }
         const expiresIn = typeof payload?.['expires_in'] === 'number' ? payload['expires_in'] : 60;
         this.cached = { token, expiresAtMs: this.now() + expiresIn * 1000 - TOKEN_EXPIRY_SKEW_MS };

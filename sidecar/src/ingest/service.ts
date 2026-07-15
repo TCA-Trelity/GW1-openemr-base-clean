@@ -12,47 +12,22 @@
 //   - facts persist with per-field grounded citations; unverified quotes resolve to no
 //     stored text, so the Week 1 citation gate blocks them from claims by construction
 import { randomUUID } from 'node:crypto';
+import type { z } from 'zod';
 import type { EhrVitalPayload, StandardApiClient } from '../openemr/standardApi.js';
 import { sha3_512Hex } from '../openemr/standardApi.js';
 import type { CitationRef } from '../schemas/citations.js';
 import type { DocType, ExtractionResult } from '../schemas/extraction.js';
+import { IngestionRecordSchema, IngestionStageSchema, IngestionStatusSchema } from '../schemas/ingestion.js';
 import type { FactInput, SourceDocumentInput } from '../store/factStore.js';
 import { ExtractionValidationError, type ExtractOutcome, type VlmExtractor } from './extractor.js';
-import { groundExtraction, type GroundingSummary } from './grounding.js';
+import { groundExtraction } from './grounding.js';
 import { extractPdfWords, type PdfWords } from './pdf.js';
 
-export type IngestionStatus =
-    | 'received'
-    | 'complete'
-    | 'blocked_patient_mismatch'
-    | 'failed_validation'
-    | 'failed_extraction'
-    | 'failed_storage';
-
-export interface IngestionStage {
-    stage: string;
-    at: string;
-    detail?: string;
-}
-
-export interface IngestionRecord {
-    id: string;
-    patient_id: string;
-    doc_type: DocType;
-    filename: string;
-    mime_type: string;
-    sha3_512: string;
-    correlation_id: string;
-    status: IngestionStatus;
-    stages: IngestionStage[];
-    openemr_document_id: string | null;
-    source_document_id: string | null;
-    grounding: GroundingSummary | null;
-    facts_persisted: number;
-    vitals_written: boolean;
-    error: string | null;
-    created_at: string;
-}
+// Contract-first (H.11, REQ G1): the record's shape lives in src/schemas/ingestion.ts;
+// these runtime types are inferred so every importer keeps its current import path.
+export type IngestionStatus = z.infer<typeof IngestionStatusSchema>;
+export type IngestionStage = z.infer<typeof IngestionStageSchema>;
+export type IngestionRecord = z.infer<typeof IngestionRecordSchema>;
 
 /** In-memory record store. PG persistence is a follow-up ticket (survives restarts);
  *  the interface is the contract so the swap is invisible to routes/tests. */
@@ -67,7 +42,11 @@ export class MemoryIngestionRecordStore implements IngestionRecordStore {
     private readonly records = new Map<string, IngestionRecord>();
 
     save(record: IngestionRecord): void {
-        this.records.set(record.id, record);
+        // Contract boundary (H.11, REQ G1): the store only ever holds schema-valid
+        // records — drift fails HERE at save time, not later in a consumer. This parse
+        // is the contract the future PG swap honors (cheap at demo volume: ~8 small
+        // parses per ingestion).
+        this.records.set(record.id, IngestionRecordSchema.parse(record));
     }
     get(id: string): IngestionRecord | undefined {
         return this.records.get(id);
@@ -181,12 +160,16 @@ export class IngestionService {
                         ? this.deps.ehr.openemrPatientId
                         : await this.deps.ehr.openemrPatientId(input.patientId);
                 if (pid !== null) {
+                    // H.8 (G4): the ingestion's correlation id rides every hop of the EHR
+                    // write — without it the client stamps its per-instance boot id and the
+                    // upload leg falls out of the request's trace.
                     const uploaded = await this.deps.ehr.client.uploadPatientDocumentDeduped(
                         pid,
                         EHR_CATEGORY[input.docType],
                         input.filename,
                         input.bytes,
                         input.mimeType,
+                        correlationId,
                     );
                     record.openemr_document_id = uploaded.documentId;
                     stage('stored_ehr', uploaded.deduped ? 'deduped: byte-identical document already filed' : `document ${uploaded.documentId ?? '?'}`);

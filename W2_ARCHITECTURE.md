@@ -72,7 +72,7 @@ both scopes still hold:
   can be called a graph, its nodes wrap services that already exist, and the
   fast path pays only a bounded ~200–400 ms routing decision (REQ: S3/R4).
 
-## 3. Document ingestion flow (REQ: S1/R1, R2, G3) — [SHIPPED: upload route + attach_and_extract service, VLM extractor w/ feedback retry, geometric grounding on real fixtures, fact persistence w/ page_bbox citations, patient-mismatch block, dedupe idempotency, renal→HCQ re-tier, evidence pinning at prep time (C.6) · TARGET: chat tool wrapper, live EHR write + vitals row (deploy), brief refresh]
+## 3. Document ingestion flow (REQ: S1/R1, R2, G3) — [SHIPPED: upload route + attach_and_extract service, VLM extractor w/ feedback retry, geometric grounding on real fixtures, fact persistence w/ page_bbox citations, patient-mismatch block, dedupe idempotency, renal→HCQ re-tier, evidence pinning at prep time (C.6), attach_and_extract graph tool (H.9) · TARGET: live EHR write + vitals row (deploy), brief refresh]
 
 ```
 panel upload (front-desk role)                    chat/graph tool
@@ -133,7 +133,7 @@ observation-shaped write is the fixed-field vitals endpoint. Hence the
 persistence split above, with data authority declared per type (§10) rather
 than shoehorning lab values into fields that don't fit.
 
-## 4. The worker graph (REQ: S3/R4) — [SHIPPED: `sidecar/src/graph/` — 5-node StateGraph, deterministic router + LlmRouterModel tie-break (never-throw, fast_path-safe), Zod boundary contracts w/ GraphContractError, ≤5 s evidence budget w/ degraded handoff, per-patient pin store keyed to ingestion, worker_handoff events (worked example: docs/w2/trace-example.md); 15 tests · TARGET: Langfuse span binding (E.4), routing-latency baseline (F.1)] — chat delegation + production composer SHIPPED (E.9): `graph/composer.ts` LLM composer (verbatim-quote contract, ledger-priced, never-throws) wired into the chat route behind the router; evidence turns stream status→cited answer; graph failures fall back to the Week 1 loop
+## 4. The worker graph (REQ: S3/R4) — [SHIPPED: `sidecar/src/graph/` — 5-node StateGraph, deterministic router + LlmRouterModel tie-break (never-throw, fast_path-safe), Zod boundary contracts w/ GraphContractError, ≤5 s evidence budget w/ degraded handoff, per-patient pin store keyed to ingestion, worker_handoff events + nested span tree asserted (H.7) (worked example: docs/w2/trace-example.md); 15 tests · TARGET: Langfuse span binding (E.4), routing-latency baseline (F.1)] — chat delegation + production composer SHIPPED (E.9): `graph/composer.ts` LLM composer (verbatim-quote contract, ledger-priced, never-throws) wired into the chat route behind the router; evidence turns stream status→cited answer; graph failures fall back to the Week 1 loop
 
 **Framework:** LangGraph.js `StateGraph` inside the existing TypeScript
 sidecar. Nodes wrap existing services — the direct Anthropic client, Zod
@@ -292,9 +292,9 @@ drop a citation (`citation_present` hard-fails), plant a canary identifier in
 a log line (`no_phi_in_logs` hard-fails). Three injections, three categories,
 documented and repeatable (REQ: D5 evidence).
 
-## 8. Observability & cost (REQ: R7, G4–G6, G13, G15) — [SHIPPED: graph→Langfuse span adapter over the handoff event stream (guarded, keyed-off — src/obs/graphTracer.ts), alerts A4–A6 w/ response actions, W2 ops tiles (static until deploy), correlation-ID trace worked example · TARGET: Langfuse/LangSmith key activation (USER-ACTIONS), live tile feeds, cost report (F.2)]
+## 8. Observability & cost (REQ: R7, G4–G6, G13, G15) — [SHIPPED: graph→Langfuse span adapter over the handoff event stream (guarded, keyed-off — src/obs/graphTracer.ts), alerts A4–A6 w/ response actions, W2 ops tiles (static until deploy), correlation-ID trace worked example, nested worker⊂supervisor span tree (H.7) · TARGET: Langfuse/LangSmith key activation (USER-ACTIONS), live tile feeds, cost report (F.2)]
 
-**Shipped spine:** correlation IDs end-to-end (`server.ts`), pino structured
+**Shipped spine:** correlation IDs end-to-end (`server.ts`) (re-walked H.8: OpenEMR write leg now per-request; ingestion stage events live in production logs), pino structured
 logs, `llm_calls` cost ledger + `SpendGuard` ($5/day, unchanged — locked #16)
 + `GET /api/usage`, `prep_runs` stage tracking, Langfuse client wired into
 prep (emit-side) but **not deployed**.
@@ -332,7 +332,7 @@ and cost reports contain no patient identifiers, no raw document text, and no
 extracted clinical values — identifiers and hashes only, verified by the CI
 canary check (REQ: G18).
 
-## 9. SLOs, resilience, readiness (REQ: G2, G14) — [SHIPPED: /ready W2 probes (document storage via cached token mint, retriever index fails-on-empty, reranker keyed-presence) with degraded not_configured semantics; timeouts/retries on Cohere + VLM legs; ≤5 s evidence budget w/ honest degrade ; measured stub-backend baselines + W1 byte-identical regression evidence (F.1) · TARGET: live-backend numbers post key-drop, circuit-breaker documentation per dependency]
+## 9. SLOs, resilience, readiness (REQ: G2, G14) — [SHIPPED: /ready W2 probes (document storage via cached token mint, retriever index fails-on-empty, reranker last-observed-traffic-outcome (H.2: ok + detail "keyed (unverified since boot)" until first use, failed after a rerank failure newer than the last success; never a per-poll Cohere call)) with degraded not_configured semantics; timeouts/retries on Cohere + VLM + all OpenEMR legs (H.5: FHIR/standard-API reads retry once, writes + uploads + registration never auto-retry, token mints retry with fresh jti); ≤5 s evidence budget w/ honest degrade ; measured stub-backend baselines + W1 byte-identical regression evidence (F.1); hand-rolled per-dependency circuit breakers w/ /ready circuit_open reflection (H.10) · TARGET: live-backend numbers post key-drop]
 
 | Flow | SLO (p95) | Measured (stub backends, 2026-07-13) | Where the budget lives |
 |---|---|---|---|
@@ -348,9 +348,14 @@ canary check (REQ: G18).
   FHIR, vitals write (closing the Week 1 gap where the FHIR client had no
   timeout and chat had no retry: new calls all get the
   transient-classification retry pattern).
-- **Circuit behavior:** after N consecutive failures of a dependency, the
-  caller short-circuits to its degraded path and `/ready` reflects the
-  dependency as degraded (no silent hammering, no binary up/down — G14).
+- **Circuit behavior (shipped, H.10):** after 5 consecutive failures of a
+  dependency its breaker opens for a 30 s cooldown, then admits exactly one
+  half-open probe; while open, callers short-circuit to their degraded path
+  (embed → keyword-only, rerank → passthrough, LLM → fallback lanes) and
+  `/ready` reports `failed: circuit_open` with the live check suppressed —
+  no silent hammering, no binary up/down (G14). One hand-rolled breaker
+  instance per dependency (openemr, anthropic, cohere), composed outside
+  H.5's timeout/retry so one logical call counts one failure.
 - **`/ready` additions:** document storage (write-scoped OpenEMR client),
   vector index (extension/table presence + chunk count), reranker (Cohere
   reachability) — joining the existing OpenEMR/Anthropic/Langfuse/Postgres
@@ -427,6 +432,10 @@ week); Cohere ranking *quality* beyond the golden retrieval cases (vendor
 model, covered by `retrieval_grounded` outcomes, not re-benchmarked);
 OpenEMR's own document storage internals (upstream-tested; we test our client
 contract against it).
+
+*Related: §18 separates the **guardrails** (prevent bad behavior at runtime)
+from the **evals** in this table (measure quality after the fact) — two
+side-by-side lists, every row pointing at its implementing file.*
 
 ## 12. Failure modes & incident response (REQ: G9) — [SHIPPED: identification signals verified against emitted events 2026-07-14]
 
@@ -513,3 +522,48 @@ retrieval (seam: embeddings table keyed by source id); lab-trend chart widget
 graph in the fast path beyond the bounded router; SaaS traces near real
 patient data; raising the $5/day budget. *"The best submissions will feel
 narrower than the original spec and stronger because of it."*
+
+## 18. Guardrails vs. evals (REQ: S4/R6, R5, R7, G14, P5) — [SHIPPED: every pointer below verified against code 2026-07-15 · TARGET: OpenEMR-leg timeouts/retries (H.5), write-endpoint rate limiting (J.2)]
+
+Two mechanisms keep this system honest, and they are not the same thing.
+**Guardrails** act before or at runtime: they prevent a bad action on a live
+request (a write without a principal, an uncited claim reaching a clinician,
+a runaway spend). **Evals** act after the fact: they measure output quality
+on committed cases and block *changes* (PRs), not requests. A guardrail
+failing open is a runtime incident; an eval failing is a blocked merge. §7
+specifies the eval gate itself; §11 places evals among the test layers; this
+section is the side-by-side.
+
+**Guardrails — prevent bad behavior before/at runtime:**
+
+| Guardrail | Enforced in | What it prevents |
+|---|---|---|
+| Write-path auth (401/403) | `sidecar/src/routes/ingest.ts` — upload returns 401 without an authenticated principal, 403 without the `documentsWrite` capability, in every `AUTH_MODE`; role table: `sidecar/src/auth/principal.ts` (`capabilitiesFor`) | Anonymous or role-inappropriate writes into a patient record |
+| Cross-patient scope denial | `sidecar/src/auth/smartVerifier.ts` (403 `no_patient_context` / `patient_not_linked`); same rule on the dev-token path (`sidecar/src/auth/devToken.ts`) | One patient's facts served into another patient's session |
+| SpendGuard $5/day cap | `sidecar/src/prep/budget.ts` — `SpendGuard.assertBudget()` sums the trailing-24h `llm_calls` ledger *before* any model call (`LLM_DAILY_BUDGET_USD`, locked #16) | Runaway model spend |
+| Citation gate | `sidecar/src/gate/citationGate.ts` (prep path, deterministic verbatim verification) + `sidecar/src/gate/responseGate.ts` (chat-path choke point — unverified citations withheld server-side, only their count travels) | Uncited or unverifiable claims rendering as provenance |
+| Prescriptiveness screen (safe-refusal posture) | `sidecar/src/gate/prescriptivenessLint.ts`, run inside `responseGate.ts` — advisory by product decision: flags are logged and counted on the wire, prose is never silently rewritten | The agent originating treatment/dosing direction unnoticed |
+| PHI query scrubber | `sidecar/src/retrieval/queryPolicy.ts` (`scrubQuery`) — known identifiers stripped before any retrieval query text leaves the boundary | PHI reaching the embedding/rerank vendor |
+| Timeouts & retries on outbound calls | `withTimeoutAndRetry` (`sidecar/src/retrieval/embeddings.ts`, reused by `CohereReranker.rerank`); idle + total timeouts with retry classification on the Anthropic leg (`sidecar/src/prep/anthropic.ts`) · **[TARGET: H.5]** extends the same pattern to the OpenEMR client legs (`standardApi.ts`, `fhir.ts`, `auth.ts` — currently un-timed-out) | A hung outbound call freezing a request forever |
+| Rate limiting on write endpoints | **[TARGET: J.2]** — not yet in code; document upload and the chat stream get the framework's rate-limit plugin | A runaway client draining the daily budget or hammering writes |
+
+**Evals — measure quality after the fact; gate changes, not requests:**
+
+| Eval surface | Lives in | What it measures |
+|---|---|---|
+| 58-case golden suite | `sidecar/eval/` — 14 `*.eval.ts` suites over committed fixtures (`sidecar/eval/fixtures/documents/`, incl. deliberately degraded scans) and synthetic corpora (`sidecar/eval/corpus.ts`) | Behavior regressions across the whole pipeline — the graders' injected-regression class (§7) |
+| Six rubric categories, two tiers | `sidecar/eval/categories.ts` — safety (`safe_refusal`, `no_phi_in_logs`, `citation_present`) vs quality (`schema_valid`, `factually_consistent`, `retrieval_grounded`) | Which failures hard-fail per-case vs fail on threshold math |
+| Committed baseline + tiered regression math | `sidecar/eval/baseline.json` + `sidecar/eval/gate.ts` (`applyGate`; re-baseline is a reviewed diff via `npm run eval:baseline`, never an env flag) | Any safety-case failure; >5-point quality drops vs baseline or below absolute threshold |
+| PR-blocking delivery | `.github/workflows/evals.yml` (`pull_request` trigger, required check on `main`) + `.githooks/pre-push` | Regressions blocked at merge time and one step earlier, pre-push |
+| Gate rehearsal | `sidecar/eval/rehearsal/run-rehearsal.sh` (`npm run gate-rehearsal`) + verbatim transcript `docs/w2/gate-rehearsal.md` | That the gate actually catches injected regressions, one per tier |
+
+Where the two meet, the pairing is deliberate — the guardrail prevents, and a
+matching eval proves the prevention still works: citation gate ↔
+`citation_present`; PHI scrubber and log discipline ↔ `no_phi_in_logs`
+(`sidecar/eval/phi-log-sweep.eval.ts` sweeps real captured log lines for
+planted canaries); refusal posture ↔ `safe_refusal` (incl.
+`sidecar/eval/injection-resistance.eval.ts`'s structural injection checks);
+strict extraction schemas (`sidecar/src/schemas/extraction.ts`) ↔
+`schema_valid`. Standing rule, restated from §7: the blocking gate never
+depends on an AI model's subjective quality judgment — any LLM-judge scoring
+is informational only and can never block a build.

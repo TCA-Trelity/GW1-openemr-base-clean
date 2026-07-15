@@ -217,6 +217,38 @@ enable the token path *before* enforcement, or the panel 401s itself.
 > remove it). The code still attaches a principal when a token is present; it just
 > never rejects.
 
+### D2. Disabling dev-login for a pilot (J.5)
+
+Demo posture ships with `POST /api/dev-login` enabled (§D.1). For a real
+pilot, turn it off. This is configuration only — no deploy of new code.
+
+1. **Remove the secret.** Railway → **enchanting-mercy** (the sidecar
+   service) → **Variables** → row `DEV_LOGIN_SECRET` → delete it → click
+   the **Apply/Deploy** banner and wait for the deployment to go green.
+2. **Verify it is off** (expect HTTP 404 with `dev_login_disabled`):
+
+   ```bash
+   curl -s -i -X POST https://enchanting-mercy-production-5d32.up.railway.app/api/dev-login -H 'content-type: application/json' -d '{"role":"physician","patient":"margaret-chen"}'
+   ```
+
+   A 404 `{"error":"dev_login_disabled"}` is success. A 200 with an
+   `access_token` means the variable survived — re-check step 1 and that
+   the redeploy actually ran.
+3. **What the panel does now.** The role switcher can no longer mint
+   tokens (its dev-login calls 404). With `AUTH_MODE=enforced` (§D.2 —
+   the correct pilot posture), every per-patient route requires a real
+   OpenEMR-issued SMART token (§D.4); panel access without one is 401.
+   With `AUTH_MODE` unset/`off`, routes stay open and the panel works
+   read-only-style without role switching — an acceptable interim, but
+   not the pilot end-state.
+4. **Pilot pairing.** The full pilot flip is: remove `DEV_LOGIN_SECRET`
+   **and** keep `AUTH_MODE=enforced` **and** have the SMART launch path
+   configured (§D.4). Doing only step 1 with enforcement on locks
+   everyone out until SMART works — sequence deliberately.
+5. **Reverting for a demo later:** re-add `DEV_LOGIN_SECRET` per §D.1
+   (fresh `openssl rand -hex 24` — do not reuse the old value) and
+   Apply/Deploy.
+
 ## E. Backup & recovery (G18)
 
 *Operationalizes `W2_ARCHITECTURE.md` §14. The design property that makes this

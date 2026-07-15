@@ -7,11 +7,23 @@
 // Each call gets ONE validation retry (errors fed back) and ONE fresh retry for
 // transient failures or truncation; truncation never retries with feedback because the
 // failure is structural, not correctable.
+//
+// H.4c (live finding, 2026-07-15 — the prep sibling of the composer's H.4b): the
+// deployed extraction model INTERMITTENTLY paraphrases/reformats its excerpt quotes
+// (one run blocked all five medication facts on citation_failed; the rerun 26 minutes
+// later verified 147/147), so the deliberately-verbatim citation gate rewrote the
+// brief's med facts as absence — safe but lossy. Validation now runs the gate's own
+// excerpt verification (checkCitation: exact range -> indexOf -> whitespace-run-flexible
+// search) over every fact citation whose document is in scope, so a paraphrase earns the
+// SAME single feedback retry that already fixes empty excerpts, instead of dying
+// downstream. Same retry budget, same post-retry ExtractionError, src/gate untouched.
 import { z } from 'zod';
+import { checkCitation, type DocumentTextResolver } from '../gate/citationGate.js';
 import {
     FACT_TYPES,
     PatientFactSchema,
     RuntimeContradictionSchema,
+    type CitationRef,
     type PatientFact,
     type RuntimeContradiction,
 } from '../schemas/index.js';
@@ -165,7 +177,12 @@ function stripFences(text: string): string {
     return fenced?.[1] ?? trimmed;
 }
 
-export type Validation<T> = { ok: true; result: T } | { ok: false; issues: string[] };
+// `issues` are MODEL-facing: the feedback retry may quote document excerpts back at the
+// model (that is the repair mechanism — model-side only). `loggedIssues`, when present,
+// is the PHI-redacted parallel (ids/paths/counts, never document text) that goes to the
+// structured log and into the thrown ExtractionError; absent means `issues` is already
+// safe to log (every pre-H.4c issue kind).
+export type Validation<T> = { ok: true; result: T } | { ok: false; issues: string[]; loggedIssues?: string[] };
 
 // Models emit explicit nulls for unknown optional fields despite instructions (live
 // failure: "severity": null on six facts failed the whole prep run — .optional()
@@ -216,25 +233,48 @@ function strayPatients(items: { id: string; patient_id: string }[], patientId: s
 // failure to the citation gate, which then has to block the fact (live regression: 5
 // blocked claims per prep once null-stripping relaxed the retry pressure). Failing HERE
 // feeds the issue back through the retry, which reliably makes the model quote the source.
+//
+// H.4c extends the same guard to verbatim-ness: a non-empty excerpt is verified against
+// its cited document with the gate's OWN checkCitation (reused, never re-implemented, so
+// this pre-check can never drift from what the pipeline gate later enforces — the H.4b
+// parity-by-construction move). A paraphrased-but-non-empty excerpt used to sail through
+// here and die at the gate as a silently blocked fact. Citations whose document id does
+// not resolve are left alone: there is no text to verify against, and missing_document
+// stays the pipeline gate's verdict exactly as today.
+//
+// Returns parallel arrays: `issues` for the model feedback (verbatim failures quote the
+// offending excerpt — that is the repair mechanism), `loggedIssues` the PHI-redacted
+// twins for logs and thrown errors (ids/paths only, never document text).
 function weakCitations(
-    facts: { id: string; sources: { excerpt_text?: string | null; excerpt_location?: unknown }[] }[],
-): string[] {
+    facts: { id: string; sources: CitationRef[] }[],
+    resolve: DocumentTextResolver,
+): { issues: string[]; loggedIssues: string[] } {
     const issues: string[] = [];
+    const loggedIssues: string[] = [];
+    const push = (issue: string, logged: string = issue): void => {
+        issues.push(issue);
+        loggedIssues.push(logged);
+    };
     facts.forEach((fact, factIndex) => {
         if (fact.sources.length === 0) {
-            issues.push(`facts.${factIndex} (id=${fact.id}): at least one source citation is required`);
+            push(`facts.${factIndex} (id=${fact.id}): at least one source citation is required`);
             return;
         }
         fact.sources.forEach((source, sourceIndex) => {
             if (typeof source.excerpt_text !== 'string' || source.excerpt_text.length === 0) {
-                issues.push(`facts.${factIndex}.sources.${sourceIndex}.excerpt_text: the exact verbatim quote from the document is required`);
+                push(`facts.${factIndex}.sources.${sourceIndex}.excerpt_text: the exact verbatim quote from the document is required`);
+            } else if (checkCitation(source, resolve).result === 'excerpt_mismatch') {
+                push(
+                    `facts.${factIndex}.sources.${sourceIndex}.excerpt_text: ${JSON.stringify(source.excerpt_text)} is not a verbatim substring of document ${JSON.stringify(source.source_document_id)} — copy the quote character-for-character from that document`,
+                    `facts.${factIndex}.sources.${sourceIndex}.excerpt_text: excerpt is not a verbatim substring of document ${JSON.stringify(source.source_document_id)}`,
+                );
             }
             if (source.excerpt_location === null || source.excerpt_location === undefined) {
-                issues.push(`facts.${factIndex}.sources.${sourceIndex}.excerpt_location: start_char/end_char of the quote is required`);
+                push(`facts.${factIndex}.sources.${sourceIndex}.excerpt_location: start_char/end_char of the quote is required`);
             }
         });
     });
-    return issues;
+    return { issues, loggedIssues };
 }
 
 export class FactExtractor {
@@ -248,6 +288,11 @@ export class FactExtractor {
         onDocProgress?: OnDocProgress,
     ): Promise<ExtractionResult> {
         const facts: PatientFact[] = [];
+        // The same document-id -> text resolution the pipeline's citation gate builds
+        // (pipeline.ts citation_gate stage) — the pre-check verifies against the exact
+        // set of texts the gate will, wherever the cited id is in scope.
+        const textById = new Map(input.documents.map((doc) => [doc.id, doc.text]));
+        const resolve: DocumentTextResolver = (id) => textById.get(id);
         const total = input.documents.length;
         let done = 0;
         for (const doc of input.documents) {
@@ -260,11 +305,13 @@ export class FactExtractor {
                     if (!parsed.ok) {
                         return parsed;
                     }
-                    const issues = [
-                        ...strayPatients(parsed.result.facts, input.patientId, 'facts'),
-                        ...weakCitations(parsed.result.facts),
-                    ];
-                    return issues.length > 0 ? { ok: false, issues } : parsed;
+                    const strays = strayPatients(parsed.result.facts, input.patientId, 'facts');
+                    const weak = weakCitations(parsed.result.facts, resolve);
+                    const issues = [...strays, ...weak.issues];
+                    if (issues.length === 0) {
+                        return parsed;
+                    }
+                    return { ok: false, issues, loggedIssues: [...strays, ...weak.loggedIssues] };
                 },
                 correlationId,
                 logger,
@@ -392,14 +439,17 @@ export async function schemaValidatedJsonCall<T>(
             if (validation.ok) {
                 return validation.result;
             }
-            lastIssues = validation.issues;
-            logger.warn({ correlationId, label, attempt, issues: validation.issues }, 'extraction response failed validation');
+            // PHI split (H.4c): the log and the thrown ExtractionError carry the redacted
+            // issues (ids/paths, never document text); only the model feedback below gets
+            // the full issues, which may quote excerpts to demand verbatim correction.
+            lastIssues = validation.loggedIssues ?? validation.issues;
+            logger.warn({ correlationId, label, attempt, issues: lastIssues }, 'extraction response failed validation');
             // Retry ONCE with the validation errors appended to the conversation.
             messages.push(
                 { role: 'assistant', content: completion.text },
                 {
                     role: 'user',
-                    content: `Your JSON response failed validation with these errors:\n${lastIssues
+                    content: `Your JSON response failed validation with these errors:\n${validation.issues
                         .map((issue) => `- ${issue}`)
                         .join('\n')}\nReply again with a single corrected JSON object only.`,
                 },

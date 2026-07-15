@@ -11,43 +11,22 @@
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { z } from 'zod';
+import { EvidenceSnippetSchema, RetrievalResultSchema, SearchOptionsSchema } from '../schemas/retrieval.js';
 import { InMemoryDenseIndex, type DenseIndex } from './denseIndex.js';
 import { Bm25Index, tokenize } from './bm25.js';
 import { chunkCorpusDocument, type CorpusChunk } from './chunker.js';
 import type { EmbeddingsProvider } from './embeddings.js';
 import type { Reranker } from './rerank.js';
-import { rewriteQuery, type PatientIdentifiers, type QueryContext } from './queryPolicy.js';
+import { rewriteQuery } from './queryPolicy.js';
 
-export interface EvidenceSnippet {
-    chunk_id: string;
-    doc_id: string;
-    section_title: string;
-    /** Verbatim chunk body — the quotable, gate-verifiable evidence text. */
-    quote: string;
-    /** Context-prefixed text (doc title › section) — what was indexed. */
-    text: string;
-    score: number;
-    guideline_source: string;
-    version: string;
-    disease_tags: readonly string[];
-    rerank_applied: boolean;
-}
-
-export interface RetrievalResult {
-    snippets: EvidenceSnippet[];
-    /** The PHI-scrubbed query that was actually searched (log-safe by construction). */
-    searched_query: string;
-    rerank_applied: boolean;
-    /** True when nothing cleared the confidence floor — callers must say so, not improvise. */
-    empty: boolean;
-}
-
-export interface SearchOptions {
-    topK?: number;
-    context?: QueryContext;
-    identifiers?: PatientIdentifiers;
-    correlationId?: string;
-}
+// Contract-first (H.11, REQ G1): the retriever's query/response shapes live in
+// src/schemas/retrieval.ts (the single home — src/graph/contracts.ts imports the same
+// snippet schema); these runtime types are inferred so every importer keeps its
+// current import path.
+export type EvidenceSnippet = z.infer<typeof EvidenceSnippetSchema>;
+export type RetrievalResult = z.infer<typeof RetrievalResultSchema>;
+export type SearchOptions = z.infer<typeof SearchOptionsSchema>;
 
 /** Structural logger (pino-compatible) so this module never imports a logging library. */
 export interface RetrievalLogger {
@@ -140,9 +119,15 @@ export class HybridRetriever {
     }
 
     async search(rawQuery: string, options: SearchOptions = {}): Promise<RetrievalResult> {
-        const topK = options.topK ?? 5;
-        const correlationId = options.correlationId ?? 'evidence-search';
-        const { query, filters } = rewriteQuery(rawQuery, options.context ?? {}, options.identifiers ?? {});
+        // Contract boundary (H.11, REQ G1): multiple caller classes build these options
+        // (routes, graph, scripts, evals) — parse once at entry so malformed options
+        // fail loudly here instead of misbehaving downstream. The RESULT stays
+        // construction-typed: the graph re-parses snippets through parseEvidencePayload,
+        // and double-parsing the hot path buys nothing.
+        const opts = SearchOptionsSchema.parse(options);
+        const topK = opts.topK ?? 5;
+        const correlationId = opts.correlationId ?? 'evidence-search';
+        const { query, filters } = rewriteQuery(rawQuery, opts.context ?? {}, opts.identifiers ?? {});
 
         // Keyword leg (with floor) — always available.
         const keywordHits = this.bm25.search(query, CANDIDATE_POOL).filter((hit) => hit.score >= KEYWORD_FLOOR);

@@ -280,15 +280,16 @@ describe('FhirClient', () => {
     });
 
     // Guards: losing the server's diagnostic on 500 — surface OperationOutcome text only,
-    // never the rest of the response body.
+    // never the rest of the response body. 500 is transient, so the client retries once
+    // (H.5 policy) before surfacing the second failure.
     it('extracts OperationOutcome diagnostics on 500 without leaking the raw body', async () => {
-        const fetch = fetchMockReturning(
+        const outcome500 = () =>
             jsonResponse(500, {
                 resourceType: 'OperationOutcome',
                 secret_debug: 'SECRET-INTERNALS',
                 issue: [{ severity: 'error', diagnostics: 'search processing failed' }],
-            }),
-        );
+            });
+        const fetch = fetchMockReturning(outcome500(), outcome500());
         const attempt = fhirClient(fetch).searchByPatient('Condition', 'uuid-9', 'corr-1');
         const error = await attempt.catch((e: unknown) => e as FhirRequestError);
         expect(error).toBeInstanceOf(FhirRequestError);
@@ -296,5 +297,6 @@ describe('FhirClient', () => {
         expect(error.operationOutcome).toBe('search processing failed');
         expect(error.message).toContain('search processing failed');
         expect(error.message).not.toContain('SECRET-INTERNALS');
+        expect(fetch).toHaveBeenCalledTimes(2); // one bounded retry on the transient 500, no more
     });
 });

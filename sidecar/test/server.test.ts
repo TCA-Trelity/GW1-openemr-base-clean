@@ -3,7 +3,7 @@
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { buildServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 
@@ -81,6 +81,87 @@ describe('health endpoints', () => {
         const healthyBody = (await healthy.inject({ method: 'GET', url: '/ready' })).json();
         expect(healthyBody.ready).toBe(true);
         expect(healthyBody.dependencies.reranker.status).toBe('ok');
+    });
+
+    // H.2: the reranker probe is honest about what it proves. Keyed-but-unexercised
+    // resolves a detail string that must ride the ok status (never silently dropped),
+    // so /ready readers can tell "verified by traffic" from "key present, unproven".
+    it('GET /ready surfaces a probe-resolved detail string on an ok dependency', async () => {
+        const { default: Fastify } = await import('fastify');
+        const { registerHealthRoutes } = await import('../src/routes/health.js');
+        const app = Fastify();
+        registerHealthRoutes(app, loadConfig({ NODE_ENV: 'test' }), {
+            checkReranker: async () => 'keyed (unverified since boot — no rerank traffic yet)',
+        });
+        const body = (await app.inject({ method: 'GET', url: '/ready' })).json();
+        expect(body.ready).toBe(true);
+        expect(body.dependencies.reranker.status).toBe('ok');
+        expect(body.dependencies.reranker.detail).toContain('unverified since boot');
+        // Probes that resolve void keep the lean shape — no detail key at all.
+        expect(body.dependencies.openemr).not.toHaveProperty('detail');
+    });
+
+    // H.2: a rerank failure observed on real traffic must fail readiness (503) with the
+    // failure surfaced — key presence alone can no longer keep the reranker green.
+    it('GET /ready flips reranker to failed when the last observed real rerank failed', async () => {
+        const { default: Fastify } = await import('fastify');
+        const { registerHealthRoutes } = await import('../src/routes/health.js');
+        const app = Fastify();
+        registerHealthRoutes(app, loadConfig({ NODE_ENV: 'test' }), {
+            checkPostgres: async () => {},
+            checkReranker: async () => {
+                throw new Error('last real rerank failed at 2026-07-15T00:00:00.000Z — cohere rerank failed with status 429');
+            },
+        });
+        const res = await app.inject({ method: 'GET', url: '/ready' });
+        expect(res.statusCode).toBe(503);
+        const body = res.json();
+        expect(body.dependencies.reranker.status).toBe('failed');
+        expect(body.dependencies.reranker.error).toContain('status 429');
+        expect(body.dependencies.postgres.status).toBe('ok');
+    });
+
+    // H.10: an OPEN breaker must win over the live probe — consecutive real failures
+    // already proved the dependency down, and probing it again from readiness is exactly
+    // the hammering the breaker exists to stop. Siblings keep reporting independently.
+    it('GET /ready reports a dependency failed with circuit_open when its breaker is open, without probing it', async () => {
+        const { default: Fastify } = await import('fastify');
+        const { registerHealthRoutes } = await import('../src/routes/health.js');
+        const app = Fastify();
+        const rerankerProbe = vi.fn(async () => 'keyed (unverified since boot — no rerank traffic yet)');
+        registerHealthRoutes(app, loadConfig({ NODE_ENV: 'test' }), {
+            checkPostgres: async () => {},
+            checkReranker: rerankerProbe,
+            breakerStates: () => ({ reranker: 'open' as const }),
+        });
+        const res = await app.inject({ method: 'GET', url: '/ready' });
+        expect(res.statusCode).toBe(503);
+        const body = res.json();
+        expect(body.dependencies.reranker.status).toBe('failed');
+        expect(body.dependencies.reranker.error).toContain('circuit_open');
+        expect(rerankerProbe).not.toHaveBeenCalled(); // suppressed — no hammering from readiness
+        expect(body.dependencies.postgres.status).toBe('ok'); // siblings report independently
+    });
+
+    // H.10 × H.2 composition: only 'open' suppresses the check. closed/half_open leave the
+    // dep's own probe in charge — the H.2 traffic-outcome reranker probe answers as today
+    // (a masked probe here would hide real rerank failures behind a healthy-looking breaker).
+    it('GET /ready leaves the H.2 traffic-outcome probe in charge while the breaker is closed or half-open', async () => {
+        const { default: Fastify } = await import('fastify');
+        const { registerHealthRoutes } = await import('../src/routes/health.js');
+        const app = Fastify();
+        registerHealthRoutes(app, loadConfig({ NODE_ENV: 'test' }), {
+            checkReranker: async () => {
+                throw new Error('last real rerank failed at 2026-07-15T00:00:00.000Z — cohere rerank failed with status 429');
+            },
+            breakerStates: () => ({ reranker: 'half_open' as const }),
+        });
+        const res = await app.inject({ method: 'GET', url: '/ready' });
+        expect(res.statusCode).toBe(503);
+        const body = res.json();
+        expect(body.dependencies.reranker.status).toBe('failed');
+        expect(body.dependencies.reranker.error).toContain('status 429'); // the probe's error, not circuit_open
+        expect(body.dependencies.reranker.error).not.toContain('circuit_open');
     });
 });
 

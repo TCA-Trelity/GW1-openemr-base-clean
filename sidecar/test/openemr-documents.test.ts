@@ -198,6 +198,86 @@ describe('uuid → numeric pid resolution', () => {
     });
 });
 
+// H.8 (REQ G4): the caller's request id must ride EVERY hop of a document write — with
+// only the per-client-instance id, the OpenEMR leg falls out of the request's trace and
+// "reconstructable from the correlation ID alone" breaks for exactly the graded flow.
+describe('per-call correlation id (H.8, G4)', () => {
+    const patientEnvelope = jsonResponse.bind(null, 200, {
+        validationErrors: [],
+        internalErrors: [],
+        data: { uuid: MARGARET_UUID, pid: 3, fname: 'Margaret', lname: 'Chen', DOB: '1952-03-14' },
+    });
+
+    it('threads the per-request correlation id into every OpenEMR call header — the boot-time instance id would break G4 trace reconstruction', async () => {
+        const headers: string[] = [];
+        const fetchImpl = vi.fn(async (url: string, init?: RequestInit) => {
+            headers.push((init?.headers as Record<string, string>)['x-correlation-id'] ?? '(missing)');
+            if (url.endsWith(`/patient/${MARGARET_UUID}`)) {
+                return patientEnvelope(); // uuid → pid resolve
+            }
+            if ((init?.method ?? 'GET') === 'GET') {
+                // Fresh-upload path: dedupe listing 404s, verification listing shows our row.
+                return headers.length <= 2
+                    ? emptyCategory404()
+                    : jsonResponse(200, [{ id: 91, filename: 'renal.pdf', hash: PDF_HASH }]);
+            }
+            return jsonResponse(200, true);
+        });
+        const result = await client(fetchImpl).uploadPatientDocumentDeduped(
+            MARGARET_UUID,
+            'Lab Report',
+            'renal.pdf',
+            PDF_BYTES,
+            'application/pdf',
+            'corr-req-1',
+        );
+        expect(result.deduped).toBe(false);
+        // All four hops — pid resolve, dedupe listing, multipart POST, verification
+        // listing — carry the caller's id, never the instance fallback.
+        expect(headers).toEqual(['corr-req-1', 'corr-req-1', 'corr-req-1', 'corr-req-1']);
+    });
+
+    it('falls back to the per-instance id when no per-call id is given (seed scripts stay untouched)', async () => {
+        const headers: string[] = [];
+        const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
+            headers.push((init?.headers as Record<string, string>)['x-correlation-id'] ?? '(missing)');
+            return emptyCategory404();
+        });
+        await client(fetchImpl).listPatientDocuments(42, 'Lab Report');
+        expect(headers).toEqual(['corr-w2-test']); // the instance id from client() options
+
+        // And a per-call id on the listing alone overrides it.
+        await client(fetchImpl).listPatientDocuments(42, 'Lab Report', 'corr-list-2');
+        expect(headers).toEqual(['corr-w2-test', 'corr-list-2']);
+    });
+});
+
+describe('addVital contract boundary (H.11, G1)', () => {
+    it('addVital parses the payload before any network call — a negative bps or invented key never reaches OpenEMR', async () => {
+        const fetchImpl = vi.fn(async () => jsonResponse(200, { validationErrors: [], internalErrors: [], data: true }));
+        const api = client(fetchImpl);
+
+        await expect(api.addVital('3', '7', { bps: -128 })).rejects.toSatisfy(
+            (error: unknown) =>
+                error instanceof StandardApiError &&
+                error.kind === 'validation' &&
+                /vitals payload failed contract/.test(error.message) &&
+                /bps/.test(error.message),
+        );
+        await expect(api.addVital('3', '7', { bps: 128, invented_key: true } as never)).rejects.toSatisfy(
+            (error: unknown) => error instanceof StandardApiError && error.kind === 'validation',
+        );
+        expect(fetchImpl).not.toHaveBeenCalled(); // zero network calls on invalid payloads
+
+        // A valid payload still POSTs to the vital route unchanged.
+        await api.addVital('3', '7', { bps: 128, bpd: 78, weight: 138.5 });
+        expect(fetchImpl).toHaveBeenCalledTimes(1);
+        const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+        expect(url).toBe('https://emr.example.test/apis/default/api/patient/3/encounter/7/vital');
+        expect(JSON.parse(String(init.body))).toEqual({ bps: 128, bpd: 78, weight: 138.5 });
+    });
+});
+
 describe('sha3_512Hex', () => {
     it('matches OpenEMR: 128 hex chars, deterministic, content-sensitive', () => {
         expect(PDF_HASH).toMatch(/^[0-9a-f]{128}$/);

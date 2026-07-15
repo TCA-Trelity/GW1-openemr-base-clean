@@ -6,8 +6,17 @@
 // except the medication list routes, which return the raw service result and 404 on an empty list
 // (RestControllerHelper::responseHandler, :156-169).
 import { createHash } from 'node:crypto';
+import type { z } from 'zod';
+import { guardedBy, type CircuitBreaker } from '../lib/circuitBreaker.js';
+import { withTimeoutAndRetry } from '../lib/httpRetry.js';
+import { EhrVitalPayloadSchema } from '../schemas/ehrWrites.js';
 import type { FetchLike } from './auth.js';
 import type { TokenProvider } from './fhir.js';
+
+// Hard per-attempt ceilings (REQ G2). JSON routes get 10s; the multipart document POST gets
+// 30s because PDF payloads ride it (well inside the ingestion p95 ≤90s/doc SLO budget).
+const STANDARD_API_TIMEOUT_MS = 10_000;
+const DOCUMENT_UPLOAD_TIMEOUT_MS = 30_000;
 
 /** How a failure should be acted on: auth = fix scopes/role/enablement, validation = fix payload. */
 export type StandardApiErrorKind = 'auth' | 'validation' | 'other';
@@ -94,19 +103,10 @@ export interface EhrEncounterPayload {
     billing_facility?: number;
 }
 
-export interface EhrVitalPayload {
-    // Every field optional (EncounterService::validateVital, :657+). Weight/height are US units
-    // (lbs / inches) — what the stock vitals form stores and displays.
-    bps?: number;
-    bpd?: number;
-    pulse?: number;
-    respiration?: number;
-    temperature?: number;
-    oxygen_saturation?: number;
-    weight?: number;
-    height?: number;
-    note?: string;
-}
+// Every field optional (EncounterService::validateVital, :657+). Contract-first (H.11,
+// REQ G1): the shape lives in src/schemas/ehrWrites.ts and is parsed in addVital()
+// before any network call; the type is inferred so importers keep this module as its home.
+export type EhrVitalPayload = z.infer<typeof EhrVitalPayloadSchema>;
 
 export interface EhrSoapNotePayload {
     subjective?: string;
@@ -192,8 +192,18 @@ export interface StandardApiClientOptions {
     baseUrl: string;
     tokenProvider: TokenProvider;
     fetchImpl?: FetchLike;
-    /** Stamped on every request as x-correlation-id; defaults to one id per client instance. */
+    /** Stamped on every request as x-correlation-id; defaults to one id per client instance.
+     *  The document methods take a per-call override so the caller's request id rides its
+     *  EHR writes (G4/H.8) — this instance id is only the fallback (seed scripts, boot probes). */
     correlationId?: string;
+    /** Per-attempt ceiling for the JSON routes; tests shorten it (same shape as rerank's options.timeoutMs). */
+    timeoutMs?: number;
+    /** Per-attempt ceiling for the multipart document POST (larger: PDF payloads). */
+    uploadTimeoutMs?: number;
+    /** H.10: the shared 'openemr' circuit breaker (same instance as the FHIR + auth clients —
+     *  one host, one dependency, one counter). Sits OUTSIDE the H.5 retry wrapper: one
+     *  request = one logical call = one breaker failure, however many attempts ran inside. */
+    breaker?: CircuitBreaker;
 }
 
 export class StandardApiClient {
@@ -201,12 +211,18 @@ export class StandardApiClient {
     private readonly tokenProvider: TokenProvider;
     private readonly fetchImpl: FetchLike;
     private readonly correlationId: string;
+    private readonly timeoutMs: number;
+    private readonly uploadTimeoutMs: number;
+    private readonly breaker: CircuitBreaker | undefined;
 
     constructor(options: StandardApiClientOptions) {
         this.apiBase = `${options.baseUrl.replace(/\/+$/, '')}/apis/default/api`;
         this.tokenProvider = options.tokenProvider;
         this.fetchImpl = options.fetchImpl ?? globalThis.fetch;
         this.correlationId = options.correlationId ?? crypto.randomUUID();
+        this.timeoutMs = options.timeoutMs ?? STANDARD_API_TIMEOUT_MS;
+        this.uploadTimeoutMs = options.uploadTimeoutMs ?? DOCUMENT_UPLOAD_TIMEOUT_MS;
+        this.breaker = options.breaker;
     }
 
     // GET /api/patient with fname/lname/DOB, all in PatientRestController::SUPPORTED_SEARCH_FIELDS
@@ -324,7 +340,21 @@ export class StandardApiClient {
     }
 
     async addVital(pid: string, eid: string, payload: EhrVitalPayload): Promise<void> {
-        await this.request('POST', `/patient/${encodeURIComponent(pid)}/encounter/${encodeURIComponent(eid)}/vital`, payload);
+        const path = `/patient/${encodeURIComponent(pid)}/encounter/${encodeURIComponent(eid)}/vital`;
+        // Contract boundary (H.11, REQ G1): parse BEFORE any network call — a malformed
+        // vitals payload (negative bps, invented key) fails closed here with kind
+        // 'validation' and never reaches OpenEMR.
+        const parsed = EhrVitalPayloadSchema.safeParse(payload);
+        if (!parsed.success) {
+            throw new StandardApiError(
+                path,
+                400,
+                `vitals payload failed contract: ${parsed.error.issues
+                    .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+                    .join('; ')}`,
+            );
+        }
+        await this.request('POST', path, parsed.data);
     }
 
     async addSoapNote(pid: string, eid: string, payload: EhrSoapNotePayload): Promise<void> {
@@ -424,26 +454,39 @@ export class StandardApiClient {
         return Array.isArray(rows) ? titlesOf(rows) : [];
     }
 
-    private async request(method: 'GET' | 'POST' | 'PUT', path: string, payload?: unknown): Promise<unknown> {
+    // correlationId: per-call override (H.8, G4) — the caller's request id, when it has one,
+    // must ride every hop of its EHR write; the instance id is only the no-request fallback.
+    private async request(method: 'GET' | 'POST' | 'PUT', path: string, payload?: unknown, correlationId?: string): Promise<unknown> {
         const token = await this.tokenProvider.getAccessToken();
         const init: RequestInit = {
             method,
             headers: {
                 authorization: `Bearer ${token}`,
                 accept: 'application/json',
-                'x-correlation-id': this.correlationId,
+                'x-correlation-id': correlationId ?? this.correlationId,
                 ...(payload === undefined ? {} : { 'content-type': 'application/json' }),
             },
         };
         if (payload !== undefined) {
             init.body = JSON.stringify(payload);
         }
-        const response = await this.fetchImpl(`${this.apiBase}${path}`, init);
-        const body = await parseJson(response);
-        if (!response.ok) {
-            throw new StandardApiError(path, response.status, failureDetail(body));
-        }
-        return body;
+        // Method-aware retry policy (REQ G2): a retried write can double-file a document; the A.3 post-write verification re-lists by content hash but guards absence, not duplicates — so only idempotent GETs get the helper's one bounded retry.
+        const retries = method === 'GET' ? 1 : 0;
+        // H.10: breaker OUTSIDE the retry pair — a timed-out-and-retried call that still
+        // failed counts as ONE breaker failure, never one per attempt.
+        return guardedBy(this.breaker, () => withTimeoutAndRetry(`standard API ${method} ${path}`, this.timeoutMs, async (signal) => {
+            const response = await this.fetchImpl(`${this.apiBase}${path}`, { ...init, signal });
+            const body = await parseJson(response);
+            if (!response.ok) {
+                throw new StandardApiError(path, response.status, failureDetail(body));
+            }
+            return body;
+        }, {
+            retries,
+            // Timeouts stay in the standard-API error family so callers' instanceof handling
+            // (e.g. ehrSeed's degrade-to-skipped depth sections) keeps working.
+            onTimeout: (operation, timeoutMs) => new StandardApiError(path, 408, `${operation} timed out after ${timeoutMs}ms`),
+        }));
     }
 
     // ---- Week 2 documents (Wave 0.2, REQ S1/R1) ----
@@ -478,7 +521,7 @@ export class StandardApiClient {
     /** uuid → numeric pid cache; a chart's pid never changes, so one lookup per client. */
     private readonly pidByUuid = new Map<string, string>();
 
-    private async resolveNumericPid(pidOrUuid: number | string): Promise<string> {
+    private async resolveNumericPid(pidOrUuid: number | string, correlationId?: string): Promise<string> {
         const raw = String(pidOrUuid).trim();
         if (/^[1-9]\d*$/.test(raw)) {
             return raw;
@@ -495,7 +538,7 @@ export class StandardApiClient {
             return cached;
         }
         const path = `/patient/${encodeURIComponent(raw)}`;
-        const body = await this.request('GET', path);
+        const body = await this.request('GET', path, undefined, correlationId);
         const pid = asRecord(envelopeData(body, path))?.['pid'];
         const numeric = typeof pid === 'number' || typeof pid === 'string' ? String(pid) : '';
         if (!/^[1-9]\d*$/.test(numeric)) {
@@ -517,14 +560,15 @@ export class StandardApiClient {
     /**
      * List the patient's documents filed under a category (e.g. 'Lab Report'). A 404 is
      * "no documents in this category yet" — OpenEMR 404s empty listings by design — so
-     * first-use categories return [] instead of failing the caller.
+     * first-use categories return [] instead of failing the caller. `correlationId`
+     * overrides the instance id per call (H.8, G4).
      */
-    async listPatientDocuments(pidOrUuid: number | string, categoryPath: string): Promise<EhrDocumentRow[]> {
-        const pid = await this.resolveNumericPid(pidOrUuid);
+    async listPatientDocuments(pidOrUuid: number | string, categoryPath: string, correlationId?: string): Promise<EhrDocumentRow[]> {
+        const pid = await this.resolveNumericPid(pidOrUuid, correlationId);
         const path = `/patient/${pid}/document?path=${encodeURIComponent(this.wireCategoryPath(categoryPath))}`;
         let body: unknown;
         try {
-            body = await this.request('GET', path);
+            body = await this.request('GET', path, undefined, correlationId);
         } catch (error) {
             if (error instanceof StandardApiError && error.status === 404) {
                 return [];
@@ -565,6 +609,10 @@ export class StandardApiClient {
      * write this method re-lists the category and requires our hash to appear, returning
      * the listed row's real id. Absence throws instead of reporting a half-ingested
      * upload (W2_ARCHITECTURE §12: uploads land failed-visible, never half-ingested).
+     *
+     * `correlationId` (H.8, G4): the caller's request id — stamped on EVERY hop of this
+     * write (pid resolve, dedupe listing, POST, verification listing) so the upload is
+     * grep-reconstructable from the one id. Omitted → the per-instance fallback.
      */
     async uploadPatientDocumentDeduped(
         pidOrUuid: number | string,
@@ -572,10 +620,11 @@ export class StandardApiClient {
         filename: string,
         bytes: Uint8Array,
         mimeType: string,
+        correlationId?: string,
     ): Promise<EhrDocumentUploadResult> {
-        const pid = await this.resolveNumericPid(pidOrUuid);
+        const pid = await this.resolveNumericPid(pidOrUuid, correlationId);
         const hash = sha3_512Hex(bytes);
-        const existing = await this.listPatientDocuments(pid, categoryPath);
+        const existing = await this.listPatientDocuments(pid, categoryPath, correlationId);
         const match = existing.find((row) => row.hash === hash);
         if (match !== undefined) {
             return { documentId: match.id, hash, deduped: true };
@@ -589,25 +638,33 @@ export class StandardApiClient {
         const payload = new Uint8Array(bytes);
         form.append('document', new Blob([payload.buffer as ArrayBuffer], { type: mimeType }), filename);
         // No manual content-type: fetch sets the multipart boundary itself.
-        const response = await this.fetchImpl(`${this.apiBase}${path}`, {
-            method: 'POST',
-            headers: {
-                authorization: `Bearer ${token}`,
-                accept: 'application/json',
-                'x-correlation-id': this.correlationId,
-            },
-            body: form,
-        });
-        const body = await parseJson(response);
-        if (!response.ok) {
-            throw new StandardApiError(path, response.status, failureDetail(body));
-        }
+        // Non-idempotent write — timeout only, retries: 0: a retried write can double-file a document; the A.3 post-write verification below re-lists by content hash but guards absence, not duplicates.
+        // H.10: breaker OUTSIDE the (no-retry) timeout wrapper — one upload, one logical call.
+        await guardedBy(this.breaker, () => withTimeoutAndRetry(`standard API POST ${path} (document upload)`, this.uploadTimeoutMs, async (signal) => {
+            const response = await this.fetchImpl(`${this.apiBase}${path}`, {
+                method: 'POST',
+                headers: {
+                    authorization: `Bearer ${token}`,
+                    accept: 'application/json',
+                    'x-correlation-id': correlationId ?? this.correlationId,
+                },
+                body: form,
+                signal,
+            });
+            const body = await parseJson(response);
+            if (!response.ok) {
+                throw new StandardApiError(path, response.status, failureDetail(body));
+            }
+        }, {
+            retries: 0,
+            onTimeout: (operation, timeoutMs) => new StandardApiError(path, 408, `${operation} timed out after ${timeoutMs}ms`),
+        }));
 
         // Post-write verification: the write is only real if the document is now listed
         // under the category with our hash (REQ G1 "no untraceable records") — this is
         // what catches the silent category-orphan mode, and it is also the only way to
         // learn the new document's id (the POST body is literal `true`).
-        const filed = (await this.listPatientDocuments(pid, categoryPath)).find((row) => row.hash === hash);
+        const filed = (await this.listPatientDocuments(pid, categoryPath, correlationId)).find((row) => row.hash === hash);
         if (filed === undefined) {
             throw new StandardApiError(
                 path,

@@ -75,13 +75,13 @@
 <body>
 <div class="wrap">
 <header>
-  <h1>User actions — ARCHIVE <span style="font-weight:400;font-size:14px;color:var(--muted)">(completed 2026-07-14)</span></h1>
-  <p><b>Nothing left to do here.</b> All 8 actionable items are complete and verified live
-     (<code>ready: true</code>, all W2 probes <code>ok</code>, held across redeploys); item 4 (LangSmith)
-     is on hold by user decision. This page is kept as a reference — click any card to expand its
-     original instructions (useful if a credential ever needs re-doing). What remains for Week 2 lives
-     on the <a href="build-status.html"><b>build board</b></a>: the Manual test plan tab and the open
-     rows in the requirements matrix.</p>
+  <h1>User actions <span style="font-weight:400;font-size:14px;color:var(--muted)">(reopened 2026-07-15 — merged follow-on plan)</span></h1>
+  <p><b>Two live items:</b> <b>9</b> (optional network-policy widen — unblocks in-session live checks;
+     H.4 runs via CI dispatch either way) and <b>10</b> (a 2-minute Langfuse eyeball once the agent posts
+     a correlation id). Items <b>11–13</b> are parked until after the grading window. The 8 original W2
+     items below them are the completed archive (verified 2026-07-14; item 4 on hold) — click any card to
+     expand its original instructions. Build work tracks on the
+     <a href="build-status.html"><b>build board</b></a> (sections T1/T2).</p>
 </header>
 
 <div class="navrow">
@@ -105,6 +105,9 @@
   The sidecar image needed <code>COPY corpus</code> (fixed, PR #11). pgvector dense index confirmed in
   production: 71 vectors persisted, reused on restart.
 </div>
+
+<h2 style="font-size:15px;margin:18px 0 8px;color:var(--muted)">Merged follow-on plan — items 9–13 (9–10 live, 11–13 parked)</h2>
+<main id="active"></main>
 
 <h2 style="font-size:15px;margin:18px 0 8px;color:var(--muted)">Archive — original instructions, collapsed</h2>
 <main id="items"></main>
@@ -236,6 +239,69 @@ cd sidecar</code></pre>
 <pre><button class="copy">copy</button><code>gh workflow run "Sidecar Evals" --ref main</code></pre>
 <div class="verify"><b>Verify:</b> the run goes green; open it → the <b>Artifacts</b> section at the bottom has <code>eval-results</code>. The scheduled live-model suite (<code>LIVE_EVALS=1</code>) rides ticket F.6 — this dispatch proves the pipe.</div>`},
 ];
+
+const ACTIVE_ITEMS = [
+{ id:'b9', order:'live · optional', title:'9 · Widen the Claude Code environment network policy', sub:'Attempted 07-15: domains went into the desktop Browser-tools "Allowed sites" — a different control; the cloud container still 403s. Correct path below; applies on a NEW session. Optional — CI dispatch covers live checks.', body:`
+<div class="warnbox"><b>What happened 07-15:</b> the four domains were added under desktop Settings → Claude Code → <i>Allowed sites</i>, which governs Claude's <b>Browser tools</b> on your machine — it does not change this cloud session's egress (proxy re-verified CONNECT 403). The control that matters is the <b>environment's network policy</b>, and it takes effect when a new session/container starts.</div>
+<p><b>Where:</b> claude.ai → Code → <b>Environments</b> → the environment this session runs in → <b>Network policy / allowed domains</b>
+(<a href="https://code.claude.com/docs/en/claude-code-on-the-web" target="_blank" rel="noopener">docs</a>). Add to the allowlist, then start a fresh session:</p>
+<table><tr><th>Domain</th><th>Why</th></tr>
+<tr><td><code>enchanting-mercy-production-5d32.up.railway.app</code></td><td>deployed sidecar + panel</td></tr>
+<tr><td><code>gw1-openemr-base-clean-production.up.railway.app</code></td><td>deployed EHR</td></tr>
+<tr><td><code>cloud.langfuse.com</code></td><td>Langfuse API (also <code>us.cloud.langfuse.com</code> if your project shows the US host)</td></tr>
+<tr><td><code>api.cohere.com</code></td><td>only if you also want in-session Cohere probes</td></tr></table>
+<div class="verify"><b>Verify:</b> say "network policy updated" in chat — the agent re-runs the <code>/ready</code> curl and reports the probe JSON.</div>`},
+
+{ id:'b10', order:'live · ~5 min', title:'10 · Langfuse eyeball + Railway log read (two live findings)', sub:'H.4 runs done (#28–#30, 07-15): document pipeline verified live; two findings need the server-side views only you can open.', body:`
+<h4>A — Langfuse (<a href="https://cloud.langfuse.com" target="_blank" rel="noopener">cloud.langfuse.com</a> → Traces)</h4>
+<div class="warnbox"><b>"Not seeing anything" (07-15):</b> the sidecar probe reports <code>langfuse: ok</code> (verified live) — traces ARE shipping. If the UI is empty: try the other region host (<code>us.cloud.langfuse.com</code> vs <code>cloud.langfuse.com</code>); check the org/project picker top-left (pick the project whose keys sit on Railway); widen the time filter to "Past 24 hours".</div>
+<ol>
+<li>Search <code>839a5e0f-c334-46b2-b7d9-1e850f98fd4d</code> (run #30's renal upload) or <code>4a45d4d1-06ae-4b76-89cb-81914e315985</code> (in-session live chat repro) — trace exists and opens.</li>
+<li>Find the graph/chat trace ~<b>15:33:50 UTC 07-15</b> (conversation <code>cf4bfa54-edd3-4c02-a7be-0a8bc3466acc</code>): check whether <code>supervisor</code> shows <code>evidence_retriever</code> (and critic) as <b>children nested inside it</b>. <b>Expected today: flat siblings</b> — spec-verification found the tracer emits flat spans; H.7 is the fix ticket. Your look confirms the before-state (H.7/G13's visual half).</li>
+<li>Privacy spot-check: ids/hashes/counts only — no patient names, no document text.</li>
+</ol>
+<h4>B — Railway → the SIDECAR service → latest deployment → Deploy Logs</h4>
+<div class="warnbox"><b>Two common misses (hit 07-15):</b> the right card is the one whose domain is <code>enchanting-mercy-production-5d32.up.railway.app</code> — NOT the <code>gw1-openemr-…</code> card (that's OpenEMR; its logs never contain <code>blockedFacts</code>). And the search goes in the <b>Deploy Logs</b> tab — Build Logs only show the image build.</div>
+<ol>
+<li><s>Search <code>blockedFacts</code></s> — <b>DONE (07-15, via <code>citation AND gate</code>):</b> 15:06 UTC prep blocked <code>med-001..med-005</code>, all <code>citation_failed</code>; 15:33 UTC prep verified 147/147, <code>blockedFacts: []</code>. Intermittent live-model paraphrase in prep extraction confirmed — fix = ticket H.4c. Nothing further needed.</li>
+<li><s>Search the critic/gate rejection for the chat turn</s> — <b>no longer needed</b>: finding 2 was root-caused in-session by direct live repro (composer paraphrases; verbatim gate strips). Fix = ticket H.4b on the branch.</li>
+</ol>
+<div class="verify"><b>Report in chat:</b> the two pasted log lines + "trace visible, nested, clean" (or what you actually see). The agent turns them into a one-time live-data cleanup or a product ticket.</div>`},
+
+{ id:'b11', order:'parked · post-grading', title:'11 · Alert notification destination (J.1)', sub:'No action now — parked until the grading window closes.', body:`
+<p>When J.1 starts you'll need ONE of: a Langfuse alert/webhook configured in the Langfuse UI, <b>or</b> a Slack incoming-webhook URL dropped as a sidecar Railway variable (exact name set by the J.1 spec, e.g. <code>ALERT_WEBHOOK_URL</code>). The ticket spec (<a href="tickets/">docs/internal/tickets/</a>) carries the click path when it's time.</p>`},
+
+{ id:'b12', order:'parked · post-grading', title:'12 · Railway staging + PHP required checks (J.3/J.4)', sub:'No action now — parked until the grading window closes.', body:`
+<p>J.3 needs Railway dashboard clicks (staging/preview environment + a manual promote step). J.4 ends with two retargeted PHP workflows added as <b>required checks</b> in branch protection — same click path as archive item 7. The ticket specs carry exact steps.</p>`},
+
+{ id:'b13', order:'parked · post-crunch', title:'13 · Domain-expert scoring batch (CT7, ~30 min)', sub:'No action now — parked until after the submission crunch.', body:`
+<p>CT7's LLM-judge scorecard needs a one-time human-scored batch for agreement stats: the script generates a scoring sheet; a clinical domain expert scores the full-answer cases by hand.</p>`},
+];
+
+const activeMain = document.getElementById('active');
+for (const item of ACTIVE_ITEMS) {
+  const parked = item.order.startsWith('parked');
+  const card = document.createElement('section');
+  card.className = 'card';
+  const saved = localStorage.getItem('ua-' + item.id) === '1';
+  card.innerHTML = `
+    <div class="head">
+      <input type="checkbox" ${saved ? 'checked' : ''} ${parked ? 'disabled' : ''}>
+      <div class="t"><b>${item.title}</b><div class="sub">${item.sub}</div></div>
+      <span class="order">${item.order}</span>
+    </div>
+    <div class="body links">${item.body}</div>`;
+  if (saved) card.classList.add('done');
+  activeMain.appendChild(card);
+  card.querySelector('.head').addEventListener('click', (e) => {
+    if (e.target.type === 'checkbox') return;
+    card.classList.toggle('open');
+  });
+  card.querySelector('input').addEventListener('change', (e) => {
+    localStorage.setItem('ua-' + item.id, e.target.checked ? '1' : '0');
+    card.classList.toggle('done', e.target.checked);
+  });
+}
 
 const main = document.getElementById('items');
 

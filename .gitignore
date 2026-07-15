@@ -55,3 +55,6 @@ tmp/
 # Sidecar build output (rebuilt in Docker)
 sidecar/dist/
 sidecar/panel/dist/
+
+# Claude Code agent worktrees (transient per-session workspaces)
+.claude/worktrees/

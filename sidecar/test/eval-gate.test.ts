@@ -7,7 +7,8 @@ import { applyGate, computeCategoryStats, MAX_REGRESSION, type Baseline } from '
 import type { EvalRecord } from '../eval/collector.js';
 
 function rec(id: string, pass: boolean, category?: EvalRecord['category']): EvalRecord {
-    const record: EvalRecord = { id, description: id, metric: 'm', value: pass ? 1 : 0, threshold: 1, pass };
+    // difficulty (CT2) is reporting-only — any tier works for gate-math fixtures.
+    const record: EvalRecord = { id, description: id, metric: 'm', value: pass ? 1 : 0, threshold: 1, pass, difficulty: 'straightforward' };
     if (category !== undefined) {
         record.category = category;
     }

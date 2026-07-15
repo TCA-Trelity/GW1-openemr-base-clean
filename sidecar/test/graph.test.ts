@@ -5,12 +5,14 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
+import { ALL_CHAT_TOOLS } from '../src/chat/tools/index.js';
 import { GraphContractError } from '../src/graph/contracts.js';
 import { runClinicalGraph, type AnswerComposer, type ClinicalGraphDeps } from '../src/graph/graph.js';
 import { MemoryPinnedEvidenceStore, type PinnedEvidenceStore } from '../src/graph/pins.js';
 import { routeAsk } from '../src/graph/router.js';
+import { attachAndExtractTool } from '../src/graph/tools.js';
 import { VlmExtractor } from '../src/ingest/extractor.js';
-import { IngestionService, MemoryIngestionRecordStore } from '../src/ingest/service.js';
+import { IngestionService, MemoryIngestionRecordStore, type IngestionRecord } from '../src/ingest/service.js';
 import type { AnthropicCompletion } from '../src/prep/anthropic.js';
 import { HashEmbeddings } from '../src/retrieval/embeddings.js';
 import { PassthroughReranker } from '../src/retrieval/rerank.js';
@@ -227,6 +229,70 @@ describe('graph boundary contracts (C.1, G1/G7)', () => {
                 'corr-rogue',
             ),
         ).rejects.toThrow(/evidence_retriever/);
+    });
+});
+
+describe('attach_and_extract graph tool (H.9)', () => {
+    const validUpload = { docType: 'lab_pdf' as const, filename: 'renal.pdf', mimeType: 'application/pdf', bytes: renalPdf };
+    // Structural spy — the tool must treat the service as its only collaborator.
+    const spyService = (record?: IngestionRecord) => {
+        const attachAndExtract = vi.fn(async () => record ?? stubRecord());
+        return { attachAndExtract, service: { attachAndExtract } as unknown as IngestionService };
+    };
+    const stubRecord = (): IngestionRecord => ({
+        id: 'ing-stub',
+        patient_id: 'margaret-chen',
+        doc_type: 'lab_pdf',
+        filename: 'renal.pdf',
+        mime_type: 'application/pdf',
+        sha3_512: 'stub-hash',
+        correlation_id: 'corr-tool',
+        status: 'complete',
+        stages: [],
+        openemr_document_id: null,
+        source_document_id: null,
+        grounding: null,
+        facts_persisted: 0,
+        vitals_written: false,
+        error: null,
+        created_at: '2026-01-01T00:00:00.000Z',
+    });
+
+    it('parses input at the boundary — a malformed payload throws GraphContractError naming the tool, never reaching the service', async () => {
+        const { attachAndExtract, service } = spyService();
+        const tool = attachAndExtractTool(service);
+        await expect(tool.run({ patient_id: '', upload: validUpload }, { correlationId: 'c' })).rejects.toThrow(GraphContractError);
+        await expect(
+            tool.run({ patient_id: 'p', upload: { ...validUpload, bytes: new Uint8Array(0) } }, { correlationId: 'c' }),
+        ).rejects.toThrow(/attach_and_extract/);
+        await expect(tool.run({ patient_id: 'p', upload: validUpload, rogue: true }, { correlationId: 'c' })).rejects.toThrow(
+            /graph_tool/,
+        );
+        expect(attachAndExtract).not.toHaveBeenCalled();
+    });
+
+    it('delegates valid input to IngestionService.attachAndExtract with the graph correlation id', async () => {
+        const record = stubRecord();
+        const { attachAndExtract, service } = spyService(record);
+        const tool = attachAndExtractTool(service);
+        const outcome = await tool.run({ patient_id: 'margaret-chen', upload: validUpload }, { correlationId: 'corr-tool' });
+        expect(outcome).toBe(record);
+        expect(attachAndExtract).toHaveBeenCalledTimes(1);
+        expect(attachAndExtract).toHaveBeenCalledWith({
+            patientId: 'margaret-chen',
+            docType: 'lab_pdf',
+            filename: 'renal.pdf',
+            mimeType: 'application/pdf',
+            bytes: renalPdf,
+            correlationId: 'corr-tool',
+        });
+    });
+
+    it('is not registered on the sync read-only chat tool list', () => {
+        const { service } = spyService();
+        // The discrete named tool object exists — but ONLY on the async graph surface.
+        expect(attachAndExtractTool(service).name).toBe('attach_and_extract');
+        expect(ALL_CHAT_TOOLS.map((tool) => tool.name)).not.toContain('attach_and_extract');
     });
 });
 

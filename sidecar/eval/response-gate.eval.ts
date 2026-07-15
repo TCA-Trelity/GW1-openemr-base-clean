@@ -126,6 +126,8 @@ describe('response-gate', () => {
             value: `${releasedTexts.length} citation event(s) released; invented span on the wire=${res.body.includes(INVENTED_SPAN)}; done.citations=${doneCitations.length}; unverified_count=${String(done['unverified_count'])}`,
             threshold: '0 unverified citations in any SSE event or done.citations; unverified_count=1',
             pass,
+            // Adversarial span: an invented citation must never cross the wire.
+            difficulty: 'edge-case',
         });
     });
 
@@ -170,6 +172,7 @@ describe('response-gate', () => {
             value: `${result.citations.length}/1 citations released; deltas==reply=${deltas.join('') === reply}; unverified_count=${result.unverified_count}`,
             threshold: '1/1 released, reply unaltered, 0 withheld',
             pass,
+            difficulty: 'straightforward',
         });
     });
 
@@ -222,6 +225,8 @@ describe('response-gate', () => {
             value: `directive digest → ${directiveFlags.length} flag(s) (${directiveFlags[0]?.rule ?? 'none'}); clean digest → ${cleanFlags.length} flags; ${warns.length} warn log(s)`,
             threshold: 'directive flagged with a lint rule + logged once; clean digest 0 flags',
             pass,
+            // Smuggled directive in the seed surface.
+            difficulty: 'edge-case',
         });
     });
 });

@@ -61,8 +61,13 @@ requires password-grant token + `user/document.write` scope (sidecar does
   accepts `doc_type ∈ {lab_pdf, intake_form}` for PDF/PNG/JPEG; returns `202`
   with `{ingestion_id, correlation_id}`; rejects other types/oversize with a
   structured 4xx.
-- [ ] Equivalent chat/graph tool `attach_and_extract(patient_id, file_path,
+- [x] Equivalent chat/graph tool `attach_and_extract(patient_id, file_path,
   doc_type)` wraps the same service path (name preserved from spec).
+  *(H.9: async graph-tool object `src/graph/tools.ts` wrapping
+  `IngestionService.attachAndExtract`; the `intake_extractor` node invokes
+  it by name; deliberately NOT on the sync read-only chat tool list —
+  pinned by test; `file_path` ≙ `{filename, mimeType, bytes}` — uploads
+  are multipart bytes by design.)*
 - [x] Original file is stored in OpenEMR Documents under a per-doc-type
   category, associated to the correct patient (`documents.foreign_id = pid`),
   before extraction begins. OpenEMR remains the system of record for the file.
@@ -236,10 +241,10 @@ production composer), Langfuse span binding (E.4), routing-latency baseline.
   transition emits a structured log event `{correlation_id, from, to,
   routing_reason, timestamp}` (P3 anti-pattern guard: the supervisor is never a
   black box). *(Worked example: `docs/w2/trace-example.md`.)*
-- [ ] Tracing: worker invocations are child spans of the supervisor span;
+- [x] Tracing: worker invocations are child spans of the supervisor span;
   extraction/retrieval sub-calls are children of their worker spans (G13).
-  *(Span skeleton = the handoff events, documented in trace-example.md;
-  Langfuse binding lands in E.4.)*
+  *(Nested tree shipped + shape-asserted (H.7); visual confirm =
+  USER-ACTIONS item 10.)*
 - [x] Contract tests on the supervisor↔worker interface (typed state schema —
   G1/G7): a malformed worker payload fails the graph loudly, never propagates.
   *(`graph/contracts.ts`: entry ask + evidence payload, `.strict()` Zod;
@@ -283,7 +288,9 @@ page/bbox variant, no PDF preview overlay.
 - [x] Guideline citations verify quote-vs-stored-chunk through the same gate
   path as record citations. *(E.9: the critic node runs `runCitationGate`
   over composer claims against snippet bodies; blocked claims release zero
-  citations end-to-end through the chat SSE — route-tested.)*
+  citations end-to-end through the chat SSE — route-tested. H.6 (merged
+  plan) adds gate-unit reject proof for both v2 citation types —
+  page/page_bbox and guideline_evidence — in `sidecar/test/gate.test.ts`.)*
 
 ### S4/R6 — Eval-driven CI gate
 
@@ -303,6 +310,12 @@ all six categories measured and baselined** (`eval/baseline.json`); rehearsal
 proves the gate catches injected regressions (`docs/w2/gate-rehearsal.md`);
 **`Run eval suite` is a required check on `main`** (branch protection flipped
 2026-07-13). Remaining: the scheduled live-model suite (F.6, post key-drop).
+Known blind spot (H.4a→H.4b/H.4c, 2026-07-15): the stub-backed evals quote
+verbatim by construction (graph-path stubs the composer; extraction evals
+use authored corpus facts), so live-model paraphrase drift was invisible to
+the 58-case gate in BOTH the composer and prep extraction — covered by
+composer unit tests since H.4b and extraction unit tests since H.4c; the
+scheduled live-model leg (F.6) is the durable catch-net.
 
 **Acceptance criteria:**
 - [x] 50 committed golden cases, extraction-weighted (locked): ~20 extraction
@@ -433,7 +446,7 @@ when PR #9's build deploys. LangSmith fenced to the demo env (E.5); no OTEL.
 
 | ID | Spec item | Status / decision |
 |----|-----------|-------------------|
-| E1 | *"Critic agent that rejects uncited claims or unsafe action suggestions."* | **Committed.** Week 1's deterministic citation gate + prescriptiveness lint promoted to the graph's answer-side critic node. Acceptance: no answer leaves the graph without passing the critic node; rejections logged with reason. |
+| E1 | *"Critic agent that rejects uncited claims or unsafe action suggestions."* | **Committed.** Week 1's deterministic citation gate + prescriptiveness lint promoted to the graph's answer-side critic node. Acceptance: no answer leaves the graph without passing the critic node; rejections logged with reason. H.6 (merged plan) adds gate-unit reject proof for page/page_bbox + guideline_evidence citations — 7 reject-path cases in `sidecar/test/gate.test.ts`; the gate rejected both on first run. H.4b (2026-07-15, live): the critic correctly blocked near-verbatim composer quotes in production; the composer now pre-checks with the gate's own verification and retries once with feedback — gate semantics untouched. |
 | E2 | *"Click-to-source UI for citation snippets, with a simple document preview."* | **Delivered via R5** (required bbox overlay implies preview + click-to-source). Acceptance folded into R5. |
 | E3 | *"A third document type such as referral fax or medication list."* | **Not committed** — framed "seam built, sequenced next" (schema enum + doc-type registry designed for extension; referral fax is the designed slot, UC-3). |
 | E4 | *"Lab trend chart widget that uses extracted Observation data."* | **Not committed** this week — seam: extracted lab facts carry `{test_name, value, unit, collection_date}` sufficient for the panel's existing `Trends.tsx` pattern to consume later. |
@@ -454,7 +467,7 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
 | D1 | Repository: Week 1 fork with Week 2 changes, setup guide, deployed link, clear env-var documentation. *(Spec says "GitLab Repository"; this project is the GitHub fork — equivalence noted.)* | README separates **Week 1 baseline behavior vs Week 2 multimodal behavior**; graders can run the core W2 flow "without guessing which branch, environment variable, or service is required" — one setup section lists branch (`main`), all env vars (incl. `COHERE_API_KEY`, Langfuse/LangSmith keys, `AUTH_MODE`, dev-login), and both Railway services. **Shipped** — README restructured: W1-vs-W2 split, no-guessing quickstart, full 34-key env table, D1–D8 doc map. |
 | D2 | `./W2_ARCHITECTURE.md`: document ingestion flow, worker graph, RAG design, eval gate, risks, tradeoffs. | Exists at repo root; also carries G8 testing strategy and G9 failure modes; cross-linked from README deliverables table. **Full draft committed this session.** |
 | D3 | Schemas: Zod schemas for `lab_pdf` and `intake_form` incl. source-citation fields and validation tests. | Schemas per R2; validation test files exercising valid/invalid/missing-field/malformed-VLM cases; tests run in `sidecar-ci.yml`. |
-| D4 | Eval dataset: 50 synthetic/demo cases with expected behavior, boolean rubrics, judge configuration, and results. | Cases + expected behavior + rubric category per case committed under `sidecar/eval/`; judge config committed; results auto-regenerate `docs/execution/eval-results.md`; reproducible from repo alone (G18). |
+| D4 | Eval dataset: 50 synthetic/demo cases with expected behavior, boolean rubrics, judge configuration, and results. | Cases + expected behavior + rubric category **and difficulty tier** per case committed under `sidecar/eval/`; judge config committed; results auto-regenerate `docs/execution/eval-results.md` (incl. coverage-by-difficulty + retrieval hit-rate/average-rank, CT2/CT3); reproducible from repo alone (G18). |
 | D5 | CI evidence: Git Hook or equivalent that runs the eval suite and blocks regressions. | Pre-push hook (installable, documented) + `pull_request`-triggered required check; screenshot/log evidence of a blocked regression committed with the hard-gate rehearsal (S4/R6). |
 | D6 | Demo video: 3–5 min showing document upload, extraction, evidence retrieval, citations, eval results, and observability. | Video link in README; walkthrough covers all six spec items in order; synthetic data only. **Script committed** (`docs/w2/demo-script.md`, 7 shots ≤4:30, REQ/UC captions); recording = human action. |
 | D7 | Cost and latency report: actual dev spend, projected production cost, p50/p95 latency, bottleneck analysis. | `docs/COSTS.md` extended (or `docs/w2/cost-latency-report.md`): ledger-backed dev spend, per-doc extraction + per-query retrieval costs, p50/p95 for ingestion/retrieval/evidence-turn/fast-path vs SLOs, named bottleneck analysis, W1-vs-W2 comparison (G11). |
@@ -471,9 +484,12 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
 > authority must be explicit: one source of truth per data type, no silent
 > overwrites."*
 
-- [ ] Zod contracts on: upload API, ingestion job state, extraction outputs
+- [x] Zod contracts on: upload API, ingestion job state, extraction outputs
   (R2), retriever query/response, graph state + handoffs, vitals write
-  payload, citation v2.
+  payload, citation v2. *(Closed by H.11: ingestion job state, retriever
+  query/response, vitals write payload, upload mime/filename (size =
+  multipart limits by design, doc_type was already Zod). Extraction
+  outputs, graph contracts, citation v2 were already schema'd.)*
 - [x] `docs/w2/migration-notes.md` (or section in W2_ARCHITECTURE.md) records
   every schema change from Week 1 (citation v2 is the first entry).
 - [x] Data-authority table (in W2_ARCHITECTURE.md §data-model): per data type —
@@ -485,28 +501,47 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
 - [x] SLOs stated (locked): ingestion p95 ≤ 90 s/doc; retrieval p95 ≤ 2.5 s
   incl. rerank; evidence turns ≤ 5 s streamed; fast-path chat < 2 s first
   token + ≤ 0.4 s router. Measured against baselines (G11).
-- [ ] Every outbound LLM/VLM/embed/rerank/FHIR call has an explicit timeout +
+- [x] Every outbound LLM/VLM/embed/rerank/FHIR call has an explicit timeout +
   bounded retry (transient-error classification per Week 1's
   `isTransientAnthropicError` pattern; chat-path retry gap closed for new
-  calls). Known Week 1 gap to not replicate: FHIR client has no timeout today.
-- [ ] Circuit-breaking behavior per dependency: after N consecutive failures,
+  calls). Known Week 1 gap to not replicate: FHIR client has no timeout today
+  *(closed by H.5, 2026-07-15: helper moved to `src/lib/httpRetry.ts`;
+  FHIR/standard-API reads + token mints get 10 s timeout + one bounded
+  retry; writes, uploads (30 s), and client registration get timeouts with
+  NO auto-retry — a retried write can double-file a document; JWKS/
+  introspection and the doc-write diagnostic script covered too).*
+- [x] Circuit-breaking behavior per dependency: after N consecutive failures,
   short-circuit with degraded response + `/ready` reflects it (simple breaker
-  or documented equivalent fallback — no silent hammering).
+  or documented equivalent fallback — no silent hammering). *(H.10:
+  hand-rolled CircuitBreaker — 5 consecutive failures → 30 s cooldown →
+  one half-open probe; one instance per dependency (openemr, anthropic,
+  cohere), composed OUTSIDE H.5's retry so one logical call = one failure;
+  degrades embed→keyword-only, rerank→passthrough; `/ready` reports
+  `failed: circuit_open` with the live check suppressed. Full lifecycle
+  verified against a booted server + stub OpenEMR at the /ready surface.)*
 
 ### G3 — Schemas are canonical
 - [x] Raw VLM output never bypasses validation: the only path from model
   output to persistence is through the R2 Zod parse; failures are
   logged + retried with validation feedback, then surfaced as ingestion
-  failure — never stored partially.
+  failure — never stored partially. H.4c (2026-07-15) extends the same
+  discipline to prep extraction: excerpt verbatim-ness is now enforced
+  pre-gate by the gate's own `checkCitation` ladder, failures feeding the
+  existing single feedback retry (model sees the failing excerpts; logs
+  see redacted ids only).
   *(Shipped A.4 and re-verified in the 2026-07-14 sweep: extractor output
   reaches persistence only via the Zod parse; one validation-feedback retry,
   then `failed_validation` with nothing persisted — pinned by ingest tests
   and the schema_valid eval category.)*
 
 ### G4 — Correlation ID propagation
-- [ ] The Week 1 correlation ID propagates into: upload request → OpenEMR
+- [x] The Week 1 correlation ID propagates into: upload request → OpenEMR
   document write → extraction job + VLM calls → graph supervisor + both
   workers → retrieval (embed/rerank) calls → vitals write → answer + citations.
+  *(Walked + fixed H.8: OpenEMR document writes now carry the per-request id
+  (was per-client-instance); production ingestion stage logging wired (H.7);
+  vitals leg = contract-carried on the vitalsWriter seam, server wiring
+  pending per §10. Audit table: docs/w2/trace-example.md.)*
 - [x] *"A full multi-agent trace must be reconstructable from the correlation
   ID alone"* — demonstrated in docs with one worked example (log query +
   Langfuse trace link). *(`docs/w2/trace-example.md`: verbatim handoff lines
@@ -609,13 +644,18 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
   W2 routes) logs via the injected pino-shaped logger. The only console.*
   sites in src/ are Week 1-era bootstrap paths — config parse before the
   logger exists, migrate CLI — plus two structured-JSON wrappers; none are
-  W2 components.)*
+  W2 components. H.3, 2026-07-15: the one gap at the wiring layer — the
+  boot block handed raw `console` to LlmRouterModel/LlmAnswerComposer —
+  now injects the structured graphLogBase instead, so the claim holds at
+  the boot seam too.)*
 
 ### G13 — Distributed tracing hierarchy
-- [ ] Worker invocations are child spans of the supervisor span; extraction
+- [x] Worker invocations are child spans of the supervisor span; extraction
   and retrieval sub-calls are children of their worker spans; verified
   visually in Langfuse (and LangSmith demo env) and by span-parent assertions
-  in an integration test.
+  in an integration test. *(Span-parent assertions shipped (H.7). Langfuse
+  visual = USER-ACTIONS item 10 — a flat layout there reopens this box.
+  LangSmith leg on hold with USER-ACTIONS item 4.)*
 
 ### G14 — Health/readiness
 - [x] `/ready` adds probes: document storage (OpenEMR standard API
@@ -623,9 +663,13 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
   presence + count), reranker API (Cohere reachability). Degraded status per
   dependency, not binary up/down (existing pattern extended). *(Shipped:
   document_storage = password-grant token mint (cached provider);
-  retriever_index = fails on zero chunks; reranker = keyed-Cohere presence,
-  unkeyed reports not_configured with the Passthrough fallback active.
-  Absent probes degrade to not_configured, never binary-down.)*
+  retriever_index = fails on zero chunks; reranker (as-built by H.2,
+  2026-07-15) = outcome of the last REAL rerank made by traffic — keyed
+  but unexercised reports ok with detail "keyed (unverified since boot)",
+  a failure newer than the last success reports failed/503; never a
+  per-poll Cohere call (trial-key rate limits + per-call cost); unkeyed
+  reports not_configured with the Passthrough fallback active. Absent
+  probes degrade to not_configured, never binary-down.)*
 
 ### G15 — Alerts
 - [x] Three new alert definitions with thresholds + documented response

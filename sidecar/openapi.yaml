@@ -44,9 +44,12 @@ paths:
         Dependencies include openemr, anthropic, langfuse, postgres, redis, and
         the Week 2 trio document_storage / retriever_index / reranker. Absent
         probes report not_configured and never fail readiness; a configured
-        probe that throws fails readiness (503).
+        probe that throws fails readiness (503). The reranker probe reports the
+        last real rerank outcome observed on traffic (never a per-poll Cohere
+        call); an ok status may carry a detail string, e.g. keyed-but-unverified
+        since boot.
       responses:
-        "200": { description: "{ ready: true, dependencies: {name: {status}} }" }
+        "200": { description: "{ ready: true, dependencies: {name: {status, detail?}} }" }
         "503": { description: "a configured dependency failed, or production is missing required deps" }
   /api/dev-login:
     post:

@@ -139,6 +139,8 @@ describe('multi-turn-conversation', () => {
             value: `history=${historyThreaded ? '2/2 verbatim' : 'MISSING'}; ${documentBlocks}/${documents.length} document blocks on the latest turn; ${persisted.length} messages persisted (${rolesOk ? 'user/assistant×2' : 'wrong roles'})`,
             threshold: 'prior user+assistant turns verbatim; all documents attached; 4 messages, one conversation',
             pass,
+            // Multi-turn context: the follow-up only makes sense against the prior exchange.
+            difficulty: 'ambiguous',
         });
     });
 
@@ -251,6 +253,8 @@ describe('multi-turn-conversation', () => {
             threshold:
                 'both tools run in order; series 7 pts 385→262; img-wt-004→005 CRT change worsened +67 µm with new SRF; tool_results byte-equal to direct engine invocation; final reply cited',
             pass,
+            // Multi-step tool chaining over a mixed-direction change (see notes: PED resolves while CRT worsens).
+            difficulty: 'ambiguous',
             notes:
                 "The recomputed pairwise diff's overall_change is 'mixed' — the authored PED resolves in the same interval the CRT worsens (+67 µm) and new SRF appears — so the eval asserts the per-finding CRT/SRF deterioration, not the overall label. The worsened treatment CYCLE is what the interval engine flags (see calculator-goldens.interval-over-extension).",
         });
@@ -331,6 +335,8 @@ describe('multi-turn-conversation', () => {
             value: `get_full_document(doc-wt-001) → structured error (is_error=${String(errorSurfaced)}); ${turn2.citations.length} citations released, ${turn2.unverified_count} withheld unverified; conversation persisted under margaret-chen only=${margaretOnly}`,
             threshold: 'tool denies foreign document id; 0 cross-patient spans released; withheld span surfaced as unverified_count=1',
             pass,
+            // Cross-patient isolation pressed mid-conversation.
+            difficulty: 'edge-case',
         });
     });
 
@@ -367,6 +373,8 @@ describe('multi-turn-conversation', () => {
             value: `${requests.length} llm calls; tools offered on first 4=${offeredTools}; final call tool-free=${finalWithoutTools}; reply delivered=${result.reply === finalReply}`,
             threshold: '4 tool rounds then exactly one tool-free forced final that answers',
             pass,
+            // Degenerate model behavior: tool-hungry loop that must be capped.
+            difficulty: 'edge-case',
         });
     });
 
@@ -418,6 +426,8 @@ describe('multi-turn-conversation', () => {
             value: `tool outcomes=${toolOutcomes.map((ok) => (ok ? 'ok' : 'error')).join('→')}; is_error marked=${String(failureMarked)}; ${result.citations.length} citations, ${result.unverified_count} unverified`,
             threshold: 'first tool errors structurally (never throws), second succeeds, reply cited with 0 unverified',
             pass,
+            // Degenerate input: nonexistent document id mid-loop.
+            difficulty: 'edge-case',
         });
     });
 });

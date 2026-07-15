@@ -17,9 +17,13 @@ import {
     mapIntakeVitals,
     MemoryIngestionRecordStore,
     patientMismatch,
+    type IngestionRecord,
+    type IngestionRecordStore,
 } from '../src/ingest/service.js';
+import { sha3_512Hex, StandardApiClient } from '../src/openemr/standardApi.js';
 import type { AnthropicCompletion } from '../src/prep/anthropic.js';
 import type { ExtractionResult } from '../src/schemas/extraction.js';
+import { IngestionRecordSchema } from '../src/schemas/ingestion.js';
 import type { FactBundle } from '../src/store/factStore.js';
 
 const FIXTURES = fileURLToPath(new URL('../eval/fixtures/documents/', import.meta.url));
@@ -199,6 +203,59 @@ describe('IngestionService end-to-end (A.3/A.6, stubbed VLM over the real fixtur
         }
     });
 
+    it('threads the ingestion correlation id into the OpenEMR document-write requests (H.8, G4)', async () => {
+        // Real StandardApiClient over a recording fetch (the openemr-documents.test.ts
+        // harness): every /document hop of the EHR write must carry the ingestion's id,
+        // not the client's per-instance boot id — the exact drop H.8 fixed.
+        const hash = sha3_512Hex(cleanRenal);
+        const seen: Array<{ url: string; correlationId: string }> = [];
+        const fetchImpl = vi.fn(async (url: string, init?: RequestInit) => {
+            seen.push({ url, correlationId: (init?.headers as Record<string, string>)['x-correlation-id'] ?? '(missing)' });
+            if ((init?.method ?? 'GET') === 'GET') {
+                // First GET = dedupe listing: empty category (404). Second = verification
+                // listing: our row. (pid '3' is numeric, so there is no resolve hop.)
+                return seen.length <= 1
+                    ? new Response('', { status: 404 })
+                    : new Response(JSON.stringify([{ id: 91, filename: 'renal-panel-clean.pdf', hash }]), {
+                          status: 200,
+                          headers: { 'content-type': 'application/json' },
+                      });
+            }
+            return new Response(JSON.stringify(true), { status: 200, headers: { 'content-type': 'application/json' } });
+        });
+        const ehrClient = new StandardApiClient({
+            baseUrl: 'https://emr.example.test/',
+            tokenProvider: { getAccessToken: async () => 'user-token-abc' },
+            fetchImpl,
+            correlationId: 'corr-boot-instance', // the id that must NOT appear on these requests
+        });
+        const service = new IngestionService({
+            extractor: new VlmExtractor(vlmReturning(RENAL_JSON)),
+            records: new MemoryIngestionRecordStore(),
+            factSink: makeSink(),
+            ehr: { client: ehrClient, openemrPatientId: '3' },
+        });
+        const record = await service.attachAndExtract({
+            patientId: 'margaret-chen',
+            docType: 'lab_pdf',
+            filename: 'renal-panel-clean.pdf',
+            mimeType: 'application/pdf',
+            bytes: cleanRenal,
+            correlationId: 'corr-ing-7',
+            expectedPatient: { name: 'Margaret L. Chen' },
+        });
+        expect(record.status).toBe('complete');
+        expect(record.openemr_document_id).toBe('91');
+        expect(record.stages.map((stage) => stage.stage)).toContain('stored_ehr');
+        // All three hops (dedupe listing, multipart POST, verification listing) carried
+        // the ingestion's id — the per-instance fallback never leaked in.
+        expect(seen.length).toBe(3);
+        for (const call of seen) {
+            expect(call.url).toContain('/patient/3/document?path=Lab_Report');
+            expect(call.correlationId).toBe('corr-ing-7');
+        }
+    });
+
     it('byte-identical re-upload returns the SAME record — no duplicate rows or facts', async () => {
         const sink = makeSink();
         const records = new MemoryIngestionRecordStore();
@@ -227,6 +284,78 @@ describe('IngestionService end-to-end (A.3/A.6, stubbed VLM over the real fixtur
 
     it('patientMismatch: absent printed identity is NOT a mismatch', () => {
         expect(patientMismatch({ ...RENAL_EXTRACTION, document_patient: null }, { name: 'Anyone Else' })).toBeNull();
+    });
+});
+
+describe('ingestion record contract (H.11, G1 — schema is the source of truth)', () => {
+    const validRecord = (): IngestionRecord => ({
+        id: 'ing-abcdef123456',
+        patient_id: 'margaret-chen',
+        doc_type: 'lab_pdf',
+        filename: 'renal.pdf',
+        mime_type: 'application/pdf',
+        sha3_512: 'a'.repeat(128),
+        correlation_id: 'corr-contract',
+        status: 'received',
+        stages: [{ stage: 'received', at: '2026-07-15T00:00:00.000Z' }],
+        openemr_document_id: null,
+        source_document_id: null,
+        grounding: null,
+        facts_persisted: 0,
+        vitals_written: false,
+        error: null,
+        created_at: '2026-07-15T00:00:00.000Z',
+    });
+
+    it('the record store rejects a hand-built record violating the ingestion contract — drift fails at save, not in a consumer', () => {
+        const store = new MemoryIngestionRecordStore();
+
+        // A status outside the enum names the offending field in the failure.
+        expect(() => store.save({ ...validRecord(), status: 'exploded' as never })).toThrow(/status/);
+        // A missing required field fails the same way.
+        const { filename: _dropped, ...withoutFilename } = validRecord();
+        expect(() => store.save(withoutFilename as never)).toThrow(/filename/);
+        // An invented key fails closed (.strict()) instead of riding along silently.
+        expect(() => store.save({ ...validRecord(), invented_key: true } as never)).toThrow(/invented_key/);
+
+        // Nothing invalid was stored, and a valid record still round-trips.
+        expect(store.get('ing-abcdef123456')).toBeUndefined();
+        store.save(validRecord());
+        expect(store.get('ing-abcdef123456')?.status).toBe('received');
+    });
+
+    it('every stage of a real run saves a schema-valid record', async () => {
+        const base = new MemoryIngestionRecordStore();
+        const saved: IngestionRecord[] = [];
+        // Delegating store: snapshot every save so each intermediate stage — not just the
+        // final state — is held to the contract.
+        const records: IngestionRecordStore = {
+            save: (record) => {
+                saved.push(structuredClone(record));
+                base.save(record);
+            },
+            get: (id) => base.get(id),
+            findByHash: (patientId, hash) => base.findByHash(patientId, hash),
+            listForPatient: (patientId) => base.listForPatient(patientId),
+        };
+        const service = new IngestionService({
+            extractor: new VlmExtractor(vlmReturning(JSON.stringify(RENAL_EXTRACTION))),
+            records,
+        });
+        const record = await service.attachAndExtract({
+            patientId: 'margaret-chen',
+            docType: 'lab_pdf',
+            filename: 'renal-panel-clean.pdf',
+            mimeType: 'application/pdf',
+            bytes: cleanRenal,
+            correlationId: 'corr-contract-run',
+            expectedPatient: { name: 'Margaret L. Chen' },
+        });
+        expect(record.status).toBe('complete');
+        expect(saved.length).toBeGreaterThanOrEqual(6); // received + every stage stamp
+        for (const snapshot of saved) {
+            expect(() => IngestionRecordSchema.parse(snapshot)).not.toThrow();
+        }
     });
 });
 

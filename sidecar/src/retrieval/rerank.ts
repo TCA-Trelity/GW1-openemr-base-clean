@@ -2,8 +2,9 @@
 // names); PassthroughReranker preserves fused order when no key is configured — retrieval
 // keeps working, results carry rerank_applied=false so the degradation is visible, never
 // silent (REQ G2 posture).
+import { withTimeoutAndRetry } from '../lib/httpRetry.js';
 import type { FetchLike } from '../openemr/auth.js';
-import { RetrievalProviderError, withTimeoutAndRetry } from './embeddings.js';
+import { RetrievalProviderError, retrievalTimeoutError } from './embeddings.js';
 
 export interface RerankCandidate {
     id: string;
@@ -31,11 +32,27 @@ export interface CohereRerankerOptions {
     onUsage?: (units: number, correlationId: string) => void;
 }
 
+/** H.2: outcome of the last COMPLETED real rerank call — the /ready probe's memory.
+ *  `detail` carries provider/operation/status text only, never query or document content. */
+export interface RerankObservation {
+    ok: boolean;
+    at: Date;
+    detail?: string;
+}
+
 export class CohereReranker implements Reranker {
     readonly id: string;
+    private observed: RerankObservation | undefined;
 
     constructor(private readonly options: CohereRerankerOptions) {
         this.id = `cohere:${options.model}`;
+    }
+
+    /** H.2 (/ready honesty): the readiness probe reads the last observed traffic outcome
+     *  instead of making a per-poll live Cohere call (trial keys are rate-limited and
+     *  every rerank call costs money). Undefined until traffic exercises the reranker. */
+    get lastOutcome(): RerankObservation | undefined {
+        return this.observed;
     }
 
     async rerank(
@@ -45,8 +62,29 @@ export class CohereReranker implements Reranker {
         correlationId: string,
     ): Promise<RerankOutcome> {
         if (candidates.length === 0) {
+            // No API call happens here — the probe's view of Cohere must not change.
             return { order: [], rerankApplied: true };
         }
+        try {
+            const outcome = await this.callApi(query, candidates, topK, correlationId);
+            this.observed = { ok: true, at: new Date() };
+            return outcome;
+        } catch (error) {
+            this.observed = {
+                ok: false,
+                at: new Date(),
+                detail: error instanceof Error ? error.message : String(error),
+            };
+            throw error;
+        }
+    }
+
+    private callApi(
+        query: string,
+        candidates: readonly RerankCandidate[],
+        topK: number,
+        correlationId: string,
+    ): Promise<RerankOutcome> {
         const fetchImpl = this.options.fetchImpl ?? globalThis.fetch;
         const url = `${(this.options.baseUrl ?? 'https://api.cohere.com').replace(/\/+$/, '')}/v2/rerank`;
         return withTimeoutAndRetry('rerank', this.options.timeoutMs ?? 3000, async (signal) => {
@@ -80,7 +118,7 @@ export class CohereReranker implements Reranker {
             });
             this.options.onUsage?.(candidates.length, correlationId);
             return { order, rerankApplied: true };
-        });
+        }, { onTimeout: retrievalTimeoutError });
     }
 }
 

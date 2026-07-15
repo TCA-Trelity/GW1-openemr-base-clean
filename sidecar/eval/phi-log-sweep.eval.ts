@@ -82,6 +82,7 @@ describe('PHI log sweep (D.5)', () => {
             value: leaked.length === 0 ? `0 leaked (${lines.length} lines swept)` : `LEAKED: ${leaked.join(', ')}`,
             threshold: '0 leaked',
             pass: record.status === 'complete' && lines.length > 0 && leaked.length === 0,
+            difficulty: 'edge-case',
             category: 'no_phi_in_logs',
         });
         expect(record.status).toBe('complete');
@@ -128,6 +129,7 @@ describe('PHI log sweep (D.5)', () => {
             value: leaked.length === 0 ? `0 leaked (${lines.length} lines swept)` : `LEAKED: ${leaked.join(', ')}`,
             threshold: '0 leaked',
             pass: outcome.ingestion?.status === 'complete' && lines.length > 0 && leaked.length === 0,
+            difficulty: 'edge-case',
             category: 'no_phi_in_logs',
         });
         expect(outcome.ingestion?.status).toBe('complete');

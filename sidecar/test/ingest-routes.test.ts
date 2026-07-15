@@ -56,7 +56,7 @@ function multipart(fields: Record<string, string>, file: { name: string; filenam
     return { payload: Buffer.concat(parts), headers: { 'content-type': `multipart/form-data; boundary=${boundary}` } };
 }
 
-async function makeApp() {
+async function makeApp(maxFileBytes?: number) {
     const records = new MemoryIngestionRecordStore();
     const service = new IngestionService({ extractor: new VlmExtractor(stubVlm()), records });
     const retriever = await HybridRetriever.build(loadCorpusChunks(CORPUS), {
@@ -73,7 +73,7 @@ async function makeApp() {
         prep: {} as never, // prep/overview/chat routes 503 without a store — not under test here
         overview: {} as never,
         chat: {} as never,
-        ingest: { service, records },
+        ingest: { service, records, ...(maxFileBytes === undefined ? {} : { maxFileBytes }) },
         evidence: { retriever },
         auth: { mode: 'off', verifier: devTokens },
     });
@@ -104,13 +104,34 @@ describe('POST /api/patients/:patientId/documents', () => {
         await app.close();
     });
 
+    // H.11 regression pins: same status codes AND messages as before the checks went
+    // schema-backed (doc_type was already Zod; mime/filename now parse through
+    // UploadFileMetaSchema; size stays the multipart `limits` stream cap).
     it('rejects unknown doc_type and unsupported mime with structured 4xx', async () => {
         const { app, devTokens } = await makeApp();
         const auth = bearer(devTokens, 'physician', 'p');
         const bad = multipart({ doc_type: 'referral_fax' }, { name: 'file', filename: 'x.pdf', contentType: 'application/pdf', data: pdfBytes });
-        expect((await app.inject({ method: 'POST', url: '/api/patients/p/documents', payload: bad.payload, headers: { ...bad.headers, ...auth } })).statusCode).toBe(400);
+        const badResponse = await app.inject({ method: 'POST', url: '/api/patients/p/documents', payload: bad.payload, headers: { ...bad.headers, ...auth } });
+        expect(badResponse.statusCode).toBe(400);
+        expect((badResponse.json() as { error: string }).error).toBe('doc_type must be one of: lab_pdf, intake_form (got referral_fax)');
         const badMime = multipart({ doc_type: 'lab_pdf' }, { name: 'file', filename: 'x.gif', contentType: 'image/gif', data: Buffer.from('GIF89a') });
-        expect((await app.inject({ method: 'POST', url: '/api/patients/p/documents', payload: badMime.payload, headers: { ...badMime.headers, ...auth } })).statusCode).toBe(415);
+        const badMimeResponse = await app.inject({ method: 'POST', url: '/api/patients/p/documents', payload: badMime.payload, headers: { ...badMime.headers, ...auth } });
+        expect(badMimeResponse.statusCode).toBe(415);
+        expect((badMimeResponse.json() as { error: string }).error).toBe('unsupported media type image/gif (pdf/png/jpeg only)');
+        await app.close();
+    });
+
+    it('rejects an oversize upload with 413 — the multipart limits cap is the size gate, not a schema', async () => {
+        const { app, devTokens } = await makeApp(1024); // fixture PDF is ~56 KiB
+        const { payload, headers } = multipart({ doc_type: 'lab_pdf' }, { name: 'file', filename: 'big.pdf', contentType: 'application/pdf', data: pdfBytes });
+        const response = await app.inject({
+            method: 'POST',
+            url: '/api/patients/p/documents',
+            payload,
+            headers: { ...headers, ...bearer(devTokens, 'physician', 'p') },
+        });
+        expect(response.statusCode).toBe(413);
+        expect((response.json() as { error: string }).error).toBe('file exceeds the size limit');
         await app.close();
     });
 

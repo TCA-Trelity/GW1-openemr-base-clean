@@ -32,6 +32,10 @@ describe('citation-validity-100', () => {
                 value: `${verified}/${total} claims verified; ${citationsChecked - citationsFailed}/${citationsChecked} citations resolved`,
                 threshold: `${expected}/${expected} claims verified; 0 citations failed`,
                 pass: total === expected && verified === total && citationsFailed === 0 && citationsChecked > 0,
+                // Uniform across the corpus loop: every case is the same happy-path check
+                // (clean authored corpus, citations expected to verify) — one shared tier
+                // is honest here; nothing per-corpus changes the difficulty.
+                difficulty: 'straightforward',
             });
         });
     }

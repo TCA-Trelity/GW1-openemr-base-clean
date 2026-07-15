@@ -4,8 +4,8 @@
 > (suite: `sidecar/eval/`). Committed as a deliverable and refreshed on every run;
 > CI regenerates and uploads it as an artifact on every push touching `sidecar/**`.
 
-- **Generated:** 2026-07-15T11:35:39.494Z
-- **Commit:** `6e702c86f895ebd86d43675976b166f896ef253f` (workspace HEAD at generation time; in CI, the pushed commit)
+- **Generated:** 2026-07-15T17:21:40.221Z
+- **Commit:** `5a27da350b81971f585659393923a2669c619aad` (workspace HEAD at generation time; in CI, the pushed commit)
 - **Result:** 58/58 evals passed
 
 ## Results
@@ -81,6 +81,41 @@
 | `safe_refusal` | safety (per-case) | 8 | 8 | 100.0% |
 | `no_phi_in_logs` | safety (per-case) | 3 | 3 | 100.0% |
 | `retrieval_grounded` | quality (>5%/threshold) | 12 | 12 | 100.0% |
+
+## Coverage by difficulty
+
+Every case carries a required difficulty tier (compile-enforced, reporting-only):
+**straightforward** = clean input, expected happy path; **ambiguous** = requires
+judgment/disambiguation (multi-turn context, degraded scans, overlapping-document
+tie-breaks); **edge-case** = adversarial/degenerate (injection, PHI canaries, empty
+record, cross-patient isolation, refusals).
+
+| Difficulty | Cases | Passed | Pass rate |
+|------------|------:|-------:|----------:|
+| straightforward | 26 | 26 | 100.0% |
+| ambiguous | 10 | 10 | 100.0% |
+| edge-case | 22 | 22 | 100.0% |
+
+Case counts per rubric category × difficulty:
+
+| Category | straightforward | ambiguous | edge-case |
+|----------|---:|---:|---:|
+| `schema_valid` | 2 | 1 | 2 |
+| `citation_present` | 8 | 1 | 4 |
+| `factually_consistent` | 8 | 4 | 5 |
+| `safe_refusal` | — | 1 | 7 |
+| `no_phi_in_logs` | — | — | 3 |
+| `retrieval_grounded` | 8 | 3 | 1 |
+
+## Retrieval quality
+
+- **Hit rate:** 10/10 (100.0%) — retrieval goldens whose expected document appears anywhere in the returned results (the eval's top-3 retrieval window, the same list the gate judges).
+- **Average rank:** 1.00 — mean 1-based position of the expected document's first snippet, over the 10 golden(s) where it was found.
+
+A true **precision** metric (how many of the top results are relevant when several
+documents could be) is deliberately absent: each retrieval golden today defines a
+single expected document, so precision cannot be calculated honestly from this set.
+Multi-document goldens are future work — the metric is omitted rather than faked.
 
 ## What these evals are (and are not)
 

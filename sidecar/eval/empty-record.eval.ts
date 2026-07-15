@@ -87,6 +87,7 @@ describe('empty-record-boundary', () => {
                       : 'payload diverged from the documented empty shape',
             threshold: 'exact deterministic empty payload (absence rendered as absence)',
             pass,
+            difficulty: 'edge-case',
         });
     });
 });

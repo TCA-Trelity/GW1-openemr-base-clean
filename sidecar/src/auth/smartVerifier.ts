@@ -11,10 +11,15 @@
 // for the authoritative {active, patient, sub, scope}. The introspection endpoint authenticates
 // the caller by client_id in the form body (TokenIntrospectionRestController.php:89-103) — no
 // separate bearer — so we need only our own client_id to resolve the binding.
+import { withTimeoutAndRetry } from '../lib/httpRetry.js';
 import type { FetchLike } from '../openemr/auth.js';
 import { algOf, decodeJwt, rsaPublicKeyFromJwk, verifyRs256 } from './jwt.js';
 import { AuthError, splitScope, type Principal, type Role } from './principal.js';
 import type { KeyObject } from 'node:crypto';
+
+// Hard per-attempt ceiling for the verifier's OpenEMR round-trips (JWKS, introspection) —
+// REQ G2: a hung EHR must fail the request closed (401), not stall every SMART-authed call.
+const VERIFIER_REQUEST_TIMEOUT_MS = 10_000;
 
 /** Maps an OpenEMR patient UUID (from introspection) to the sidecar's own patient id. */
 export type ResolvePatient = (openemrPatientUuid: string) => Promise<string | null>;
@@ -45,6 +50,8 @@ export interface SmartTokenVerifierOptions {
     now?: () => number;
     /** How long a fetched JWKS is trusted before re-fetch (default 10 min). */
     jwksCacheMs?: number;
+    /** Per-attempt request ceiling; tests shorten it (same shape as rerank's options.timeoutMs). */
+    timeoutMs?: number;
 }
 
 interface CachedKey {
@@ -62,6 +69,7 @@ export class SmartTokenVerifier {
     private readonly fetchImpl: FetchLike;
     private readonly now: () => number;
     private readonly jwksCacheMs: number;
+    private readonly timeoutMs: number;
     private cachedKey: CachedKey | undefined;
 
     constructor(options: SmartTokenVerifierOptions) {
@@ -76,6 +84,7 @@ export class SmartTokenVerifier {
         this.fetchImpl = options.fetchImpl ?? globalThis.fetch;
         this.now = options.now ?? Date.now;
         this.jwksCacheMs = options.jwksCacheMs ?? 600_000;
+        this.timeoutMs = options.timeoutMs ?? VERIFIER_REQUEST_TIMEOUT_MS;
     }
 
     async verify(token: string): Promise<Principal> {
@@ -138,7 +147,10 @@ export class SmartTokenVerifier {
         }
         let response: Response;
         try {
-            response = await this.fetchImpl(this.jwksUrl, { method: 'GET', headers: { accept: 'application/json' } });
+            // Idempotent GET — timeout + the helper's one bounded retry; any failure (including
+            // the mapped timeout) falls through to the fail-closed 401 below.
+            response = await withTimeoutAndRetry('jwks fetch', this.timeoutMs, (signal) =>
+                this.fetchImpl(this.jwksUrl, { method: 'GET', headers: { accept: 'application/json' }, signal }));
         } catch {
             throw new AuthError(401, 'jwks_unavailable');
         }
@@ -158,11 +170,15 @@ export class SmartTokenVerifier {
         const form = new URLSearchParams({ token, token_type_hint: 'access_token', client_id: this.clientId });
         let response: Response;
         try {
-            response = await this.fetchImpl(this.introspectUrl, {
-                method: 'POST',
-                headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
-                body: form.toString(),
-            });
+            // Introspection is a read-only query (RFC 7662) despite the POST verb — safe to give
+            // it the helper's one bounded retry; failures fall through to the fail-closed 401.
+            response = await withTimeoutAndRetry('token introspection', this.timeoutMs, (signal) =>
+                this.fetchImpl(this.introspectUrl, {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
+                    body: form.toString(),
+                    signal,
+                }));
         } catch {
             throw new AuthError(401, 'introspection_unavailable');
         }

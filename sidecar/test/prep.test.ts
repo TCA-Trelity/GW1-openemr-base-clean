@@ -502,6 +502,160 @@ describe('FactExtractor', () => {
     });
 });
 
+// H.4c: live production evidence (2026-07-15, corr e0b043a1… vs ee1e8e9d…) — the
+// extraction model INTERMITTENTLY paraphrases/reformats its excerpt quotes (one prep
+// blocked all five medication facts on citation_failed; the rerun 26 minutes later
+// verified 147/147). Paraphrased-but-non-empty excerpts sailed through weakCitations
+// and died silently at the pipeline gate (rewrite-as-absence — safe but lossy).
+// Validation now reuses the gate's own checkCitation ladder (exact range -> indexOf ->
+// whitespace-run-flexible) over in-scope documents, feeding failures through the SAME
+// single feedback retry. These tests pin call counts — the retry budget is unchanged.
+const MED_DOC = [
+    {
+        id: 'doc-meds',
+        document_type: 'pharmacy_record',
+        document_date: '2024-12-15',
+        // Double space after the colon on purpose: the corpus carries OCR-style
+        // whitespace runs the gate tolerates; the pre-check must tolerate them too.
+        text: 'Current medications:  Hydroxychloroquine 200 mg PO daily since January 2019. Prednisolone acetate 1% drops QID left eye.',
+    },
+];
+const VERBATIM_MED_EXCERPT = 'Hydroxychloroquine 200 mg PO daily since January 2019';
+const PARAPHRASED_MED_EXCERPT = 'Hydroxychloroquine 200mg PO QD since Jan 2019';
+
+// One schema-valid medication fact quoting MED_DOC: a corpus med fact recited onto the
+// synthetic document (offsets stay stale on purpose — the ladder's search paths correct
+// them, per the offsets-are-best-effort contract).
+function medFactQuoting(excerpt: string) {
+    const fact = structuredClone(corpusFacts().find((candidate) => candidate.fact_type === 'medication')) as any;
+    fact.id = 'fact-med-h4c';
+    fact.source_document_id = 'doc-meds';
+    fact.sources = [
+        {
+            ...fact.sources[0],
+            id: 'cit-med-h4c',
+            fact_id: 'fact-med-h4c',
+            source_document_id: 'doc-meds',
+            excerpt_text: excerpt,
+        },
+    ];
+    return fact;
+}
+
+describe('FactExtractor verbatim excerpt pre-check (H.4c)', () => {
+    it('retries once with verbatim-quote feedback when the model paraphrases a med excerpt, then succeeds', async () => {
+        const { extractor, fetchMock } = extractorWith(
+            llmResponse({ facts: [medFactQuoting(PARAPHRASED_MED_EXCERPT)] }),
+            llmResponse({ facts: [medFactQuoting(VERBATIM_MED_EXCERPT)] }),
+        );
+        const result = await extractor.extract(
+            { patientId: PATIENT_ID, patientName: null, documents: MED_DOC },
+            'corr-h4c-1',
+            silentLogger,
+        );
+        expect(fetchMock).toHaveBeenCalledTimes(2); // failed attempt + feedback retry; single fact skips the contradiction pass
+        expect(result.facts).toHaveLength(1);
+        expect(result.facts[0]!.sources[0]!.excerpt_text).toBe(VERBATIM_MED_EXCERPT);
+        // The retry threads the failure back and names the offending excerpt to the MODEL.
+        const secondBody = JSON.parse(String(fetchMock.mock.calls[1]![1]?.body)) as Record<string, unknown>;
+        const messages = secondBody['messages'] as { role: string; content: string }[];
+        expect(messages).toHaveLength(3); // original user + failed assistant + error feedback
+        expect(messages[2]!.content).toContain('failed validation');
+        expect(messages[2]!.content).toContain('is not a verbatim substring of document');
+        expect(messages[2]!.content).toContain(PARAPHRASED_MED_EXCERPT);
+        expect(messages[2]!.content).toContain('doc-meds');
+    });
+
+    it('throws the same ExtractionError as any double validation failure when the model paraphrases twice', async () => {
+        const { extractor, fetchMock } = extractorWith(
+            llmResponse({ facts: [medFactQuoting(PARAPHRASED_MED_EXCERPT)] }),
+            llmResponse({ facts: [medFactQuoting(PARAPHRASED_MED_EXCERPT)] }),
+        );
+        const error: unknown = await extractor
+            .extract({ patientId: PATIENT_ID, patientName: null, documents: MED_DOC }, 'corr-h4c-2', silentLogger)
+            .then(() => null)
+            .catch((thrown: unknown) => thrown);
+        expect(error).toBeInstanceOf(ExtractionError);
+        const message = (error as ExtractionError).message;
+        expect(message).toMatch(/extraction failed after 2 attempt\(s\)/);
+        expect(message).toMatch(/is not a verbatim substring of document/);
+        // PHI discipline: the thrown message (Railway logs + prep_run row) carries the
+        // redacted issue — path and document id, never the model's excerpt text.
+        expect(message).not.toContain('200mg PO QD');
+        expect(fetchMock).toHaveBeenCalledTimes(2); // never a third call — same retry budget as today
+    });
+
+    it('spends no retry when the model quotes verbatim on the first call', async () => {
+        const { extractor, fetchMock } = extractorWith(llmResponse({ facts: [medFactQuoting(VERBATIM_MED_EXCERPT)] }));
+        const result = await extractor.extract(
+            { patientId: PATIENT_ID, patientName: null, documents: MED_DOC },
+            'corr-h4c-3',
+            silentLogger,
+        );
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(result.facts).toHaveLength(1);
+    });
+
+    it('does not retry over whitespace runs the gate already tolerates', async () => {
+        // Single-spaced quote of the document's double-spaced run: indexOf misses, the
+        // gate's whitespace-flexible search accepts — the pre-check reuses the gate, so
+        // it must not burn the retry on a citation the gate was always going to verify.
+        const singleSpaced = 'Current medications: Hydroxychloroquine 200 mg PO daily';
+        const { extractor, fetchMock } = extractorWith(llmResponse({ facts: [medFactQuoting(singleSpaced)] }));
+        const result = await extractor.extract(
+            { patientId: PATIENT_ID, patientName: null, documents: MED_DOC },
+            'corr-h4c-4',
+            silentLogger,
+        );
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(result.facts).toHaveLength(1);
+    });
+
+    it('leaves citations to out-of-scope document ids for the pipeline gate, as today', async () => {
+        // No text to verify against -> not a validation issue; missing_document stays the
+        // pipeline gate's verdict (see 'drops a gate-blocked fact while the prep run still
+        // completes'). This is also what keeps corpus-fact fixtures valid against ONE_DOC.
+        const strayDoc = medFactQuoting(PARAPHRASED_MED_EXCERPT) as any;
+        strayDoc.sources[0].source_document_id = 'doc-absent-from-inputs';
+        const { extractor, fetchMock } = extractorWith(llmResponse({ facts: [strayDoc] }));
+        const result = await extractor.extract(
+            { patientId: PATIENT_ID, patientName: null, documents: MED_DOC },
+            'corr-h4c-5',
+            silentLogger,
+        );
+        expect(fetchMock).toHaveBeenCalledTimes(1); // no retry spent on what cannot be checked
+        expect(result.facts).toHaveLength(1);
+    });
+
+    it('logs the validation failure with redacted issues — excerpt text goes to the model, never the log', async () => {
+        const events: { obj: Record<string, unknown>; msg?: string }[] = [];
+        const recordingLogger: PrepLogger = {
+            info: () => {},
+            warn: (obj, msg) => events.push({ obj, msg: msg ?? '' }),
+            error: () => {},
+        };
+        const { extractor, fetchMock } = extractorWith(
+            llmResponse({ facts: [medFactQuoting(PARAPHRASED_MED_EXCERPT)] }),
+            llmResponse({ facts: [medFactQuoting(VERBATIM_MED_EXCERPT)] }),
+        );
+        await extractor.extract(
+            { patientId: PATIENT_ID, patientName: null, documents: MED_DOC },
+            'corr-h4c-6',
+            recordingLogger,
+        );
+        const failureEvents = events.filter((event) => event.msg === 'extraction response failed validation');
+        expect(failureEvents).toHaveLength(1);
+        const serialized = JSON.stringify(failureEvents[0]!.obj);
+        expect(serialized).toContain('facts.0.sources.0.excerpt_text');
+        expect(serialized).toContain('doc-meds');
+        expect(serialized).not.toContain('200mg PO QD'); // the paraphrase never reaches the log
+        // ...while the model-facing feedback DOES quote it — that is the repair mechanism.
+        const secondBody = JSON.parse(String(fetchMock.mock.calls[1]![1]?.body)) as Record<string, unknown>;
+        const messages = secondBody['messages'] as { role: string; content: string }[];
+        expect(messages[2]!.content).toContain(PARAPHRASED_MED_EXCERPT);
+    });
+});
+
 // ---- Transient-failure retry ----
 
 function apiErrorResponse(status: number, type: string): Response {
@@ -850,6 +1004,9 @@ describe('prep pipeline end-to-end', () => {
 
     // Guards: the rewrite-as-absence invariant — a fabricated citation blocks the fact
     // (dropped from facts_by_type, counted in gate metrics) without failing the prep.
+    // Since H.4c the extraction pre-check repairs paraphrases against IN-SCOPE documents
+    // before the gate ever sees them, so the pipeline-reachable gate-block is a citation
+    // whose document id does not resolve — exactly what this fixture fabricates.
     it('drops a gate-blocked fact while the prep run still completes', async () => {
         const facts = corpusFacts();
         const fabricated = structuredClone(facts[0]);
@@ -860,6 +1017,7 @@ describe('prep pipeline end-to-end', () => {
                 ...facts[0].sources[0],
                 id: 'cit-fabricated',
                 fact_id: 'fact-fabricated',
+                source_document_id: 'doc-that-does-not-exist',
                 excerpt_text: 'this text appears nowhere in any source document',
             },
         ];
