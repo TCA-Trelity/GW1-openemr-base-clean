@@ -509,6 +509,14 @@ if (process.argv[1]?.endsWith('server.js') || process.argv[1]?.endsWith('server.
         // the same retriever/ingestion the routes use. Keyless deployments skip it and
         // every turn takes the Week 1 loop (an explicit boot log says so below).
         if (config.ANTHROPIC_API_KEY !== undefined && deps.ingest !== undefined) {
+            // One structured JSON logger for the whole evidence lane (G12: every W2
+            // component logs pino-shaped info/warn — ids/hashes/counts only, never
+            // document text or patient identifiers). H.3: the router and composer log
+            // through it too, so their degradation warnings never hit the raw console.
+            const graphLogBase = {
+                info: (obj: Record<string, unknown>, msg: string) => console.log(JSON.stringify({ level: 'info', msg, ...obj })),
+                warn: (obj: Record<string, unknown>, msg: string) => console.warn(JSON.stringify({ level: 'warn', msg, ...obj })),
+            };
             const routerModel = new LlmRouterModel(
                 new AnthropicClient({
                     apiKey: config.ANTHROPIC_API_KEY,
@@ -517,7 +525,7 @@ if (process.argv[1]?.endsWith('server.js') || process.argv[1]?.endsWith('server.
                     idleTimeoutMs: 3_000,
                     totalTimeoutMs: 5_000,
                 }),
-                console,
+                graphLogBase,
             );
             const composer = new LlmAnswerComposer(
                 new AnthropicClient({
@@ -528,15 +536,11 @@ if (process.argv[1]?.endsWith('server.js') || process.argv[1]?.endsWith('server.
                     totalTimeoutMs: 20_000,
                 }),
                 deps.chat.spendGuard,
-                console,
+                graphLogBase,
             );
             // E.4: when Langfuse is keyed, graph events additionally become spans on a
             // correlation-scoped trace (adapter over the same logger seam — no new
             // instrumentation points; docs/w2/trace-example.md is the span skeleton).
-            const graphLogBase = {
-                info: (obj: Record<string, unknown>, msg: string) => console.log(JSON.stringify({ level: 'info', msg, ...obj })),
-                warn: (obj: Record<string, unknown>, msg: string) => console.warn(JSON.stringify({ level: 'warn', msg, ...obj })),
-            };
             const graphLangfuse =
                 config.LANGFUSE_HOST !== undefined && config.LANGFUSE_PUBLIC_KEY !== undefined && config.LANGFUSE_SECRET_KEY !== undefined
                     ? new Langfuse({

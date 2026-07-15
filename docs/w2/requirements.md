@@ -611,7 +611,10 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
   W2 routes) logs via the injected pino-shaped logger. The only console.*
   sites in src/ are Week 1-era bootstrap paths — config parse before the
   logger exists, migrate CLI — plus two structured-JSON wrappers; none are
-  W2 components.)*
+  W2 components. H.3, 2026-07-15: the one gap at the wiring layer — the
+  boot block handed raw `console` to LlmRouterModel/LlmAnswerComposer —
+  now injects the structured graphLogBase instead, so the claim holds at
+  the boot seam too.)*
 
 ### G13 — Distributed tracing hierarchy
 - [ ] Worker invocations are child spans of the supervisor span; extraction
@@ -625,9 +628,13 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
   presence + count), reranker API (Cohere reachability). Degraded status per
   dependency, not binary up/down (existing pattern extended). *(Shipped:
   document_storage = password-grant token mint (cached provider);
-  retriever_index = fails on zero chunks; reranker = keyed-Cohere presence,
-  unkeyed reports not_configured with the Passthrough fallback active.
-  Absent probes degrade to not_configured, never binary-down.)*
+  retriever_index = fails on zero chunks; reranker (as-built by H.2,
+  2026-07-15) = outcome of the last REAL rerank made by traffic — keyed
+  but unexercised reports ok with detail "keyed (unverified since boot)",
+  a failure newer than the last success reports failed/503; never a
+  per-poll Cohere call (trial-key rate limits + per-call cost); unkeyed
+  reports not_configured with the Passthrough fallback active. Absent
+  probes degrade to not_configured, never binary-down.)*
 
 ### G15 — Alerts
 - [x] Three new alert definitions with thresholds + documented response
