@@ -21,6 +21,12 @@ runner (`run-rehearsal.sh`, wired as `npm run gate-rehearsal`). For each leg the
 The runner itself exits non-zero if any injected regression slips through, so the
 rehearsal is CI-runnable evidence, not a one-off transcript.
 
+Each leg's `npm run eval` regenerates `docs/execution/eval-results.md`, so a passing
+run finishes by restoring that file to its committed state (and prints that it did) —
+no stale injected-failure report is left in the working tree. A **failing** run
+deliberately leaves the file in place: there it is diagnostic evidence, not a false
+alarm.
+
 | Leg | Fault (patch) | What it simulates | Category expected to catch it | Tier exercised |
 |---|---|---|---|---|
 | A | `a-citation-drop.patch` — `factsOf`'s citation builder returns `[]` | A refactor that persists extracted facts **without citations** | `citation_present` | **Safety: any newly-failing case fails the build** |
