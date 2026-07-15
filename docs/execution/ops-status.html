@@ -330,7 +330,7 @@
         </div>
         <div class="item">
           <div class="t"><a href="https://enchanting-mercy-production-5d32.up.railway.app/ready">/ready</a></div>
-          <div class="d">real checks: OpenEMR · Anthropic · Postgres · Langfuse · document storage (live token mint) · retriever index (pgvector) · reranker — all <b>ok</b> on the 2026-07-14 deploy (configured deps that fail ⇒ 503; unconfigured report degraded, never binary-down)</div>
+          <div class="d">real checks: OpenEMR · Anthropic · Postgres · Langfuse · document storage (live token mint) · retriever index (pgvector) · reranker — all <b>ok</b> on the 2026-07-14 deploy (configured deps that fail ⇒ 503; unconfigured report degraded, never binary-down). <b>Known probe limit (07-15 incident):</b> the doc-storage probe proves the token mint only and stayed green while live document writes 404'd (category wire-format bug, fixed client-side); actual write proof is the per-upload post-write hash verification, which fails the upload visibly instead of half-ingesting</div>
         </div>
         <div class="item">
           <div class="t">Bruno probes</div>

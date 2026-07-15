@@ -66,6 +66,16 @@ requires password-grant token + `user/document.write` scope (sidecar does
 - [x] Original file is stored in OpenEMR Documents under a per-doc-type
   category, associated to the correct patient (`documents.foreign_id = pid`),
   before extraction begins. OpenEMR remains the system of record for the file.
+  *Incident note (evaluator-found, live 404s on both test patients 07-15): three
+  stacked client bugs meant this box was implemented but not true in production
+  — uuid passed where the route needs the numeric pid (silently filed to
+  patient 0; fixed 07-14), category sent as `Lab Report` where the wire format
+  is `Lab_Report` (silently orphaned the document), and the client parsed a
+  `{data}` envelope where these routes return raw bodies + 404 on empty
+  listings (killed the dedupe pre-check on every first upload). All fixed
+  07-15 with post-write hash verification (a write that isn't listed under the
+  category now throws instead of half-ingesting). Live re-verify = test plan
+  A1/A2 after the next deploy.*
 - [x] Idempotency: re-uploading byte-identical content creates **no** second
   OpenEMR document row and no duplicate facts (caller-side sha3-512 check —
   OpenEMR stores the hash but does not enforce uniqueness; sidecar
