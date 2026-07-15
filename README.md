@@ -133,6 +133,7 @@ Key-drop steps with verification: [`docs/internal/tickets/USER-ACTIONS.md`](docs
 [execution plan](docs/w2/execution-plan.md) ·
 [trace worked example](docs/w2/trace-example.md) ·
 [defense outline](docs/w2/defense-outline.md) ·
+[course-technique alignment map](docs/w2/gauntlet-alignment.md) ·
 [OpenAPI contract](sidecar/openapi.yaml) ·
 [Bruno collection](sidecar/api-collection/)
 

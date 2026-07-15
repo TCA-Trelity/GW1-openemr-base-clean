@@ -428,6 +428,10 @@ model, covered by `retrieval_grounded` outcomes, not re-benchmarked);
 OpenEMR's own document storage internals (upstream-tested; we test our client
 contract against it).
 
+*Related: §18 separates the **guardrails** (prevent bad behavior at runtime)
+from the **evals** in this table (measure quality after the fact) — two
+side-by-side lists, every row pointing at its implementing file.*
+
 ## 12. Failure modes & incident response (REQ: G9) — [SHIPPED: identification signals verified against emitted events 2026-07-14]
 
 | Failure | How you see it (logs/traces) | Recovery action |
@@ -513,3 +517,48 @@ retrieval (seam: embeddings table keyed by source id); lab-trend chart widget
 graph in the fast path beyond the bounded router; SaaS traces near real
 patient data; raising the $5/day budget. *"The best submissions will feel
 narrower than the original spec and stronger because of it."*
+
+## 18. Guardrails vs. evals (REQ: S4/R6, R5, R7, G14, P5) — [SHIPPED: every pointer below verified against code 2026-07-15 · TARGET: OpenEMR-leg timeouts/retries (H.5), write-endpoint rate limiting (J.2)]
+
+Two mechanisms keep this system honest, and they are not the same thing.
+**Guardrails** act before or at runtime: they prevent a bad action on a live
+request (a write without a principal, an uncited claim reaching a clinician,
+a runaway spend). **Evals** act after the fact: they measure output quality
+on committed cases and block *changes* (PRs), not requests. A guardrail
+failing open is a runtime incident; an eval failing is a blocked merge. §7
+specifies the eval gate itself; §11 places evals among the test layers; this
+section is the side-by-side.
+
+**Guardrails — prevent bad behavior before/at runtime:**
+
+| Guardrail | Enforced in | What it prevents |
+|---|---|---|
+| Write-path auth (401/403) | `sidecar/src/routes/ingest.ts` — upload returns 401 without an authenticated principal, 403 without the `documentsWrite` capability, in every `AUTH_MODE`; role table: `sidecar/src/auth/principal.ts` (`capabilitiesFor`) | Anonymous or role-inappropriate writes into a patient record |
+| Cross-patient scope denial | `sidecar/src/auth/smartVerifier.ts` (403 `no_patient_context` / `patient_not_linked`); same rule on the dev-token path (`sidecar/src/auth/devToken.ts`) | One patient's facts served into another patient's session |
+| SpendGuard $5/day cap | `sidecar/src/prep/budget.ts` — `SpendGuard.assertBudget()` sums the trailing-24h `llm_calls` ledger *before* any model call (`LLM_DAILY_BUDGET_USD`, locked #16) | Runaway model spend |
+| Citation gate | `sidecar/src/gate/citationGate.ts` (prep path, deterministic verbatim verification) + `sidecar/src/gate/responseGate.ts` (chat-path choke point — unverified citations withheld server-side, only their count travels) | Uncited or unverifiable claims rendering as provenance |
+| Prescriptiveness screen (safe-refusal posture) | `sidecar/src/gate/prescriptivenessLint.ts`, run inside `responseGate.ts` — advisory by product decision: flags are logged and counted on the wire, prose is never silently rewritten | The agent originating treatment/dosing direction unnoticed |
+| PHI query scrubber | `sidecar/src/retrieval/queryPolicy.ts` (`scrubQuery`) — known identifiers stripped before any retrieval query text leaves the boundary | PHI reaching the embedding/rerank vendor |
+| Timeouts & retries on outbound calls | `withTimeoutAndRetry` (`sidecar/src/retrieval/embeddings.ts`, reused by `CohereReranker.rerank`); idle + total timeouts with retry classification on the Anthropic leg (`sidecar/src/prep/anthropic.ts`) · **[TARGET: H.5]** extends the same pattern to the OpenEMR client legs (`standardApi.ts`, `fhir.ts`, `auth.ts` — currently un-timed-out) | A hung outbound call freezing a request forever |
+| Rate limiting on write endpoints | **[TARGET: J.2]** — not yet in code; document upload and the chat stream get the framework's rate-limit plugin | A runaway client draining the daily budget or hammering writes |
+
+**Evals — measure quality after the fact; gate changes, not requests:**
+
+| Eval surface | Lives in | What it measures |
+|---|---|---|
+| 58-case golden suite | `sidecar/eval/` — 14 `*.eval.ts` suites over committed fixtures (`sidecar/eval/fixtures/documents/`, incl. deliberately degraded scans) and synthetic corpora (`sidecar/eval/corpus.ts`) | Behavior regressions across the whole pipeline — the graders' injected-regression class (§7) |
+| Six rubric categories, two tiers | `sidecar/eval/categories.ts` — safety (`safe_refusal`, `no_phi_in_logs`, `citation_present`) vs quality (`schema_valid`, `factually_consistent`, `retrieval_grounded`) | Which failures hard-fail per-case vs fail on threshold math |
+| Committed baseline + tiered regression math | `sidecar/eval/baseline.json` + `sidecar/eval/gate.ts` (`applyGate`; re-baseline is a reviewed diff via `npm run eval:baseline`, never an env flag) | Any safety-case failure; >5-point quality drops vs baseline or below absolute threshold |
+| PR-blocking delivery | `.github/workflows/evals.yml` (`pull_request` trigger, required check on `main`) + `.githooks/pre-push` | Regressions blocked at merge time and one step earlier, pre-push |
+| Gate rehearsal | `sidecar/eval/rehearsal/run-rehearsal.sh` (`npm run gate-rehearsal`) + verbatim transcript `docs/w2/gate-rehearsal.md` | That the gate actually catches injected regressions, one per tier |
+
+Where the two meet, the pairing is deliberate — the guardrail prevents, and a
+matching eval proves the prevention still works: citation gate ↔
+`citation_present`; PHI scrubber and log discipline ↔ `no_phi_in_logs`
+(`sidecar/eval/phi-log-sweep.eval.ts` sweeps real captured log lines for
+planted canaries); refusal posture ↔ `safe_refusal` (incl.
+`sidecar/eval/injection-resistance.eval.ts`'s structural injection checks);
+strict extraction schemas (`sidecar/src/schemas/extraction.ts`) ↔
+`schema_valid`. Standing rule, restated from §7: the blocking gate never
+depends on an AI model's subjective quality judgment — any LLM-judge scoring
+is informational only and can never block a build.

@@ -9,6 +9,8 @@ is handled elsewhere — this file is content. Deck title suggestion:*
 [`docs/w2/requirements.md`](requirements.md) (requirements register) and
 [`../../W2_ARCHITECTURE.md`](../../W2_ARCHITECTURE.md) (full architecture).*
 
+*For Q&A of the form "where does course technique X live in the code?": [`docs/w2/gauntlet-alignment.md`](gauntlet-alignment.md) indexes every technique's implementing file and status.*
+
 ---
 
 ## Slide 1 — Same Doctor, Same Thesis, New Inputs
