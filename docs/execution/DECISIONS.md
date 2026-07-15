@@ -87,3 +87,23 @@ architecture docs:
 - DECISION: Operational consolidation = a dedicated dashboard page `docs/execution/ops-status.html` cloning the build-status.html mechanism (hand-refreshed render of baselines/eval-results/observability/COSTS, published as a stable-URL artifact, refreshed in the same commit as its sources) — an MD index alone was judged insufficient for review; `docs/OPERATIONS.md` §0 is the prose index pointing at it. Root README gains rows for the dashboard, observability spec, and baselines (previously unlinked).
 - DECISION: Drift reconciled in the direction of code/ledger truth — ARCHITECTURE's "Sonnet 5 deep reader" corrected to Haiku 4.5 per-document (per the 2026-07-08 extraction-rework decision above); "self-hosted Langfuse" claims restated as "Langfuse Cloud renders traces during the synthetic-data demo; self-hosted is the committed pilot posture (G2)"; the defense doc's "k6" corrected to the actual dependency-free Node probe; eval-results' hardcoded unit-test count made drift-proof. `early-submission-readiness.md` keeps its historical numbers, header-marked as a point-in-time trace pointing at the live ops page.
 - DECISION: Alert definitions single-sourced in `docs/execution/observability.md` — living docs (ARCHITECTURE §7, OPERATIONS, ops-status.html as a render) link or render it rather than restating thresholds; historical ledger entries left untouched.
+
+## Product scope (2026-07-15, merged-plan K.1)
+
+- DECISION: Stay narrow — retina/medical-retina depth over ophthalmology
+  breadth. The co-pilot competes on depth in one subspecialty workflow
+  (HCQ monitoring, lab→eGFR→risk re-tiering, OCT-driven medical-retina
+  follow-up) rather than on feature parity with established full-scope
+  ophthalmology EHR products (refraction/optical workflows, surgical
+  scheduling breadth, general-ophtho menu surface). New product work that
+  broadens clinical scope is out of scope unless it deepens the
+  medical-retina workflow. REVISIT CONDITION: revisit this decision when
+  a second paying customer's primary need is a different ophthalmic
+  subspecialty (e.g. glaucoma or anterior segment), or when the pilot
+  practice's real usage shows a sustained majority of co-pilot sessions
+  falling outside medical retina — and revisiting means a deliberate
+  scope conversation with the user, never silent scope creep via
+  individual tickets. (Cross-refs: merged-plan Track 1 K.1 + its
+  "Explicitly out of scope" list; W2_ARCHITECTURE.md §17; the three
+  medically-judgment-heavy roadmap pieces deliberately excluded from the
+  merged plan remain excluded until that conversation.)

@@ -656,6 +656,30 @@ Preserve existing authors/copyrights when editing files.
   (forbidden globals, forbidden direct instantiations, namespace rules, etc.)
 - Commit messages are validated against Conventional Commits format in CI
 
+## Sidecar eval-set maintenance (Clinical Co-Pilot)
+
+Scope: `sidecar/eval/` — the deterministic eval suite and its gate. These
+rules are load-bearing; they restate the merged-plan standing rules in the
+file every session reads.
+
+- **Never edit an eval case's expected answer to make a failing case
+  pass.** A failing eval is information: fix the code, or re-baseline
+  deliberately (next rule). Silent expectation edits are treated as gate
+  tampering in review.
+- **Re-baselines are separate, labeled commits.** The only legitimate
+  path to changing `sidecar/eval/baseline.json` is `npm run
+  eval:baseline`, committed on its own with a message that names what
+  changed and why (e.g. `test(eval): re-baseline after adding retrieval
+  cases`). An unexplained baseline diff blocks review. Never hand-edit
+  the file.
+- **The LLM-judge scorecard (merged-plan CT7) is informational only.** It
+  is a manually-run script; it never runs in CI, never blocks a push or
+  PR, and never feeds `eval/run.ts` or `eval/gate.ts`. The pass/fail gate
+  stays 100% deterministic.
+- **Before any push, run the `before-you-push` skill**
+  (`.claude/skills/before-you-push/SKILL.md`) — it branches on whether
+  the diff touched `sidecar/`, `sidecar/panel/`, or OpenEMR PHP paths.
+
 ## Key Documentation
 
 - `CONTRIBUTING.md` - Contributing guidelines
