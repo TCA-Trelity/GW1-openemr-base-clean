@@ -3,6 +3,7 @@
 // or a rogue worker result fails LOUDLY with a typed error naming the interface, never
 // propagates half-shaped state to the next node (parse, don't validate).
 import { z } from 'zod';
+import { EvidenceSnippetSchema } from '../schemas/retrieval.js';
 
 /** Raised when a graph boundary payload fails its contract. Names the interface. */
 export class GraphContractError extends Error {
@@ -49,23 +50,10 @@ export const GraphAskSchema = z.discriminatedUnion('kind', [
 ]);
 export type ParsedGraphAsk = z.infer<typeof GraphAskSchema>;
 
-// Worker-output contract for the evidence retriever: what the critic composes from.
-// Mirrors EvidenceSnippet field-for-field; `.strict()` so a drifted retriever payload
-// (extra/missing fields) is a contract failure, not a silent pass-through.
-export const EvidenceSnippetSchema = z
-    .object({
-        chunk_id: z.string().min(1),
-        doc_id: z.string().min(1),
-        section_title: z.string(),
-        quote: z.string().min(1),
-        text: z.string().min(1),
-        score: z.number(),
-        guideline_source: z.string().min(1),
-        version: z.string().min(1),
-        disease_tags: z.array(z.string()),
-        rerank_applied: z.boolean(),
-    })
-    .strict();
+// Worker-output contract for the evidence retriever (what the critic composes from):
+// EvidenceSnippetSchema, imported above from its single home in src/schemas/retrieval.ts
+// (H.11) — the graph boundary and the retriever's own types infer from the SAME
+// contract, so a second hand-kept mirror can never drift.
 
 export function parseGraphAsk(input: unknown): ParsedGraphAsk {
     const parsed = GraphAskSchema.safeParse(input);

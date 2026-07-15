@@ -8,17 +8,15 @@
 //                blocks it from claims because its quote resolves to no stored text
 // No model output is trusted for geometry: the model's own page hint is only a starting
 // point (checked first, then every other page), and its bbox suggestions are ignored.
+import type { z } from 'zod';
 import type { ExtractionCitation, ExtractionResult } from '../schemas/extraction.js';
+import { GroundingSummarySchema } from '../schemas/ingestion.js';
 import type { PdfPageWords, PdfWords } from './pdf.js';
 
-export interface GroundingSummary {
-    total: number;
-    word_box: number;
-    page: number;
-    unverified: number;
-    /** Grounded (word_box+page) / total — the per-document extraction confidence (R7). */
-    confidence: number;
-}
+/** Per-document grounding tallies. Contract-first (H.11, REQ G1): the shape lives in
+ *  src/schemas/ingestion.ts (embedded in the ingestion record); the type is inferred so
+ *  importers keep this module as its home. */
+export type GroundingSummary = z.infer<typeof GroundingSummarySchema>;
 
 /** Per-field grounding outcome (G5 `extraction_field_outcome`). Labels are positional
  *  (`results[2]`, `allergies[0]`) — never extracted strings, so the event is PHI-free

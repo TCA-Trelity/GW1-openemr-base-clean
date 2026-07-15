@@ -45,3 +45,20 @@ never bypasses them; all objects `.strict()` so invented keys fail closed).
 Every extracted field group carries an `ExtractionCitationSchema` with the
 grounding ladder `word_box | page | unverified` — `unverified` fields are
 visible but can never be cited (R5/P2).
+
+## #3 — Zod contracts on the remaining unchecked W2 shapes (H.11, 2026-07-15)
+
+**PR:** ticket H.11. **Data migration required: none** — these schemas
+formalize EXISTING wire shapes; no wire-shape change.
+
+`IngestionRecord` (+ status/stage/grounding-summary) / `RetrievalResult` /
+`SearchOptions` / `QueryContext` / `BuiltQuery` / `EhrVitalPayload`
+formalized as Zod schemas (`src/schemas/{ingestion,retrieval,ehrWrites}.ts`);
+runtime types are now inferred (`z.infer`) from the same source modules as
+before, so no importer changed. Parses sit at real boundaries only:
+record-store `save()`, `HybridRetriever.search()` options, outbound
+`addVital()` (fails closed, kind `validation`, before any network call), and
+the upload route's mime/filename gate (`UploadFileMetaSchema`; the size check
+stays the multipart `limits` stream cap → 413, by design). The graph's
+`EvidenceSnippetSchema` mirror in `src/graph/contracts.ts` was de-duplicated —
+`src/schemas/retrieval.ts` is its single home.

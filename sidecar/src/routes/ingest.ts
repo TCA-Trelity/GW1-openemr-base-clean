@@ -10,6 +10,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { capabilitiesFor } from '../auth/principal.js';
 import { DocTypeSchema } from '../schemas/extraction.js';
+import { UploadFileMetaSchema } from '../schemas/ingestion.js';
 import { ingestionIdOf, type AttachAndExtractInput, type IngestionRecordStore, type IngestionService } from '../ingest/service.js';
 import type { HybridRetriever } from '../retrieval/retriever.js';
 import type { HealthProbe } from './health.js';
@@ -23,8 +24,6 @@ export interface IngestRouteDeps {
     /** Preview cache for the panel's bbox overlay (E.2). Defaults to an in-memory cache. */
     files?: UploadFileStore;
 }
-
-const ACCEPTED_MIME = new Set(['application/pdf', 'image/png', 'image/jpeg']);
 
 /** Recently-uploaded originals, served back for the panel's citation overlay (E.2).
  *  This is a PREVIEW CACHE, not storage: the system of record for the file is OpenEMR
@@ -63,6 +62,9 @@ export function registerIngestRoutes(app: FastifyInstance, deps?: IngestRouteDep
     }
     const files = deps.files ?? new MemoryUploadFileStore();
     void app.register(multipart, {
+        // Size is enforced HERE, by the multipart stream cap (surfaced as 413 below) —
+        // the correct layer for a size check: a schema cannot pre-measure a stream.
+        // H.11 keeps mime/filename in UploadFileMetaSchema and size in `limits` by design.
         limits: { fileSize: deps.maxFileBytes ?? 10 * 1024 * 1024, files: 1 },
     });
 
@@ -87,7 +89,10 @@ export function registerIngestRoutes(app: FastifyInstance, deps?: IngestRouteDep
         if (!docType.success) {
             return reply.status(400).send({ error: `doc_type must be one of: lab_pdf, intake_form (got ${String(docTypeRaw)})` });
         }
-        if (!ACCEPTED_MIME.has(file.mimetype)) {
+        // Mime/filename contract (H.11): the schema's mime enum is the one source of
+        // truth for what this route accepts — same 415 + message as the old Set check.
+        const fileMeta = UploadFileMetaSchema.safeParse({ mimetype: file.mimetype, filename: file.filename });
+        if (!fileMeta.success) {
             return reply.status(415).send({ error: `unsupported media type ${file.mimetype} (pdf/png/jpeg only)` });
         }
         let bytes: Buffer;
@@ -100,8 +105,8 @@ export function registerIngestRoutes(app: FastifyInstance, deps?: IngestRouteDep
         const input: AttachAndExtractInput = {
             patientId: request.params.patientId,
             docType: docType.data,
-            filename: file.filename,
-            mimeType: file.mimetype,
+            filename: fileMeta.data.filename,
+            mimeType: fileMeta.data.mimetype,
             bytes,
             correlationId: request.id,
         };
@@ -113,7 +118,7 @@ export function registerIngestRoutes(app: FastifyInstance, deps?: IngestRouteDep
         // deterministic from the bytes, so the 202 carries it immediately and the status
         // route serves the staged record as the pipeline advances.
         const ingestionId = ingestionIdOf(bytes);
-        files.save(ingestionId, bytes, file.mimetype);
+        files.save(ingestionId, bytes, fileMeta.data.mimetype);
         deps.service.attachAndExtract(input).catch((error: unknown) => {
             request.log.warn({ err: error, correlation_id: request.id, ingestion_id: ingestionId }, 'ingestion_unhandled_failure');
         });

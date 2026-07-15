@@ -198,6 +198,32 @@ describe('uuid → numeric pid resolution', () => {
     });
 });
 
+describe('addVital contract boundary (H.11, G1)', () => {
+    it('addVital parses the payload before any network call — a negative bps or invented key never reaches OpenEMR', async () => {
+        const fetchImpl = vi.fn(async () => jsonResponse(200, { validationErrors: [], internalErrors: [], data: true }));
+        const api = client(fetchImpl);
+
+        await expect(api.addVital('3', '7', { bps: -128 })).rejects.toSatisfy(
+            (error: unknown) =>
+                error instanceof StandardApiError &&
+                error.kind === 'validation' &&
+                /vitals payload failed contract/.test(error.message) &&
+                /bps/.test(error.message),
+        );
+        await expect(api.addVital('3', '7', { bps: 128, invented_key: true } as never)).rejects.toSatisfy(
+            (error: unknown) => error instanceof StandardApiError && error.kind === 'validation',
+        );
+        expect(fetchImpl).not.toHaveBeenCalled(); // zero network calls on invalid payloads
+
+        // A valid payload still POSTs to the vital route unchanged.
+        await api.addVital('3', '7', { bps: 128, bpd: 78, weight: 138.5 });
+        expect(fetchImpl).toHaveBeenCalledTimes(1);
+        const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+        expect(url).toBe('https://emr.example.test/apis/default/api/patient/3/encounter/7/vital');
+        expect(JSON.parse(String(init.body))).toEqual({ bps: 128, bpd: 78, weight: 138.5 });
+    });
+});
+
 describe('sha3_512Hex', () => {
     it('matches OpenEMR: 128 hex chars, deterministic, content-sensitive', () => {
         expect(PDF_HASH).toMatch(/^[0-9a-f]{128}$/);

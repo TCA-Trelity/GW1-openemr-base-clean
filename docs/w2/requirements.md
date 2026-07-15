@@ -478,9 +478,12 @@ commit E1 + E5 by decision, deliver E2 via R5, and defer E3 + E4 with seams.
 > authority must be explicit: one source of truth per data type, no silent
 > overwrites."*
 
-- [ ] Zod contracts on: upload API, ingestion job state, extraction outputs
+- [x] Zod contracts on: upload API, ingestion job state, extraction outputs
   (R2), retriever query/response, graph state + handoffs, vitals write
-  payload, citation v2.
+  payload, citation v2. *(Closed by H.11: ingestion job state, retriever
+  query/response, vitals write payload, upload mime/filename (size =
+  multipart limits by design, doc_type was already Zod). Extraction
+  outputs, graph contracts, citation v2 were already schema'd.)*
 - [x] `docs/w2/migration-notes.md` (or section in W2_ARCHITECTURE.md) records
   every schema change from Week 1 (citation v2 is the first entry).
 - [x] Data-authority table (in W2_ARCHITECTURE.md §data-model): per data type —

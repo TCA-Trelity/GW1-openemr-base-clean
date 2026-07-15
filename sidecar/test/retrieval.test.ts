@@ -9,6 +9,7 @@ import { CohereEmbeddings, HashEmbeddings, RetrievalProviderError } from '../src
 import { CohereReranker, PassthroughReranker } from '../src/retrieval/rerank.js';
 import { rewriteQuery, scrubQuery } from '../src/retrieval/queryPolicy.js';
 import { HybridRetriever, loadCorpusChunks, reciprocalRankFusion } from '../src/retrieval/retriever.js';
+import { RetrievalResultSchema } from '../src/schemas/retrieval.js';
 
 const CORPUS_DIR = fileURLToPath(new URL('../corpus/', import.meta.url));
 
@@ -133,6 +134,27 @@ describe('HybridRetriever over the real corpus (offline backends)', () => {
             correlationId: 'corr-pg-seam',
         });
         expect(consulted).toEqual(['corr-pg-seam']);
+    });
+
+    it('search() rejects malformed options at the boundary (topK 0, unknown key) instead of misbehaving downstream', async () => {
+        const retriever = await build();
+        // topK 0 would silently return nothing useful — the contract stops it at entry.
+        await expect(retriever.search('hydroxychloroquine screening interval', { topK: 0 })).rejects.toThrow(/topK/);
+        // An invented option key is a caller bug, not a silent no-op (.strict()).
+        await expect(
+            retriever.search('hydroxychloroquine screening interval', { maxResults: 3 } as never),
+        ).rejects.toThrow(/unrecognized key/i);
+    });
+
+    it('a real search result parses under RetrievalResultSchema — hit and honest-empty alike', async () => {
+        const retriever = await build();
+        const hit = await retriever.search('hydroxychloroquine daily dose threshold real body weight screening');
+        expect(hit.empty).toBe(false);
+        expect(() => RetrievalResultSchema.parse(hit)).not.toThrow();
+
+        const miss = await retriever.search('knee replacement rehabilitation weight bearing protocol');
+        expect(miss.empty).toBe(true);
+        expect(() => RetrievalResultSchema.parse(miss)).not.toThrow();
     });
 
     it('emits retrieval_hit / retrieval_miss structured events with chunk ids, never text (G5)', async () => {

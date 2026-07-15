@@ -17,9 +17,12 @@ import {
     mapIntakeVitals,
     MemoryIngestionRecordStore,
     patientMismatch,
+    type IngestionRecord,
+    type IngestionRecordStore,
 } from '../src/ingest/service.js';
 import type { AnthropicCompletion } from '../src/prep/anthropic.js';
 import type { ExtractionResult } from '../src/schemas/extraction.js';
+import { IngestionRecordSchema } from '../src/schemas/ingestion.js';
 import type { FactBundle } from '../src/store/factStore.js';
 
 const FIXTURES = fileURLToPath(new URL('../eval/fixtures/documents/', import.meta.url));
@@ -227,6 +230,78 @@ describe('IngestionService end-to-end (A.3/A.6, stubbed VLM over the real fixtur
 
     it('patientMismatch: absent printed identity is NOT a mismatch', () => {
         expect(patientMismatch({ ...RENAL_EXTRACTION, document_patient: null }, { name: 'Anyone Else' })).toBeNull();
+    });
+});
+
+describe('ingestion record contract (H.11, G1 — schema is the source of truth)', () => {
+    const validRecord = (): IngestionRecord => ({
+        id: 'ing-abcdef123456',
+        patient_id: 'margaret-chen',
+        doc_type: 'lab_pdf',
+        filename: 'renal.pdf',
+        mime_type: 'application/pdf',
+        sha3_512: 'a'.repeat(128),
+        correlation_id: 'corr-contract',
+        status: 'received',
+        stages: [{ stage: 'received', at: '2026-07-15T00:00:00.000Z' }],
+        openemr_document_id: null,
+        source_document_id: null,
+        grounding: null,
+        facts_persisted: 0,
+        vitals_written: false,
+        error: null,
+        created_at: '2026-07-15T00:00:00.000Z',
+    });
+
+    it('the record store rejects a hand-built record violating the ingestion contract — drift fails at save, not in a consumer', () => {
+        const store = new MemoryIngestionRecordStore();
+
+        // A status outside the enum names the offending field in the failure.
+        expect(() => store.save({ ...validRecord(), status: 'exploded' as never })).toThrow(/status/);
+        // A missing required field fails the same way.
+        const { filename: _dropped, ...withoutFilename } = validRecord();
+        expect(() => store.save(withoutFilename as never)).toThrow(/filename/);
+        // An invented key fails closed (.strict()) instead of riding along silently.
+        expect(() => store.save({ ...validRecord(), invented_key: true } as never)).toThrow(/invented_key/);
+
+        // Nothing invalid was stored, and a valid record still round-trips.
+        expect(store.get('ing-abcdef123456')).toBeUndefined();
+        store.save(validRecord());
+        expect(store.get('ing-abcdef123456')?.status).toBe('received');
+    });
+
+    it('every stage of a real run saves a schema-valid record', async () => {
+        const base = new MemoryIngestionRecordStore();
+        const saved: IngestionRecord[] = [];
+        // Delegating store: snapshot every save so each intermediate stage — not just the
+        // final state — is held to the contract.
+        const records: IngestionRecordStore = {
+            save: (record) => {
+                saved.push(structuredClone(record));
+                base.save(record);
+            },
+            get: (id) => base.get(id),
+            findByHash: (patientId, hash) => base.findByHash(patientId, hash),
+            listForPatient: (patientId) => base.listForPatient(patientId),
+        };
+        const service = new IngestionService({
+            extractor: new VlmExtractor(vlmReturning(JSON.stringify(RENAL_EXTRACTION))),
+            records,
+        });
+        const record = await service.attachAndExtract({
+            patientId: 'margaret-chen',
+            docType: 'lab_pdf',
+            filename: 'renal-panel-clean.pdf',
+            mimeType: 'application/pdf',
+            bytes: cleanRenal,
+            correlationId: 'corr-contract-run',
+            expectedPatient: { name: 'Margaret L. Chen' },
+        });
+        expect(record.status).toBe('complete');
+        expect(saved.length).toBeGreaterThanOrEqual(6); // received + every stage stamp
+        for (const snapshot of saved) {
+            expect(() => IngestionRecordSchema.parse(snapshot)).not.toThrow();
+        }
     });
 });
 

@@ -11,15 +11,14 @@
 //      band, disease tags, laterality, interval math), which is both the privacy control
 //      and the E5 contextual-retrieval improvement: concept queries retrieve better than
 //      prose questions.
-export interface PatientIdentifiers {
-    /** Full name(s) as known to the chart; split into parts and stripped case-insensitively. */
-    names?: readonly string[];
-    /** ISO or as-written DOB strings. */
-    dobs?: readonly string[];
-    mrns?: readonly string[];
-    phones?: readonly string[];
-    addresses?: readonly string[];
-}
+import type { z } from 'zod';
+import { BuiltQuerySchema, PatientIdentifiersSchema, QueryContextSchema } from '../schemas/retrieval.js';
+
+// Contract-first (H.11, REQ G1): these shapes live in src/schemas/retrieval.ts; the
+// runtime types are inferred so every importer keeps this module as its home. They are
+// parsed at the retriever's search() boundary (as part of SearchOptionsSchema) — never
+// re-validated downstream.
+export type PatientIdentifiers = z.infer<typeof PatientIdentifiersSchema>;
 
 const GENERIC_PATTERNS: RegExp[] = [
     /\b\d{4}-\d{2}-\d{2}\b/g, // ISO dates
@@ -61,19 +60,9 @@ export function scrubQuery(raw: string, identifiers: PatientIdentifiers = {}): s
     return scrubbed.replace(/\s+/g, ' ').trim();
 }
 
-export interface QueryContext {
-    /** Clinical concepts to emphasize (drug names, findings) — never identifiers. */
-    concepts?: readonly string[];
-    diseaseTags?: readonly string[];
-    laterality?: 'OD' | 'OS' | 'OU';
-}
+export type QueryContext = z.infer<typeof QueryContextSchema>;
 
-export interface BuiltQuery {
-    /** The PHI-scrubbed, concept-augmented text that may leave the boundary. */
-    query: string;
-    /** Metadata filters applied index-side (E5 contextual retrieval). */
-    filters: { diseaseTags?: readonly string[] };
-}
+export type BuiltQuery = z.infer<typeof BuiltQuerySchema>;
 
 export function rewriteQuery(raw: string, context: QueryContext = {}, identifiers: PatientIdentifiers = {}): BuiltQuery {
     const scrubbed = scrubQuery(raw, identifiers);

@@ -453,7 +453,7 @@ const DATA = {
         { id: "H.8", t: "Correlation-ID walk: one ID survives all 7 boundaries per docs/w2/trace-example.md; fix any drop/regenerate (closes G4's open box)", reqs: ["G4"], deps: "—", s: "pending" },
         { id: "H.9", t: "attach_and_extract SHIPPED as a first-class async graph tool (src/graph/tools.ts AsyncGraphTool contract; intake_extractor invokes it; GraphContractError names the graph_tool boundary) — pinned by test to NEVER join the sync read-only chat tool list", reqs: ["S1/R1"], deps: "—", s: "done" },
         { id: "H.10", t: "Simple per-dependency circuit breaker (Cohere, LLM, OpenEMR): N consecutive failures → short cooldown; /ready reflects open state (hand-rolled per requirements — no library)", reqs: ["G2"], deps: "H.5", s: "pending" },
-        { id: "H.11", t: "Zod on the 4 unchecked shapes: IngestionRecord/IngestionRecordStore (ingest/service.ts:38/59), RetrievalResult/SearchOptions + QueryContext/BuiltQuery (retriever.ts:36/45, queryPolicy.ts:64/71), EhrVitalPayload (standardApi.ts:97), upload ext+size checks (doc_type already zod)", reqs: ["G1","R2"], deps: "—", s: "pending" },
+        { id: "H.11", t: "Zod SHIPPED on the unchecked shapes (schemas/{ingestion,retrieval,ehrWrites}.ts): ingestion record parsed at store save, SearchOptions at retriever entry, EhrVitalPayload before any network call (contract failure = 400, kind validation), upload mime/filename schema-driven (size stays multipart limits); EvidenceSnippet single-homed, contracts.ts mirror deleted; +6 boundary tests", reqs: ["G1","R2"], deps: "—", s: "done" },
         { id: "H.12", t: "Trace-reconstruction tool: everything about one request from its correlation ID + PHI re-audit of log lines added since the last sweep", reqs: ["G4","G18"], deps: "H.8", s: "pending" },
         { id: "H.13", t: "Data-authority ADR section in W2_ARCHITECTURE.md (which facts write to sidecar DB vs OpenEMR, and why) + regression test: a lab fact NEVER triggers an OpenEMR write", reqs: ["G1"], deps: "—", s: "pending" },
         { id: "H.14", t: "Shared extraction schema (schemas/extraction.ts) imported by the panel UI (drops its hand-rolled duplicate) + ≥1 eval asserts an extraction result against the schema directly", reqs: ["R2","D3"], deps: "—", s: "pending" },
@@ -527,7 +527,7 @@ const DATA = {
       { id: "D8", t: "Deployed app, W2 flow public — ready:true, all probes ok, pgvector confirmed in prod", plan: "F.8", done: 1, total: 1, s: "done" },
     ]},
     { name: "Engineering (graded, non-optional)", rows: [
-      { id: "G1", t: "Typed contracts everywhere · migration notes · explicit data authority (open: Zod on the vitals-write payload — route pending)", plan: "A.2, F.7 (+table shipped in W2_ARCHITECTURE §10)", done: 2, total: 3, s: "active" },
+      { id: "G1", t: "Typed contracts everywhere · migration notes · explicit data authority — H.11 closed the Zod-contracts box (incl. vitals-write payload, validated pre-network)", plan: "A.2, F.7, H.11 (+table shipped in W2_ARCHITECTURE §10)", done: 3, total: 3, s: "done" },
       { id: "G2", t: "SLOs · timeouts + retries on all egress (H.5 closed the OpenEMR legs) · circuit behavior = H.10", plan: "A.4, B.4, E.9, H.5", done: 2, total: 3, s: "active" },
       { id: "G3", t: "Raw VLM output never bypasses validation (verified in the 2026-07-14 sweep)", plan: "A.4", done: 1, total: 1, s: "done" },
       { id: "G4", t: "Correlation ID through every W2 boundary; trace from ID alone", plan: "C.5", done: 1, total: 2, s: "active" },

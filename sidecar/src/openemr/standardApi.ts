@@ -6,7 +6,9 @@
 // except the medication list routes, which return the raw service result and 404 on an empty list
 // (RestControllerHelper::responseHandler, :156-169).
 import { createHash } from 'node:crypto';
+import type { z } from 'zod';
 import { withTimeoutAndRetry } from '../lib/httpRetry.js';
+import { EhrVitalPayloadSchema } from '../schemas/ehrWrites.js';
 import type { FetchLike } from './auth.js';
 import type { TokenProvider } from './fhir.js';
 
@@ -100,19 +102,10 @@ export interface EhrEncounterPayload {
     billing_facility?: number;
 }
 
-export interface EhrVitalPayload {
-    // Every field optional (EncounterService::validateVital, :657+). Weight/height are US units
-    // (lbs / inches) — what the stock vitals form stores and displays.
-    bps?: number;
-    bpd?: number;
-    pulse?: number;
-    respiration?: number;
-    temperature?: number;
-    oxygen_saturation?: number;
-    weight?: number;
-    height?: number;
-    note?: string;
-}
+// Every field optional (EncounterService::validateVital, :657+). Contract-first (H.11,
+// REQ G1): the shape lives in src/schemas/ehrWrites.ts and is parsed in addVital()
+// before any network call; the type is inferred so importers keep this module as its home.
+export type EhrVitalPayload = z.infer<typeof EhrVitalPayloadSchema>;
 
 export interface EhrSoapNotePayload {
     subjective?: string;
@@ -338,7 +331,21 @@ export class StandardApiClient {
     }
 
     async addVital(pid: string, eid: string, payload: EhrVitalPayload): Promise<void> {
-        await this.request('POST', `/patient/${encodeURIComponent(pid)}/encounter/${encodeURIComponent(eid)}/vital`, payload);
+        const path = `/patient/${encodeURIComponent(pid)}/encounter/${encodeURIComponent(eid)}/vital`;
+        // Contract boundary (H.11, REQ G1): parse BEFORE any network call — a malformed
+        // vitals payload (negative bps, invented key) fails closed here with kind
+        // 'validation' and never reaches OpenEMR.
+        const parsed = EhrVitalPayloadSchema.safeParse(payload);
+        if (!parsed.success) {
+            throw new StandardApiError(
+                path,
+                400,
+                `vitals payload failed contract: ${parsed.error.issues
+                    .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+                    .join('; ')}`,
+            );
+        }
+        await this.request('POST', path, parsed.data);
     }
 
     async addSoapNote(pid: string, eid: string, payload: EhrSoapNotePayload): Promise<void> {
