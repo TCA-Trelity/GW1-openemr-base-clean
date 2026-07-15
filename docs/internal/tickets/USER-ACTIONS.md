@@ -51,8 +51,17 @@ can open:
 
 **A. Langfuse (cloud.langfuse.com → Traces):**
 
-1. Search `839a5e0f-c334-46b2-b7d9-1e850f98fd4d` (run #30's renal upload) —
-   trace exists and opens.
+> **"Not seeing anything" troubleshooting (2026-07-15):** the sidecar's own
+> probe reports `langfuse: ok` (verified live), so traces ARE being
+> shipped. If the UI looks empty: (1) try the other region host —
+> `us.cloud.langfuse.com` vs `cloud.langfuse.com`; traces live wherever
+> the project whose keys sit on Railway was created; (2) check the
+> org/project picker top-left — pick the project whose API keys you
+> pasted; (3) widen the time filter to "Past 24 hours".
+
+1. Search `839a5e0f-c334-46b2-b7d9-1e850f98fd4d` (run #30's renal upload)
+   or `4a45d4d1-06ae-4b76-89cb-81914e315985` (the in-session live chat
+   repro) — trace exists and opens.
 2. Find the graph/chat trace from ~15:33:50 UTC 2026-07-15 (conversation
    `cf4bfa54-edd3-4c02-a7be-0a8bc3466acc`): check whether `supervisor` shows
    `evidence_retriever` (and critic) as **children nested inside it**.
@@ -67,9 +76,10 @@ can open:
 1. Search `blockedFacts` around **15:01–15:07 UTC** (prep correlation
    `e0b043a1-1eaa-400d-813c-a5299b16cc63`) — paste the log line(s) in chat.
    This names exactly which 5 prep claims got blocked and why (finding 1).
-2. Search the critic/gate rejection logged around **15:33:50–54 UTC** for
-   the chat turn above — paste it too. This shows why the live evidence
-   answer released zero citations (finding 2).
+2. ~~Search the critic/gate rejection for the chat turn~~ **No longer
+   needed** — finding 2 was root-caused in-session by direct live repro
+   once network access opened (composer paraphrases; verbatim gate
+   strips). The fix is ticket H.4b on the branch.
 
 **Report in chat:** the two pasted log lines + "trace visible, nested,
 clean" (or what you actually see). The agent turns them into either a
