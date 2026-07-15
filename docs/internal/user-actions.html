@@ -75,13 +75,13 @@
 <body>
 <div class="wrap">
 <header>
-  <h1>User actions — ARCHIVE <span style="font-weight:400;font-size:14px;color:var(--muted)">(completed 2026-07-14)</span></h1>
-  <p><b>Nothing left to do here.</b> All 8 actionable items are complete and verified live
-     (<code>ready: true</code>, all W2 probes <code>ok</code>, held across redeploys); item 4 (LangSmith)
-     is on hold by user decision. This page is kept as a reference — click any card to expand its
-     original instructions (useful if a credential ever needs re-doing). What remains for Week 2 lives
-     on the <a href="build-status.html"><b>build board</b></a>: the Manual test plan tab and the open
-     rows in the requirements matrix.</p>
+  <h1>User actions <span style="font-weight:400;font-size:14px;color:var(--muted)">(reopened 2026-07-15 — merged follow-on plan)</span></h1>
+  <p><b>Two live items:</b> <b>9</b> (optional network-policy widen — unblocks in-session live checks;
+     H.4 runs via CI dispatch either way) and <b>10</b> (a 2-minute Langfuse eyeball once the agent posts
+     a correlation id). Items <b>11–13</b> are parked until after the grading window. The 8 original W2
+     items below them are the completed archive (verified 2026-07-14; item 4 on hold) — click any card to
+     expand its original instructions. Build work tracks on the
+     <a href="build-status.html"><b>build board</b></a> (sections T1/T2).</p>
 </header>
 
 <div class="navrow">
@@ -105,6 +105,9 @@
   The sidecar image needed <code>COPY corpus</code> (fixed, PR #11). pgvector dense index confirmed in
   production: 71 vectors persisted, reused on restart.
 </div>
+
+<h2 style="font-size:15px;margin:18px 0 8px;color:var(--muted)">Merged follow-on plan — items 9–13 (9–10 live, 11–13 parked)</h2>
+<main id="active"></main>
 
 <h2 style="font-size:15px;margin:18px 0 8px;color:var(--muted)">Archive — original instructions, collapsed</h2>
 <main id="items"></main>
@@ -236,6 +239,60 @@ cd sidecar</code></pre>
 <pre><button class="copy">copy</button><code>gh workflow run "Sidecar Evals" --ref main</code></pre>
 <div class="verify"><b>Verify:</b> the run goes green; open it → the <b>Artifacts</b> section at the bottom has <code>eval-results</code>. The scheduled live-model suite (<code>LIVE_EVALS=1</code>) rides ticket F.6 — this dispatch proves the pipe.</div>`},
 ];
+
+const ACTIVE_ITEMS = [
+{ id:'b9', order:'live · optional', title:'9 · Widen the Claude Code environment network policy', sub:'Optional but unblocking — the plan-executing session cannot reach Railway/Langfuse (proxy 403, verified 2026-07-15). H.4 still runs via CI dispatch without this.', body:`
+<p><b>Where:</b> claude.ai → Code → the environment this session runs in → Environment settings → Network policy
+(<a href="https://code.claude.com/docs/en/claude-code-on-the-web" target="_blank" rel="noopener">docs</a>). Add to the allowlist:</p>
+<table><tr><th>Domain</th><th>Why</th></tr>
+<tr><td><code>enchanting-mercy-production-5d32.up.railway.app</code></td><td>deployed sidecar + panel</td></tr>
+<tr><td><code>gw1-openemr-base-clean-production.up.railway.app</code></td><td>deployed EHR</td></tr>
+<tr><td><code>cloud.langfuse.com</code></td><td>Langfuse API (also <code>us.cloud.langfuse.com</code> if your project shows the US host)</td></tr>
+<tr><td><code>api.cohere.com</code></td><td>only if you also want in-session Cohere probes</td></tr></table>
+<div class="verify"><b>Verify:</b> say "network policy updated" in chat — the agent re-runs the <code>/ready</code> curl and reports the probe JSON.</div>`},
+
+{ id:'b10', order:'live · ~2 min', title:'10 · Langfuse eyeball: H.4 trace + H.7 span nesting', sub:'Wait for the agent to post an x-correlation-id from the H.4 live-smoke run (chat + build board T1).', body:`
+<ol>
+<li>Open your Langfuse project (<a href="https://cloud.langfuse.com" target="_blank" rel="noopener">cloud.langfuse.com</a>) → <b>Traces</b> → search the posted correlation id.</li>
+<li>Confirm the trace opens and the graph turn shows <code>supervisor</code> with <code>evidence_retriever</code> (and critic) as <b>children nested inside it</b> — not siblings (H.7/G13's visual half).</li>
+<li>Privacy spot-check: spans carry ids/hashes/counts — no patient names, no document text.</li>
+</ol>
+<div class="verify"><b>Report in chat:</b> "trace visible, nested, clean" — or paste what you actually see (a flat/sibling layout means H.7's code half has a bug to fix).</div>`},
+
+{ id:'b11', order:'parked · post-grading', title:'11 · Alert notification destination (J.1)', sub:'No action now — parked until the grading window closes.', body:`
+<p>When J.1 starts you'll need ONE of: a Langfuse alert/webhook configured in the Langfuse UI, <b>or</b> a Slack incoming-webhook URL dropped as a sidecar Railway variable (exact name set by the J.1 spec, e.g. <code>ALERT_WEBHOOK_URL</code>). The ticket spec (<a href="tickets/">docs/internal/tickets/</a>) carries the click path when it's time.</p>`},
+
+{ id:'b12', order:'parked · post-grading', title:'12 · Railway staging + PHP required checks (J.3/J.4)', sub:'No action now — parked until the grading window closes.', body:`
+<p>J.3 needs Railway dashboard clicks (staging/preview environment + a manual promote step). J.4 ends with two retargeted PHP workflows added as <b>required checks</b> in branch protection — same click path as archive item 7. The ticket specs carry exact steps.</p>`},
+
+{ id:'b13', order:'parked · post-crunch', title:'13 · Domain-expert scoring batch (CT7, ~30 min)', sub:'No action now — parked until after the submission crunch.', body:`
+<p>CT7's LLM-judge scorecard needs a one-time human-scored batch for agreement stats: the script generates a scoring sheet; a clinical domain expert scores the full-answer cases by hand.</p>`},
+];
+
+const activeMain = document.getElementById('active');
+for (const item of ACTIVE_ITEMS) {
+  const parked = item.order.startsWith('parked');
+  const card = document.createElement('section');
+  card.className = 'card';
+  const saved = localStorage.getItem('ua-' + item.id) === '1';
+  card.innerHTML = `
+    <div class="head">
+      <input type="checkbox" ${saved ? 'checked' : ''} ${parked ? 'disabled' : ''}>
+      <div class="t"><b>${item.title}</b><div class="sub">${item.sub}</div></div>
+      <span class="order">${item.order}</span>
+    </div>
+    <div class="body links">${item.body}</div>`;
+  if (saved) card.classList.add('done');
+  activeMain.appendChild(card);
+  card.querySelector('.head').addEventListener('click', (e) => {
+    if (e.target.type === 'checkbox') return;
+    card.classList.toggle('open');
+  });
+  card.querySelector('input').addEventListener('change', (e) => {
+    localStorage.setItem('ua-' + item.id, e.target.checked ? '1' : '0');
+    card.classList.toggle('done', e.target.checked);
+  });
+}
 
 const main = document.getElementById('items');
 

@@ -1,9 +1,77 @@
 # USER-ACTIONS — the key-drop & click checklist (human-only steps)
 
-> **STATUS: ARCHIVE (2026-07-14).** Every item below is complete and verified
-> live (item 4 on hold by user decision). Nothing here requires action —
-> kept as reference for credential re-dos and troubleshooting. Remaining W2
-> work lives on the build board (manual test plan + open matrix rows).
+> **STATUS: REOPENED (2026-07-15) for the merged follow-on plan.** Items
+> **9–10** below are the live ones (item 9 optional-but-unblocking, item 10
+> a 2-minute eyeball once the agent posts a correlation id). Items **11–13**
+> are parked until after the grading window. Items **0–8** remain the
+> completed W2 archive (verified 2026-07-14; item 4 on hold by user
+> decision) — kept for credential re-dos and troubleshooting.
+
+---
+
+## 9. (Optional, unblocking) Widen the Claude Code environment's network policy
+
+The session executing the merged plan (`docs/internal/merged-plan.md`) sits
+behind a network policy that **denies** the deployed app and Langfuse
+(proxy CONNECT 403 — verified 2026-07-15). H.4's live re-verify still runs
+**without** this item, via the `live-smoke` GitHub Actions dispatch (CI
+runners reach Railway fine). Widening the policy additionally lets the agent
+run live checks directly in-session (and later, CT6's trace-fetch script).
+
+**Where:** claude.ai → Code → the environment this session runs in →
+Environment settings → Network policy (docs:
+https://code.claude.com/docs/en/claude-code-on-the-web). Add these domains
+to the allowlist:
+
+| Domain | Why |
+|---|---|
+| `enchanting-mercy-production-5d32.up.railway.app` | deployed sidecar + panel |
+| `gw1-openemr-base-clean-production.up.railway.app` | deployed EHR |
+| `cloud.langfuse.com` | Langfuse API (add `us.cloud.langfuse.com` too if your project shows the US host) |
+| `api.cohere.com` | only if you also want in-session Cohere probes |
+
+**Verify:** tell the agent "network policy updated" — it re-runs
+`curl -s https://enchanting-mercy-production-5d32.up.railway.app/ready` and
+reports the probe JSON in chat.
+
+## 10. Langfuse eyeball: H.4's live-run trace + H.7's span nesting (~2 min)
+
+Wait until the agent posts an `x-correlation-id` from the H.4 live-smoke
+run (it lands in chat and on the build board's T1 section).
+
+1. Open your Langfuse project (cloud.langfuse.com) → **Traces** → search the
+   posted correlation id.
+2. Confirm: the trace exists and opens; the graph turn shows
+   `supervisor` with `evidence_retriever` (and critic) as **children inside
+   it** — nested, not siblings (this is H.7/G13's visual half).
+3. Spot-check privacy: spans carry ids/hashes/counts — no patient names, no
+   document text.
+
+**Report in chat:** "trace visible, nested, clean" (or paste what you see
+instead — a flat/sibling layout means H.7's code half has a bug to fix).
+
+## 11. (Parked — post-grading, J.1) Alert notification destination
+
+When J.1 starts you'll need ONE of: a Langfuse alert/webhook configured in
+the Langfuse UI, **or** a Slack incoming-webhook URL dropped as a sidecar
+Railway variable (name TBD by the J.1 spec, e.g. `ALERT_WEBHOOK_URL`). No
+action now — the J.1 ticket spec (docs/internal/tickets/J.1) carries the
+exact click path when it's time.
+
+## 12. (Parked — post-grading, J.3/J.4) Railway staging + PHP required checks
+
+J.3 needs Railway dashboard clicks (enable a staging/preview environment and
+a manual promote step). J.4 ends with two retargeted PHP workflows added as
+required checks in GitHub branch protection (same click path as item 7). No
+action now — the ticket specs carry the exact steps.
+
+## 13. (Parked — post-crunch, CT7) Domain-expert scoring batch (~30 min)
+
+CT7's LLM-judge scorecard needs a one-time human-scored batch for agreement
+stats: the script generates a scoring sheet; a clinical domain expert fills
+in scores for the full-answer cases. No action now.
+
+---
 
 > **Human surface: [`../user-actions.html`](../user-actions.html)** — the same
 > checklist as an interactive form (checkboxes persist in-browser, copy
