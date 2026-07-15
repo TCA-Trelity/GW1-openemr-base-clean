@@ -2,6 +2,10 @@
 # session cannot), so this workflow is the session's eyes on prod. With a
 # sidecar_url input it also runs the full end-to-end: trigger a real prep for
 # the seeded patient and assert the gate-checked brief exists.
+# W2 leg (H.4, merged-plan Track 1): upload a fixture lab PDF → staged
+# ingestion to 'complete' → grounding summary → stored-file (overlay source)
+# → guideline evidence search → cited chat evidence turn. Prints the upload's
+# x-correlation-id for the Langfuse eyeball (USER-ACTIONS item 10).
 name: Live smoke
 
 on:
@@ -36,6 +40,9 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
+      # The W2 leg uploads a committed fixture PDF, so it needs the repo.
+      - uses: actions/checkout@v4
+
       - name: Probe EHR login page and FHIR endpoint
         env:
           APP_URL: https://gw1-openemr-base-clean-production.up.railway.app
@@ -154,3 +161,81 @@ jobs:
 
           echo "== Brief summary =="
           jq '{prepared_at: .prepared_at, urgency: .content.urgency, discussion_points: (.content.key_discussion_points | length), facts: (.content.facts_by_type | to_entries | map({(.key): (.value | length)}) | add), gate: .content.gate_metrics}' /tmp/brief.json
+
+      - name: W2 document flow — upload, extraction, grounding, cited evidence turn (H.4)
+        if: ${{ env.SIDECAR_URL != '' }}
+        run: |
+          set -uo pipefail
+          FIXTURE=sidecar/eval/fixtures/documents/renal-panel-clean.pdf
+          [ -f "$FIXTURE" ] || { echo "fixture missing at $FIXTURE"; exit 1; }
+
+          echo "== Physician token (write path requires it regardless of AUTH_MODE) =="
+          TOKEN=$(curl -s -X POST "$SIDECAR_URL/api/dev-login" -H 'content-type: application/json' \
+            -d '{"role":"physician","patient":"margaret-chen"}' | jq -r '.access_token // empty')
+          [ -n "$TOKEN" ] || { echo "dev-login disabled — the W2 write path cannot be smoked without it"; exit 1; }
+          AUTH=(-H "Authorization: Bearer $TOKEN")
+
+          echo "== POST /api/patients/margaret-chen/documents (multipart lab_pdf) =="
+          code=$(curl -s -D /tmp/up.headers -o /tmp/up.json -w '%{http_code}' --max-time 60 "${AUTH[@]}" \
+            -F "doc_type=lab_pdf" -F "file=@$FIXTURE;type=application/pdf" \
+            "$SIDECAR_URL/api/patients/margaret-chen/documents")
+          echo "HTTP $code"; cat /tmp/up.json; echo
+          case "$code" in 200|202) : ;; *) echo "upload FAILED"; exit 1 ;; esac
+          ING=$(jq -r '.ingestion_id // empty' /tmp/up.json)
+          [ -n "$ING" ] || { echo "no ingestion_id in upload response"; exit 1; }
+          CORR=$(grep -i '^x-correlation-id:' /tmp/up.headers | tr -d '\r' | awk '{print $2}')
+          echo "ingestion: $ING"
+          echo "############################################################"
+          echo "## LANGFUSE EYEBALL (USER-ACTIONS item 10):"
+          echo "## search this trace id: ${CORR:-<x-correlation-id header absent>}"
+          echo "############################################################"
+
+          echo "== Poll /api/ingestions/$ING to 'complete' (SLO p95 <= 90 s; byte-identical re-runs dedupe fast) =="
+          status=""
+          for i in $(seq 1 36); do
+            curl -s --max-time 30 "${AUTH[@]}" "$SIDECAR_URL/api/ingestions/$ING" -o /tmp/ing.json || true
+            status=$(jq -r '.status // empty' /tmp/ing.json)
+            echo "attempt $i: status=$status"
+            case "$status" in
+              complete) break ;;
+              failed_*|blocked_*) echo "ingestion terminal failure:"; cat /tmp/ing.json; exit 1 ;;
+            esac
+            sleep 5
+          done
+          [ "$status" = "complete" ] && echo "ingestion complete" || { echo "ingestion never completed"; cat /tmp/ing.json; exit 1; }
+
+          echo "== Grounding + persistence assertions =="
+          jq -e '.facts_persisted >= 1' /tmp/ing.json >/dev/null \
+            && echo "facts persisted: $(jq '.facts_persisted' /tmp/ing.json) OK" || { echo "no facts persisted"; exit 1; }
+          jq -e '.grounding.word_box >= 1' /tmp/ing.json >/dev/null \
+            && echo "grounding word_box: $(jq '.grounding.word_box' /tmp/ing.json) OK (tight boxes exist for the overlay)" \
+            || { echo "no word_box grounding on the clean fixture"; jq '.grounding' /tmp/ing.json; exit 1; }
+
+          echo "== GET /api/ingestions/$ING/file (the bytes the citation overlay renders) =="
+          ctype=$(curl -s -o /tmp/stored.pdf -w '%{content_type}' --max-time 30 "${AUTH[@]}" "$SIDECAR_URL/api/ingestions/$ING/file")
+          case "$ctype" in application/pdf*) echo "stored original OK ($ctype, $(wc -c < /tmp/stored.pdf) bytes)" ;; *) echo "file fetch FAILED ($ctype)"; exit 1 ;; esac
+
+          echo "== POST /api/evidence/search (guideline corpus, same retrieval the chat uses) =="
+          curl -s -X POST --max-time 30 "$SIDECAR_URL/api/evidence/search" -H 'content-type: application/json' \
+            -d '{"q":"hydroxychloroquine screening interval"}' -o /tmp/search.json
+          jq -e '(.results // .snippets // []) | length > 0' /tmp/search.json >/dev/null \
+            && echo "evidence search: $(jq '(.results // .snippets // []) | length' /tmp/search.json) hits OK" \
+            || { echo "evidence search returned nothing"; cat /tmp/search.json | head -c 400; exit 1; }
+          echo "rerank_applied: $(jq -r '.rerank_applied // "absent"' /tmp/search.json) (informational — false means Cohere degraded/passthrough)"
+
+          echo "== Chat evidence turn (SSE): should cite guidelines + the uploaded lab =="
+          curl -sN -X POST --max-time 90 "${AUTH[@]}" -H 'content-type: application/json' \
+            -d '{"message":"What screening interval do our practice protocols recommend for her hydroxychloroquine, given the new eGFR?"}' \
+            "$SIDECAR_URL/api/chat/margaret-chen" > /tmp/chat.sse || true
+          grep -q '"type":"status"' /tmp/chat.sse \
+            && echo "SSE status event seen (evidence path engaged)" \
+            || echo "note: no status event (fast path answered — acceptable but unexpected for this question)"
+          grep -q '"citations":\[' /tmp/chat.sse || { echo "no citations event in the stream"; tail -c 800 /tmp/chat.sse; exit 1; }
+          grep -q 'guideline_evidence' /tmp/chat.sse \
+            && echo "guideline citation present OK" || { echo "no guideline_evidence citation"; tail -c 800 /tmp/chat.sse; exit 1; }
+          grep -qi 'egfr' /tmp/chat.sse \
+            && echo "answer references the eGFR (uploaded lab in play) OK" \
+            || echo "note: answer does not mention eGFR verbatim (soft check — read the transcript)"
+          echo "== last chat events =="
+          tail -c 1200 /tmp/chat.sse; echo
+          echo "W2 leg PASSED — correlation id for Langfuse: ${CORR:-unknown}"
