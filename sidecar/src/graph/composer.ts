@@ -7,7 +7,18 @@
 // Failure philosophy mirrors LlmRouterModel: the composer can NEVER throw. Budget denial,
 // API errors, timeouts, and unparseable output all degrade to an honest-failure answer
 // with zero claims — a broken composition must never wedge a chat turn.
+//
+// H.4b (live finding, 2026-07-15): the deployed model NEAR-quotes — it mutates
+// punctuation/units/plurals inside excerpt_text — so every claim died at the gate
+// (excerpt_mismatch) and correct answers shipped uncited. Ingestion hit the identical
+// failure mode and fixed it with a pre-gate validation + ONE feedback retry
+// (extraction.ts weakCitations); the same discipline applies here: after parsing, the
+// draft's citations run through the critic's own gate function, and a mismatch earns
+// exactly one retry listing the failing excerpts. Claims are still never filtered here —
+// a draft that misses twice returns as-is and the critic blocks it (honest degrade,
+// blocked-count telemetry intact, spend bounded at the same two-calls-per-compose cap).
 import { z } from 'zod';
+import { runCitationGate, type Claim, type DocumentTextResolver } from '../gate/citationGate.js';
 import type { AnthropicCompletion, AnthropicMessage } from '../prep/anthropic.js';
 import type { LlmCallRecord } from '../prep/budget.js';
 import { CitationRefSchema } from '../schemas/citations.js';
@@ -62,6 +73,10 @@ function systemPrompt(evidence: EvidenceSnippet[]): string {
         'ONLY these snippets. A deterministic gate verifies every quote you cite against',
         'the snippet bodies verbatim and BLOCKS any claim whose quote does not match —',
         'so every "excerpt_text" must be a VERBATIM substring of one snippet\'s quote body.',
+        'Copy each excerpt_text CHARACTER-FOR-CHARACTER from the snippet: a short',
+        'contiguous fragment, exactly as written. Never re-punctuate, never normalize',
+        'units or numbers, never pluralize, never reword. Locate the sentence in the',
+        'snippet and copy it precisely; do not reconstruct it from memory.',
         '',
         'Output STRICT JSON and nothing else (no prose, no markdown fences):',
         '{ "text": string, "claims": [ { "id": string, "citations": [ CITATION ] } ] }',
@@ -80,6 +95,53 @@ function systemPrompt(evidence: EvidenceSnippet[]): string {
         'SNIPPETS:',
         blocks,
     ].join('\n');
+}
+
+// H.4b verbatim pre-check: the critic's own gate (runCitationGate — exact range, then
+// indexOf, then whitespace-run-flexible search) run over the parsed draft against the
+// same snippet-quote resolution the critic node uses. Reused, never re-implemented, so
+// the pre-check can never drift from what the gate will actually enforce.
+function verbatimCitationIssues(
+    claims: Claim[],
+    evidence: EvidenceSnippet[],
+): { failedClaimIds: string[]; issues: string[] } {
+    const resolve: DocumentTextResolver = (chunkId) => evidence.find((snippet) => snippet.chunk_id === chunkId)?.quote;
+    const gate = runCitationGate(claims, resolve);
+    const failedClaimIds: string[] = [];
+    const issues: string[] = [];
+    gate.verdicts.forEach((verdict, claimIndex) => {
+        if (verdict.status === 'verified') {
+            return;
+        }
+        failedClaimIds.push(verdict.id);
+        if (verdict.citations.length === 0) {
+            issues.push(`claims.${String(claimIndex)} (id=${verdict.id}): at least one citation quoting a snippet is required`);
+            return;
+        }
+        verdict.citations.forEach((entry, citationIndex) => {
+            if (entry.check.result === 'ok_range' || entry.check.result === 'ok_search') {
+                return;
+            }
+            const path = `claims.${String(claimIndex)}.citations.${String(citationIndex)}`;
+            if (entry.check.result === 'missing_document') {
+                issues.push(`${path}.source_document_id: ${JSON.stringify(entry.citation.source_document_id)} is not a provided snippet chunk_id`);
+                return;
+            }
+            issues.push(
+                `${path}.excerpt_text: ${JSON.stringify(entry.citation.excerpt_text)} is not a verbatim substring of snippet ${JSON.stringify(entry.citation.source_document_id)}'s quote body — copy a short contiguous fragment character-for-character from that snippet`,
+            );
+        });
+    });
+    return { failedClaimIds, issues };
+}
+
+// Mirror of extraction.ts's validation-feedback message: the errors, then the demand.
+function verbatimFeedback(issues: string[]): string {
+    return `Your answer failed citation verification with these errors:\n${issues
+        .map((issue) => `- ${issue}`)
+        .join(
+            '\n',
+        )}\nEvery excerpt_text must be copied CHARACTER-FOR-CHARACTER from one snippet's quote body — a short contiguous fragment; no re-punctuation, no unit normalization, no pluralization, no rewording. Reply again with a single corrected JSON object only.`;
 }
 
 export class LlmAnswerComposer implements AnswerComposer {
@@ -108,7 +170,40 @@ export class LlmAnswerComposer implements AnswerComposer {
             );
             const parsed = this.parse(first.text);
             if (parsed !== null) {
-                return parsed;
+                const precheck = verbatimCitationIssues(parsed.claims, evidence);
+                if (precheck.issues.length === 0) {
+                    return parsed;
+                }
+                // H.4b: ONE validation-feedback retry (the extraction.ts discipline) —
+                // the failing excerpts go back to the model with the demand to copy
+                // character-for-character. PHI-safe log: counts + model-minted claim
+                // ids only, never excerpt or snippet text.
+                this.logger?.warn(
+                    {
+                        correlation_id: correlationId,
+                        failed_claims: precheck.failedClaimIds.length,
+                        citation_issues: precheck.issues.length,
+                        claim_ids: precheck.failedClaimIds,
+                    },
+                    'composer_excerpt_retry',
+                );
+                const retry = await this.record(
+                    correlationId,
+                    this.client.complete(
+                        system,
+                        [
+                            { role: 'user', content: question },
+                            { role: 'assistant', content: first.text },
+                            { role: 'user', content: verbatimFeedback(precheck.issues) },
+                        ],
+                        correlationId,
+                    ),
+                );
+                // Never loop more than once (SpendGuard): whatever comes back ships to
+                // the critic, which blocks anything still unverifiable (honest degrade —
+                // identical terminal behavior to today). An unparseable retry falls back
+                // to the first parsed draft rather than losing the answer text.
+                return this.parse(retry.text) ?? parsed;
             }
             // One repair attempt: show the model its broken output, demand only the JSON.
             const repair = await this.record(
@@ -125,6 +220,9 @@ export class LlmAnswerComposer implements AnswerComposer {
             );
             const repaired = this.parse(repair.text);
             if (repaired !== null) {
+                // Two calls already spent — no verbatim retry on the repair path (the
+                // same per-compose spend cap as today); the critic blocks any residual
+                // paraphrase and the blocked-count telemetry still fires.
                 return repaired;
             }
             this.logger?.warn({ correlation_id: correlationId }, 'composer_unparseable');

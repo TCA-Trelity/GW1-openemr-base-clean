@@ -310,6 +310,10 @@ all six categories measured and baselined** (`eval/baseline.json`); rehearsal
 proves the gate catches injected regressions (`docs/w2/gate-rehearsal.md`);
 **`Run eval suite` is a required check on `main`** (branch protection flipped
 2026-07-13). Remaining: the scheduled live-model suite (F.6, post key-drop).
+Known blind spot (H.4a→H.4b, 2026-07-15): graph-path evals stub the composer
+with exact quotes, so live-composer paraphrase drift was invisible to the
+58-case gate — covered by composer unit tests since H.4b; the scheduled
+live-model leg (F.6) is the durable catch-net.
 
 **Acceptance criteria:**
 - [x] 50 committed golden cases, extraction-weighted (locked): ~20 extraction
@@ -440,7 +444,7 @@ when PR #9's build deploys. LangSmith fenced to the demo env (E.5); no OTEL.
 
 | ID | Spec item | Status / decision |
 |----|-----------|-------------------|
-| E1 | *"Critic agent that rejects uncited claims or unsafe action suggestions."* | **Committed.** Week 1's deterministic citation gate + prescriptiveness lint promoted to the graph's answer-side critic node. Acceptance: no answer leaves the graph without passing the critic node; rejections logged with reason. H.6 (merged plan) adds gate-unit reject proof for page/page_bbox + guideline_evidence citations — 7 reject-path cases in `sidecar/test/gate.test.ts`; the gate rejected both on first run. |
+| E1 | *"Critic agent that rejects uncited claims or unsafe action suggestions."* | **Committed.** Week 1's deterministic citation gate + prescriptiveness lint promoted to the graph's answer-side critic node. Acceptance: no answer leaves the graph without passing the critic node; rejections logged with reason. H.6 (merged plan) adds gate-unit reject proof for page/page_bbox + guideline_evidence citations — 7 reject-path cases in `sidecar/test/gate.test.ts`; the gate rejected both on first run. H.4b (2026-07-15, live): the critic correctly blocked near-verbatim composer quotes in production; the composer now pre-checks with the gate's own verification and retries once with feedback — gate semantics untouched. |
 | E2 | *"Click-to-source UI for citation snippets, with a simple document preview."* | **Delivered via R5** (required bbox overlay implies preview + click-to-source). Acceptance folded into R5. |
 | E3 | *"A third document type such as referral fax or medication list."* | **Not committed** — framed "seam built, sequenced next" (schema enum + doc-type registry designed for extension; referral fax is the designed slot, UC-3). |
 | E4 | *"Lab trend chart widget that uses extracted Observation data."* | **Not committed** this week — seam: extracted lab facts carry `{test_name, value, unit, collection_date}` sufficient for the panel's existing `Trends.tsx` pattern to consume later. |

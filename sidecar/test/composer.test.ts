@@ -130,3 +130,129 @@ describe('LlmAnswerComposer (E.9)', () => {
         expect(warnings.filter((msg) => msg === 'composer_failed')).toHaveLength(2);
     });
 });
+
+// H.4b: the live model NEAR-quotes (re-punctuates, normalizes units, pluralizes) so the
+// verbatim gate blocked every claim and correct answers shipped uncited. The composer now
+// pre-checks parsed excerpts with the gate's own verification and retries ONCE with the
+// extraction.ts-style validation feedback; a second miss falls through for the critic to
+// block, exactly as today. These tests pin call counts — the SpendGuard contract.
+const PARAPHRASED_EXCERPT = 'Yearly screening begins after 5 years of use';
+const PARAPHRASED_JSON = VALID_JSON.replace('Annual screening begins after five years of use', PARAPHRASED_EXCERPT);
+
+describe('LlmAnswerComposer verbatim excerpt pre-check (H.4b)', () => {
+    it('retries once with verbatim-quote feedback when the model paraphrases instead of quoting', async () => {
+        const complete = vi
+            .fn()
+            .mockResolvedValueOnce(completion(PARAPHRASED_JSON))
+            .mockResolvedValueOnce(completion(VALID_JSON));
+        const recordCall = vi.fn(async () => {});
+        const composer = new LlmAnswerComposer({ complete }, { recordCall, assertBudget: async () => {} });
+        const draft = await composer.compose(ASK, [SNIPPET], null, 'h4b-1');
+        expect(complete).toHaveBeenCalledTimes(2);
+        expect(recordCall).toHaveBeenCalledTimes(2); // both calls hit the $5/day ledger
+        expect(draft.claims).toHaveLength(1);
+        expect(draft.claims[0]!.citations[0]!.excerpt_text).toBe('Annual screening begins after five years of use');
+        // The retry threads the failed attempt back and names the offending excerpt.
+        const retryMessages = complete.mock.calls[1]![1] as { role: string; content: string }[];
+        expect(retryMessages).toHaveLength(3);
+        expect(retryMessages[1]).toEqual({ role: 'assistant', content: PARAPHRASED_JSON });
+        expect(retryMessages[2]!.role).toBe('user');
+        expect(retryMessages[2]!.content).toContain('failed citation verification');
+        expect(retryMessages[2]!.content).toContain(PARAPHRASED_EXCERPT);
+        expect(retryMessages[2]!.content).toContain('CHARACTER-FOR-CHARACTER');
+    });
+
+    it('falls through to the critic after the single retry when the model paraphrases twice', async () => {
+        const complete = vi.fn().mockResolvedValue(completion(PARAPHRASED_JSON));
+        const composer = new LlmAnswerComposer({ complete });
+        const draft = await composer.compose(ASK, [SNIPPET], null, 'h4b-2');
+        expect(complete).toHaveBeenCalledTimes(2); // never a third call (SpendGuard)
+        // Unchanged terminal behavior: the paraphrased draft ships to the critic, which
+        // blocks the claim — the composer never filters and never fails the whole turn.
+        expect(draft.claims).toHaveLength(1);
+        expect(draft.claims[0]!.citations[0]!.excerpt_text).toBe(PARAPHRASED_EXCERPT);
+        expect(draft.text).not.toContain('could not compose');
+    });
+
+    it('spends no retry when the model quotes verbatim on the first call', async () => {
+        const complete = vi.fn().mockResolvedValue(completion(VALID_JSON));
+        const composer = new LlmAnswerComposer({ complete });
+        const draft = await composer.compose(ASK, [SNIPPET], null, 'h4b-3');
+        expect(complete).toHaveBeenCalledTimes(1); // no retry cost on the happy path
+        expect(draft.claims).toHaveLength(1);
+    });
+
+    it('does not retry over whitespace runs the gate already tolerates', async () => {
+        // The corpus carries OCR-style double spaces; the gate's whitespace-flexible
+        // search accepts a single-spaced quote of them. The pre-check must apply the
+        // SAME normalization (it reuses the gate), or it would burn retries on drafts
+        // the critic was always going to verify.
+        const doubleSpaced: EvidenceSnippet = {
+            ...SNIPPET,
+            chunk_id: 'renal#egfr-thresholds',
+            quote: 'eGFR >= 60,  no other risk factor: follow the standard screening cadence.',
+        };
+        const singleSpacedQuote = JSON.stringify({
+            text: 'Per the protocol, standard cadence applies at eGFR >= 60 without other risk factors.',
+            claims: [
+                {
+                    id: 'claim-ws',
+                    citations: [
+                        {
+                            id: 'cit-ws',
+                            fact_id: null,
+                            source_label: doubleSpaced.guideline_source,
+                            source_type: 'guideline_evidence',
+                            excerpt_text: 'eGFR >= 60, no other risk factor: follow the standard screening cadence.',
+                            excerpt_location: null,
+                            attribution: null,
+                            source_document_id: doubleSpaced.chunk_id,
+                            document_date: null,
+                            deep_link_url: null,
+                            page_or_section: doubleSpaced.section_title,
+                            field_or_chunk_id: doubleSpaced.chunk_id,
+                        },
+                    ],
+                },
+            ],
+        });
+        const complete = vi.fn().mockResolvedValue(completion(singleSpacedQuote));
+        const composer = new LlmAnswerComposer({ complete });
+        const draft = await composer.compose(ASK, [doubleSpaced], null, 'h4b-4');
+        expect(complete).toHaveBeenCalledTimes(1);
+        expect(draft.claims).toHaveLength(1);
+    });
+
+    it('caps at two calls: a JSON repair that still paraphrases goes to the critic, never a third call', async () => {
+        const complete = vi
+            .fn()
+            .mockResolvedValueOnce(completion('Sure! Screening thoughts follow…'))
+            .mockResolvedValueOnce(completion(PARAPHRASED_JSON));
+        const composer = new LlmAnswerComposer({ complete });
+        const draft = await composer.compose(ASK, [SNIPPET], null, 'h4b-5');
+        expect(complete).toHaveBeenCalledTimes(2);
+        expect(draft.claims[0]!.citations[0]!.excerpt_text).toBe(PARAPHRASED_EXCERPT);
+    });
+
+    it('logs a PHI-safe composer_excerpt_retry event — counts and claim ids, never excerpt text', async () => {
+        const events: { obj: Record<string, unknown>; msg: string }[] = [];
+        const logger = { warn: (obj: Record<string, unknown>, msg: string) => events.push({ obj, msg }) };
+        const complete = vi
+            .fn()
+            .mockResolvedValueOnce(completion(PARAPHRASED_JSON))
+            .mockResolvedValueOnce(completion(VALID_JSON));
+        const composer = new LlmAnswerComposer({ complete }, undefined, logger);
+        await composer.compose(ASK, [SNIPPET], null, 'h4b-6');
+        const retryEvents = events.filter((event) => event.msg === 'composer_excerpt_retry');
+        expect(retryEvents).toHaveLength(1);
+        expect(retryEvents[0]!.obj).toEqual({
+            correlation_id: 'h4b-6',
+            failed_claims: 1,
+            citation_issues: 1,
+            claim_ids: ['claim-1'],
+        });
+        const serialized = JSON.stringify(retryEvents[0]!.obj);
+        expect(serialized).not.toContain(PARAPHRASED_EXCERPT);
+        expect(serialized).not.toContain('Annual screening');
+    });
+});
