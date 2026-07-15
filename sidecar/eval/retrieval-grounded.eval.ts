@@ -5,7 +5,7 @@
 // fusion/floor regression fails these cases identically everywhere.
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { recordEval, type EvalDifficulty } from './collector.js';
+import { recordEval, recordMetric, type EvalDifficulty } from './collector.js';
 import { HashEmbeddings } from '../src/retrieval/embeddings.js';
 import { PassthroughReranker } from '../src/retrieval/rerank.js';
 import { HybridRetriever, loadCorpusChunks } from '../src/retrieval/retriever.js';
@@ -56,6 +56,17 @@ describe('retrieval-grounded goldens (B.6)', () => {
             if (hit) {
                 hits += 1;
             }
+            // CT3 metrics side-channel: 1-based rank of the expected doc's first snippet
+            // in the ACTUAL returned list (the same top-3 window the verdict judges) —
+            // the report derives hit rate + average rank from these, never from `pass`.
+            const rankIndex = docs.indexOf(golden.expectDoc);
+            recordMetric({
+                kind: 'retrieval_rank',
+                evalId: `retrieval-grounded.golden-${golden.id}`,
+                expectedDoc: golden.expectDoc,
+                returnedDocs: docs,
+                rank: rankIndex === -1 ? null : rankIndex + 1,
+            });
             recordEval({
                 id: `retrieval-grounded.golden-${golden.id}`,
                 description: `Canonical ask "${golden.query}" retrieves ${golden.expectDoc} in the top-3 with a quotable chunk`,

@@ -4,8 +4,8 @@
 > (suite: `sidecar/eval/`). Committed as a deliverable and refreshed on every run;
 > CI regenerates and uploads it as an artifact on every push touching `sidecar/**`.
 
-- **Generated:** 2026-07-15T15:12:19.368Z
-- **Commit:** `32bdad08504cab4c79e25901207df43190b07ee1` (workspace HEAD at generation time; in CI, the pushed commit)
+- **Generated:** 2026-07-15T15:16:19.355Z
+- **Commit:** `a0f27beca061ed4b3fd7fec65f1e7e2d7469b109` (workspace HEAD at generation time; in CI, the pushed commit)
 - **Result:** 58/58 evals passed
 
 ## Results
@@ -106,6 +106,16 @@ Case counts per rubric category × difficulty:
 | `safe_refusal` | — | 1 | 7 |
 | `no_phi_in_logs` | — | — | 3 |
 | `retrieval_grounded` | 8 | 3 | 1 |
+
+## Retrieval quality
+
+- **Hit rate:** 10/10 (100.0%) — retrieval goldens whose expected document appears anywhere in the returned results (the eval's top-3 retrieval window, the same list the gate judges).
+- **Average rank:** 1.00 — mean 1-based position of the expected document's first snippet, over the 10 golden(s) where it was found.
+
+A true **precision** metric (how many of the top results are relevant when several
+documents could be) is deliberately absent: each retrieval golden today defines a
+single expected document, so precision cannot be calculated honestly from this set.
+Multi-document goldens are future work — the metric is omitted rather than faked.
 
 ## What these evals are (and are not)
 

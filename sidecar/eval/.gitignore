@@ -1,2 +1,3 @@
-# Intermediate result ledger — the committed deliverable is docs/execution/eval-results.md
+# Intermediate result ledgers — the committed deliverable is docs/execution/eval-results.md
 .results.jsonl
+.metrics.jsonl

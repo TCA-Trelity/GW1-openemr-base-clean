@@ -6,13 +6,14 @@ import { spawnSync } from 'node:child_process';
 import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { RESULTS_PATH } from './collector.js';
+import { METRICS_PATH, RESULTS_PATH } from './collector.js';
 import { applyGate, formatGateReport, readBaseline, readLedgerRecords } from './gate.js';
 import { generateReport } from './report.js';
 
 const sidecarDir = fileURLToPath(new URL('..', import.meta.url));
 
 rmSync(RESULTS_PATH, { force: true });
+rmSync(METRICS_PATH, { force: true });
 
 const vitest = spawnSync(
     process.execPath,

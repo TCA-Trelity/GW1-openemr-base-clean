@@ -52,6 +52,32 @@ export interface EvalRecord {
 
 export const RESULTS_PATH = fileURLToPath(new URL('./.results.jsonl', import.meta.url));
 
+// ---- metrics side-channel (CT3) ----------------------------------------------------
+// Quantitative measurements that ride ALONGSIDE a pass/fail record — never instead of
+// one. First (and so far only) kind: per-golden retrieval rank, so the report can state
+// hit rate and average rank from the actual result lists rather than inferring them from
+// pass booleans. Reporting-only: the gate never reads this ledger.
+
+export interface RetrievalRankMetric {
+    kind: 'retrieval_rank';
+    /** The EvalRecord id this measurement belongs to (`retrieval-grounded.golden-<id>`). */
+    evalId: string;
+    /** The document the golden expects. */
+    expectedDoc: string;
+    /** Ordered doc ids of the snippets the retriever actually returned (top-K window). */
+    returnedDocs: string[];
+    /** 1-based position of expectedDoc's first snippet in returnedDocs; null = not returned. */
+    rank: number | null;
+}
+
+export type EvalMetric = RetrievalRankMetric;
+
+export const METRICS_PATH = fileURLToPath(new URL('./.metrics.jsonl', import.meta.url));
+
+export function recordMetric(metric: EvalMetric): void {
+    appendFileSync(METRICS_PATH, `${JSON.stringify(metric)}\n`, 'utf8');
+}
+
 export function recordEval(record: EvalRecord): void {
     appendFileSync(RESULTS_PATH, `${JSON.stringify(record)}\n`, 'utf8');
     const safetyForcedHard = record.category !== undefined && isSafetyCategory(record.category);

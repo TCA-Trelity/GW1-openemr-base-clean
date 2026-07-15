@@ -6,7 +6,14 @@ import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { categoryForRecord, EVAL_CATEGORIES, isSafetyCategory } from './categories.js';
-import { EVAL_DIFFICULTIES, RESULTS_PATH, type EvalDifficulty, type EvalRecord } from './collector.js';
+import {
+    EVAL_DIFFICULTIES,
+    METRICS_PATH,
+    RESULTS_PATH,
+    type EvalDifficulty,
+    type EvalMetric,
+    type EvalRecord,
+} from './collector.js';
 import { computeCategoryStats } from './gate.js';
 
 const OUTPUT_PATH = fileURLToPath(new URL('../../docs/execution/eval-results.md', import.meta.url));
@@ -66,6 +73,23 @@ function readRecords(): EvalRecord[] {
 
 function cell(value: string | number): string {
     return String(value).replaceAll('|', '\\|').replaceAll('\n', ' ');
+}
+
+/** CT3: read the metrics side-channel ledger (same last-write-wins stance as readRecords). */
+function readMetrics(): EvalMetric[] {
+    if (!existsSync(METRICS_PATH)) {
+        return [];
+    }
+    const byId = new Map<string, EvalMetric>();
+    for (const line of readFileSync(METRICS_PATH, 'utf8').split('\n')) {
+        const trimmed = line.trim();
+        if (trimmed.length === 0) {
+            continue;
+        }
+        const metric = JSON.parse(trimmed) as EvalMetric;
+        byId.set(metric.evalId, metric);
+    }
+    return [...byId.values()].sort((a, b) => a.evalId.localeCompare(b.evalId));
 }
 
 export function generateReport(options: { suiteFailed?: boolean } = {}): ReportSummary {
@@ -186,6 +210,30 @@ export function generateReport(options: { suiteFailed?: boolean } = {}): ReportS
             return n === 0 ? '—' : String(n);
         });
         lines.push(`| \`${category}\` | ${counts.join(' | ')} |`);
+    }
+
+    // CT3 retrieval quality: the two honestly-calculable numbers, derived from the actual
+    // ranked result lists the retrieval eval records into the metrics side-channel —
+    // never inferred from pass/fail booleans.
+    const retrievalMetrics = readMetrics().filter((metric) => metric.kind === 'retrieval_rank');
+    lines.push('', '## Retrieval quality', '');
+    if (retrievalMetrics.length === 0) {
+        lines.push(
+            'No retrieval rank metrics were recorded this run (stale ledger) — rerun `npm run eval`.',
+        );
+    } else {
+        const ranks = retrievalMetrics.flatMap((metric) => (metric.rank === null ? [] : [metric.rank]));
+        const hitRate = (ranks.length / retrievalMetrics.length) * 100;
+        const avgRank = ranks.length === 0 ? null : ranks.reduce((sum, rank) => sum + rank, 0) / ranks.length;
+        lines.push(
+            `- **Hit rate:** ${ranks.length}/${retrievalMetrics.length} (${hitRate.toFixed(1)}%) — retrieval goldens whose expected document appears anywhere in the returned results (the eval's top-3 retrieval window, the same list the gate judges).`,
+            `- **Average rank:** ${avgRank === null ? '— (expected document never returned)' : avgRank.toFixed(2)} — mean 1-based position of the expected document's first snippet, over the ${ranks.length} golden(s) where it was found.`,
+            '',
+            'A true **precision** metric (how many of the top results are relevant when several',
+            'documents could be) is deliberately absent: each retrieval golden today defines a',
+            'single expected document, so precision cannot be calculated honestly from this set.',
+            'Multi-document goldens are future work — the metric is omitted rather than faked.',
+        );
     }
 
     lines.push(
