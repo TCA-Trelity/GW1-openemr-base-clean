@@ -99,6 +99,9 @@ afterEach(() => {
     vi.unstubAllGlobals();
     // Selection pushes ?patient= — reset so the next test starts without a deep link.
     window.history.replaceState(null, '', '/');
+    // U.1: successful mints persist the demo token per tab — clear so auth state never
+    // leaks across tests.
+    window.sessionStorage.clear();
 });
 
 describe('App auth (role switcher, AZ4)', () => {
@@ -163,6 +166,147 @@ describe('App auth (role switcher, AZ4)', () => {
         render(<App />);
         await screen.findByText(/Margaret/);
         expect(screen.queryByRole('radio', { name: 'Physician' })).not.toBeInTheDocument();
+    });
+});
+
+describe('Demo-auth persistence (U.1)', () => {
+    // Failure mode: a page refresh silently logs the tab out — the minted token lived only
+    // in React state, so the boot reads ran tokenless and 401'd until a fresh mint.
+    it('restores the demo token + role from sessionStorage on boot and sends the bearer on boot reads', async () => {
+        window.sessionStorage.setItem(
+            'copilot.demo-auth',
+            JSON.stringify({ token: 'tok-restored', role: 'nurse', patient: 'margaret-chen' }),
+        );
+        const patientsAuthHeaders: Array<string | null> = [];
+        stubFetch((url, init) => {
+            if (url.includes('/api/dev-login')) {
+                return { status: 200, body: { access_token: 'tok-fresh-nurse' } };
+            }
+            if (url.includes('/api/me')) {
+                return {
+                    status: 200,
+                    body: { authenticated: true, role: 'nurse', capabilities: { read: true, triggerPrep: false, verify: false } },
+                };
+            }
+            if (url.includes('/api/patients')) {
+                patientsAuthHeaders.push(new Headers(init?.headers).get('authorization'));
+                return { status: 200, body: { patients } };
+            }
+            if (url.includes('/api/overview/')) {
+                return { status: 200, body: overviewPayload };
+            }
+            if (url.includes('/api/facts/')) {
+                return { status: 200, body: factBundle };
+            }
+            if (url.includes('/api/brief/')) {
+                return { status: 200, body: storedBrief };
+            }
+            if (url.includes('/api/prep-runs/')) {
+                return { status: 200, body: { runs: [] } };
+            }
+            return undefined;
+        });
+        render(<App />);
+        // Authed state renders with the STORED role selected (not the physician default).
+        expect(await screen.findByRole('radio', { name: 'Nurse' })).toHaveAttribute('aria-checked', 'true');
+        expect(await screen.findByText(/Read-only role/i)).toBeInTheDocument();
+        // The boot-time schedule read carried the restored bearer instead of running tokenless.
+        expect(patientsAuthHeaders[0]).toBe('Bearer tok-restored');
+    });
+
+    // Failure mode: dev-login gets disabled (or rejects) but a stale stored token keeps the
+    // tab rendering as signed-in — the failed mint must clear the stored auth.
+    it('clears the stored token when dev-login answers disabled', async () => {
+        window.sessionStorage.setItem(
+            'copilot.demo-auth',
+            JSON.stringify({ token: 'tok-stale', role: 'physician', patient: 'margaret-chen' }),
+        );
+        stubApp(); // dev-login 404 (disabled)
+        render(<App />);
+        await screen.findByText(/Margaret/);
+        await waitFor(() => expect(window.sessionStorage.getItem('copilot.demo-auth')).toBeNull());
+        expect(screen.queryByRole('radio', { name: 'Physician' })).not.toBeInTheDocument();
+    });
+});
+
+describe('Upload completion refresh (U.1)', () => {
+    // Failure modes: the Sources list only shows a completed upload after a full page
+    // reload, or the refetch path unmounts the upload card and wipes the completion
+    // state (the old reload-nonce wiring blanked the whole tab panel into a loading flash).
+    it('refetches the facts bundle in place on completion — the new document lists and the completion card stays mounted', async () => {
+        window.history.replaceState(null, '', '?patient=margaret-chen&tab=sources');
+        const uploadedDoc = {
+            id: 'doc-upload-fbc0385ca41a',
+            document_type: 'lab_report',
+            document_date: '2026-07-16',
+            content: { format: 'text', text_content: 'eGFR (CKD-EPI) 42' },
+            metadata: { original_filename: 'renal-panel-clean.pdf' },
+        };
+        const ingestionRecord = {
+            id: 'ing-u1',
+            patient_id: 'margaret-chen',
+            doc_type: 'lab_pdf',
+            filename: 'renal-panel-clean.pdf',
+            status: 'complete',
+            stages: [
+                { stage: 'received', at: 't0' },
+                { stage: 'persisted', at: 't1', detail: '9 facts' },
+                { stage: 'complete', at: 't2' },
+            ],
+            source_document_id: 'doc-upload-fbc0385ca41a',
+            grounding: { total: 9, word_box: 9, page: 0, unverified: 0, confidence: 1 },
+            facts_persisted: 9,
+            vitals_written: false,
+            error: null,
+        };
+        let factsCalls = 0;
+        stubFetch((url, init) => {
+            if (url.includes('/api/dev-login')) {
+                return { status: 404, body: { error: 'dev_login_disabled' } };
+            }
+            if (url.includes('/api/me')) {
+                return { status: 200, body: { authenticated: false } };
+            }
+            if (url.includes('/documents') && init?.method === 'POST') {
+                return { status: 202, body: { ingestion_id: 'ing-u1' } };
+            }
+            if (url.includes('/api/ingestions/ing-u1')) {
+                return { status: 200, body: ingestionRecord };
+            }
+            if (url.includes('/api/patients')) {
+                return { status: 200, body: { patients } };
+            }
+            if (url.includes('/api/overview/')) {
+                return { status: 200, body: overviewPayload };
+            }
+            if (url.includes('/api/facts/')) {
+                factsCalls += 1;
+                return {
+                    status: 200,
+                    body: factsCalls === 1 ? factBundle : { ...factBundle, documents: [...(factBundle.documents ?? []), uploadedDoc] },
+                };
+            }
+            if (url.includes('/api/brief/')) {
+                return { status: 200, body: storedBrief };
+            }
+            if (url.includes('/api/prep-runs/')) {
+                return { status: 200, body: { runs: [] } };
+            }
+            return undefined;
+        });
+        render(<App />);
+
+        // The upload card rides the Sources tab; the new document is not listed yet.
+        fireEvent.change(await screen.findByLabelText('Choose document file'), {
+            target: { files: [new File([new Uint8Array([1])], 'renal-panel-clean.pdf', { type: 'application/pdf' })] },
+        });
+
+        // Completion renders AND the document appears — no reload, second facts fetch only.
+        await screen.findByTestId('ingestion-complete');
+        expect((await screen.findAllByText('renal-panel-clean.pdf')).length).toBeGreaterThanOrEqual(1);
+        expect(factsCalls).toBe(2);
+        // The in-place refresh never unmounted the card mid-read.
+        expect(screen.getByTestId('ingestion-complete')).toBeInTheDocument();
     });
 });
 

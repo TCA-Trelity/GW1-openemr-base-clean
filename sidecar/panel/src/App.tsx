@@ -8,7 +8,7 @@
 // widths as a persistent pane the content shifts aside for (drawer on narrow screens),
 // and ask-about-this affordances on Overview, Imaging, and AI Insights seed turns into
 // the same persisted conversation.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import {
     devLogin,
@@ -62,6 +62,60 @@ function tabFromUrl(): TabId {
     return TABS.some((tab) => tab.id === requested) ? (requested as TabId) : 'overview';
 }
 
+// ---- Demo-auth persistence (U.1) ----
+// A refresh used to silently log the tab out: the minted token lived only in React state,
+// so every read after reload 401'd. The token + role/patient persist per tab and restore on
+// boot (mirrors ChatDrawer's conversation persistence). SECURITY: this holds the demo
+// dev-login token ONLY — never a SMART launch token — and it uses sessionStorage (per-tab,
+// gone when the tab closes), not localStorage, by design.
+const AUTH_STORAGE_KEY = 'copilot.demo-auth';
+
+interface StoredDemoAuth {
+    token: string;
+    role: ClinicalRole;
+    patient: string | null;
+}
+
+function isClinicalRole(value: unknown): value is ClinicalRole {
+    return value === 'physician' || value === 'nurse' || value === 'resident';
+}
+
+function readStoredDemoAuth(): StoredDemoAuth | null {
+    try {
+        const raw = window.sessionStorage.getItem(AUTH_STORAGE_KEY);
+        if (raw === null) {
+            return null;
+        }
+        const parsed: unknown = JSON.parse(raw);
+        if (typeof parsed !== 'object' || parsed === null) {
+            return null;
+        }
+        const { token, role, patient } = parsed as Record<string, unknown>;
+        if (typeof token !== 'string' || !isClinicalRole(role)) {
+            return null;
+        }
+        return { token, role, patient: typeof patient === 'string' ? patient : null };
+    } catch {
+        return null;
+    }
+}
+
+function writeStoredDemoAuth(auth: StoredDemoAuth): void {
+    try {
+        window.sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
+    } catch {
+        // Best-effort: without storage the tab simply re-mints on refresh, as before.
+    }
+}
+
+function clearStoredDemoAuth(): void {
+    try {
+        window.sessionStorage.removeItem(AUTH_STORAGE_KEY);
+    } catch {
+        // Best-effort — see writeStoredDemoAuth.
+    }
+}
+
 export default function App() {
     const [patientId, setPatientId] = useState<string | null>(patientIdFromUrl);
     const [patientsState, setPatientsState] = useState<PatientsFetchResult | { kind: 'loading' }>({ kind: 'loading' });
@@ -88,8 +142,17 @@ export default function App() {
         setActiveTab('imaging');
     }, []);
     // Auth (Wave AZ): the demo role, whether dev-login is active, and the current capabilities.
-    const [role, setRole] = useState<ClinicalRole>('physician');
-    const [authActive, setAuthActive] = useState(false);
+    // U.1: both restore from sessionStorage so a refresh keeps the session — the restored
+    // token covers the boot-time reads; the load effect still re-mints per patient/role.
+    const [role, setRole] = useState<ClinicalRole>(() => readStoredDemoAuth()?.role ?? 'physician');
+    const [authActive, setAuthActive] = useState<boolean>(() => {
+        const stored = readStoredDemoAuth();
+        if (stored === null) {
+            return false;
+        }
+        setAuthToken(stored.token); // set before the first fetch effects run
+        return true;
+    });
     const [capabilities, setCapabilities] = useState<AuthCapabilities | null>(null);
 
     const loadPatients = useCallback(async () => {
@@ -140,6 +203,9 @@ export default function App() {
             }
             if (auth.ok) {
                 setAuthToken(auth.token);
+                // U.1: persist the fresh mint per tab — a refresh restores it instead of
+                // logging the user out. Role/patient switches overwrite it in place.
+                writeStoredDemoAuth({ token: auth.token, role, patient: patientId });
                 setAuthActive(true);
                 const me = await fetchMe();
                 if (cancelled) {
@@ -148,6 +214,7 @@ export default function App() {
                 setCapabilities(me?.capabilities ?? null);
             } else {
                 setAuthToken(null);
+                clearStoredDemoAuth(); // dev-login off or rejected — never keep a stale token
                 setAuthActive(false);
                 setCapabilities(null);
             }
@@ -206,6 +273,30 @@ export default function App() {
         },
         [patientId],
     );
+
+    // U.1: a completed upload must appear under Sources immediately. Refetch the facts
+    // bundle (documents/facts) plus the overview it feeds IN PLACE — no loading state, no
+    // unmount — so the upload card's completion panel (incl. the dedupe notice) stays on
+    // screen instead of vanishing into a page-wide reload. Errors keep the last good state.
+    const patientIdRef = useRef(patientId);
+    useEffect(() => {
+        patientIdRef.current = patientId;
+    }, [patientId]);
+    const refetchFacts = useCallback(async () => {
+        if (patientId === null) {
+            return;
+        }
+        const [overviewResult, factsResult] = await Promise.all([fetchOverview(patientId), fetchFacts(patientId)]);
+        if (patientIdRef.current !== patientId) {
+            return; // patient switched mid-flight — the load effect owns the fresh state
+        }
+        if (overviewResult.kind === 'ready') {
+            setOverviewState(overviewResult);
+        }
+        if (factsResult.kind === 'ready') {
+            setFactsState(factsResult);
+        }
+    }, [patientId]);
 
     const overview = overviewState.kind === 'ready' ? overviewState.overview : null;
     // The insights state machine is shared by the header control and the AI Insights tab.
@@ -381,7 +472,7 @@ export default function App() {
                                                 onClearFocus={() => setSourceFocus(null)}
                                                 patientId={patientId ?? undefined}
                                                 facts={factsState.kind === 'ready' ? factsState.bundle.facts : []}
-                                                onIngested={() => setReloadNonce((nonce) => nonce + 1)}
+                                                onIngested={() => void refetchFacts()}
                                             />
                                         </>
                                     )}

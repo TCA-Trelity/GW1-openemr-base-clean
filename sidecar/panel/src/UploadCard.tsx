@@ -4,7 +4,7 @@
 // Write-path auth hardening (dev bearer + role gate on the server) is ticket E.3; the
 // card itself is role-agnostic demo surface until then.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CheckCircle2, CloudUpload, FileUp, Loader2, ScanSearch, ShieldAlert, XCircle } from 'lucide-react';
+import { CheckCircle2, CloudUpload, CopyCheck, FileUp, Loader2, ScanSearch, ShieldAlert, XCircle } from 'lucide-react';
 import { fetchIngestion, uploadDocument, type IngestionRecordView } from './api';
 import { Card } from './ui';
 
@@ -14,6 +14,13 @@ const POLL_LIMIT = 120; // ~84 s ceiling — ingestion p95 budget is 90 s/doc (G
 
 function isTerminal(status: string): boolean {
     return TERMINAL_PREFIXES.some((prefix) => status.startsWith(prefix));
+}
+
+/** U.1: the EHR write dedupes byte-identical files — the record says so in a stage detail
+ *  (`stored_ehr — deduped: byte-identical document already filed`). That run must read as
+ *  "already on file", not as a fresh completion (manual test plan A3). */
+function isDeduped(record: IngestionRecordView): boolean {
+    return record.stages.some((stage) => stage.detail !== undefined && stage.detail.includes('deduped'));
 }
 
 /** Friendly stage labels — the record's stage names, humanized (order preserved). */
@@ -186,7 +193,23 @@ export default function UploadCard({ patientId, onIngested, onPreview }: UploadC
                         )}
                     </ol>
 
-                    {phase.kind === 'done' && record !== null && record.status === 'complete' && (
+                    {/* U.1: a deduped EHR write is NOT a fresh ingestion — say so, visually distinct. */}
+                    {phase.kind === 'done' && record !== null && record.status === 'complete' && isDeduped(record) && (
+                        <div className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900 space-y-1" data-testid="ingestion-deduped">
+                            <p className="font-semibold flex items-center gap-1.5">
+                                <CopyCheck className="w-3.5 h-3.5" /> We already have this exact document on file — showing the existing copy
+                            </p>
+                            <p>No duplicate was filed to the chart; its {record.facts_persisted} extracted fact(s) are up to date.</p>
+                            <button
+                                type="button"
+                                onClick={() => onPreview(record)}
+                                className="inline-flex items-center gap-1.5 mt-1 px-2 py-1 rounded-md bg-white border border-sky-300 text-sky-800 font-medium hover:bg-sky-100"
+                            >
+                                <ScanSearch className="w-3.5 h-3.5" /> View document with citation overlay
+                            </button>
+                        </div>
+                    )}
+                    {phase.kind === 'done' && record !== null && record.status === 'complete' && !isDeduped(record) && (
                         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 space-y-1" data-testid="ingestion-complete">
                             <p className="font-semibold flex items-center gap-1.5">
                                 <CheckCircle2 className="w-3.5 h-3.5" /> Extraction complete — {record.facts_persisted} fact(s) persisted
