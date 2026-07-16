@@ -338,6 +338,10 @@ function sourceDocumentOf(record: IngestionRecord, pdf: PdfWords, input: AttachA
             openemr_document_id: record.openemr_document_id,
             mime_type: input.mimeType,
             correlation_id: record.correlation_id,
+            // U.1: the panel titles documents from metadata.original_filename — without it
+            // an upload renders in Sources as its raw doc-upload-<hash> id. Only new and
+            // re-run ingestions carry it (no backfill of already-persisted rows).
+            original_filename: input.filename,
         },
     };
 }

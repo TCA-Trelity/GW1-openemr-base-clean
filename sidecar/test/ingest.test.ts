@@ -166,9 +166,14 @@ describe('IngestionService end-to-end (A.3/A.6, stubbed VLM over the real fixtur
         expect(record.grounding?.word_box).toBeGreaterThan(0);
         expect(record.facts_persisted).toBe(3); // three lab_result facts
         expect(sink.wipeEhrSnapshot).toHaveBeenCalledWith('margaret-chen', record.source_document_id);
-        // Source document stores the text layer — the gate's verification substrate.
-        const doc = sink.insertSourceDocuments.mock.calls[0]?.[1]?.[0] as { content: { text_content: string } };
+        // Source document stores the text layer — the gate's verification substrate —
+        // plus the original filename the panel titles the document with (U.1).
+        const doc = sink.insertSourceDocuments.mock.calls[0]?.[1]?.[0] as {
+            content: { text_content: string };
+            metadata: { original_filename: string };
+        };
         expect(doc.content.text_content).toContain('eGFR');
+        expect(doc.metadata.original_filename).toBe('renal-panel-clean.pdf');
     });
 
     it('emits one extraction_field_outcome event per field — positional labels, no extracted values (G5)', async () => {

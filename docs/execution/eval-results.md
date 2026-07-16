@@ -4,8 +4,8 @@
 > (suite: `sidecar/eval/`). Committed as a deliverable and refreshed on every run;
 > CI regenerates and uploads it as an artifact on every push touching `sidecar/**`.
 
-- **Generated:** 2026-07-15T17:21:40.221Z
-- **Commit:** `5a27da350b81971f585659393923a2669c619aad` (workspace HEAD at generation time; in CI, the pushed commit)
+- **Generated:** 2026-07-16T13:22:04.262Z
+- **Commit:** `a604507113e01404b71beea5cf9b3721004cba3b` (workspace HEAD at generation time; in CI, the pushed commit)
 - **Result:** 58/58 evals passed
 
 ## Results

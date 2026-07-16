@@ -95,9 +95,44 @@ describe('UploadCard (E.1)', () => {
         expect(onIngested).toHaveBeenCalledTimes(1);
         expect(screen.getByText(/3 fact\(s\) persisted/)).toBeInTheDocument();
         expect(screen.getByText(/3 tight \/ 0 page-level \/ 1 not\s+located/)).toBeInTheDocument();
+        // A fresh run never wears the dedupe state (U.1).
+        expect(screen.queryByTestId('ingestion-deduped')).not.toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('button', { name: /View document with citation overlay/ }));
         expect(onPreview).toHaveBeenCalledWith(expect.objectContaining({ id: 'ing-abc' }));
+    });
+
+    // U.1 / manual test plan A3: a deduped EHR write must read as "already on file", not
+    // as a fresh slow run — distinct state, and the refetch callback still fires so the
+    // existing copy surfaces in Sources.
+    it('renders the already-on-file state (not fresh completion) when a stage deduped, still firing onIngested once', async () => {
+        uploadDocument.mockResolvedValue({ ok: true, ingestionId: 'ing-dedupe' });
+        fetchIngestion.mockResolvedValue(
+            record({
+                id: 'ing-dedupe',
+                stages: [
+                    { stage: 'received', at: 't0' },
+                    { stage: 'stored_ehr', at: 't1', detail: 'deduped: byte-identical document already filed' },
+                    { stage: 'complete', at: 't2' },
+                ],
+                facts_persisted: 9,
+            }),
+        );
+        const onIngested = vi.fn();
+        render(<UploadCard patientId="pt-1" onIngested={onIngested} onPreview={vi.fn()} />);
+        fireEvent.change(screen.getByLabelText('Choose document file'), {
+            target: { files: [new File([new Uint8Array([7])], 'renal.pdf', { type: 'application/pdf' })] },
+        });
+        const panel = await screen.findByTestId('ingestion-deduped');
+        expect(panel).toHaveTextContent(/already have this exact document on file/i);
+        expect(panel).toHaveTextContent(/showing the existing copy/i);
+        // Distinct from a fresh completion: no emerald panel, no "persisted" headline.
+        expect(screen.queryByTestId('ingestion-complete')).not.toBeInTheDocument();
+        expect(screen.queryByText(/fact\(s\) persisted/)).not.toBeInTheDocument();
+        // The completion callback fires exactly once — Sources refreshes to the existing copy.
+        expect(onIngested).toHaveBeenCalledTimes(1);
+        // The citation overlay stays reachable on the existing document.
+        expect(screen.getByRole('button', { name: /View document with citation overlay/ })).toBeInTheDocument();
     });
 
     it('renders the patient-mismatch block loudly and persists nothing quietly', async () => {
