@@ -6,7 +6,7 @@
 // Write-path auth hardening (dev-login bearer + role) is ticket E.3; AUTH_MODE=off demo
 // keeps these open like every other route until then.
 import multipart from '@fastify/multipart';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { capabilitiesFor } from '../auth/principal.js';
 import { DocTypeSchema } from '../schemas/extraction.js';
@@ -24,6 +24,21 @@ export interface IngestRouteDeps {
     maxFileBytes?: number;
     /** Preview cache for the panel's bbox overlay (E.2). Defaults to an in-memory cache. */
     files?: UploadFileStore;
+    /** Enforce per-patient ownership on the id-keyed ingestion routes (true when AUTH_MODE=enforced).
+     *  The global PEP only cross-patient-checks routes with a `:patientId` param; `/api/ingestions/:id`
+     *  and `/:id/file` are keyed by a content-hash id, so the check is applied here instead. Off/demo
+     *  mode leaves them open, exactly like the PEP (attach-only, never reject). */
+    enforcePatientScope?: boolean;
+}
+
+/** Mirror the PEP's cross-patient block for the id-keyed ingestion routes (enforced mode only). */
+function crossPatientViolation(deps: IngestRouteDeps, request: FastifyRequest, recordPatientId: string | undefined): boolean {
+    if (deps.enforcePatientScope !== true) {
+        return false; // off/demo mode: attach-only, never reject (matches the PEP)
+    }
+    const bound = request.principal?.patient ?? null;
+    // In enforced mode the PEP has already guaranteed a bound principal; deny if ownership is unprovable.
+    return bound === null || recordPatientId === undefined || bound !== recordPatientId;
 }
 
 /** Recently-uploaded originals, served back for the panel's citation overlay (E.2).
@@ -135,6 +150,9 @@ export function registerIngestRoutes(app: FastifyInstance, deps?: IngestRouteDep
         if (record === undefined) {
             return reply.status(404).send({ error: 'unknown ingestion id' });
         }
+        if (crossPatientViolation(deps, request, record.patient_id)) {
+            return reply.status(403).send({ error: 'forbidden', reason: 'cross_patient' });
+        }
         return reply.send(record);
     });
 
@@ -150,6 +168,11 @@ export function registerIngestRoutes(app: FastifyInstance, deps?: IngestRouteDep
             return reply.status(404).send({
                 error: 'file not in the preview cache (evicted or uploaded before last restart) — the stored original lives in OpenEMR Documents',
             });
+        }
+        // Owner check: the file cache holds no patient, so resolve the ingestion record to confirm the
+        // caller owns this file before serving the bytes (enforced mode; deny if the record is gone).
+        if (crossPatientViolation(deps, request, deps.records.get(request.params.id)?.patient_id)) {
+            return reply.status(403).send({ error: 'forbidden', reason: 'cross_patient' });
         }
         return reply.header('content-type', entry.mimeType).header('cache-control', 'private, max-age=300').send(entry.bytes);
     });

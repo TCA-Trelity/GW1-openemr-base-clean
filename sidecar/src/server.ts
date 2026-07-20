@@ -321,6 +321,7 @@ export function buildDeps(config: Config): AppDeps | undefined {
         ingest: {
             service: ingestionService,
             records: ingestionRecords,
+            enforcePatientScope: authMode === 'enforced',
             expectedPatientOf: async (patientId) => {
                 const bundle = await store.getFactBundle(patientId);
                 return bundle === null ? undefined : { name: bundle.patient.name };
