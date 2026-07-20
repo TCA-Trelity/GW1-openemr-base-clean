@@ -21,6 +21,7 @@ import { OpenEmrAuthClient } from './openemr/auth.js';
 import { FhirClient } from './openemr/fhir.js';
 import { loadConfig, type Config } from './config.js';
 import { CircuitBreaker, type BreakerState } from './lib/circuitBreaker.js';
+import { registerRateLimit } from './lib/rateLimiter.js';
 import { LangfuseTracer } from './obs/langfuse.js';
 import { tracingGraphLogger } from './obs/graphTracer.js';
 import { AnthropicClient } from './prep/anthropic.js';
@@ -321,6 +322,7 @@ export function buildDeps(config: Config): AppDeps | undefined {
         ingest: {
             service: ingestionService,
             records: ingestionRecords,
+            enforcePatientScope: authMode === 'enforced',
             expectedPatientOf: async (patientId) => {
                 const bundle = await store.getFactBundle(patientId);
                 return bundle === null ? undefined : { name: bundle.patient.name };
@@ -345,6 +347,11 @@ export function buildServer(config: Config, deps?: AppDeps): FastifyInstance {
     // Authorization first: decorates request.principal and installs the global PEP preHandler
     // (a no-op in 'off' mode) before any route is registered, so every /api route is guarded.
     registerAuth(app, deps?.auth);
+
+    // Per-caller rate limit on the expensive LLM/write routes — after auth so it can key on the
+    // bound principal. Bounds a single caller's request rate so one client cannot exhaust the shared
+    // LLM budget and deny the assistant to everyone (economic-DoS defense).
+    registerRateLimit(app, { max: config.RATE_LIMIT_MAX, windowMs: config.RATE_LIMIT_WINDOW_MS });
 
     registerHealthRoutes(
         app,

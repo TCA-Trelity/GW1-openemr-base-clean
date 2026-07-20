@@ -192,6 +192,62 @@ describe('POST /api/patients/:patientId/documents', () => {
     });
 });
 
+// AgentForge red-team finding (cross-patient PHI): the id-keyed ingestion routes escape the PEP's
+// :patientId cross-patient check because they are keyed by a content-hash id. In enforced mode they
+// must confirm the caller owns the ingestion before serving the record OR the cached file.
+async function makeEnforcedApp() {
+    const records = new MemoryIngestionRecordStore();
+    const service = new IngestionService({ extractor: new VlmExtractor(stubVlm()), records });
+    const retriever = await HybridRetriever.build(loadCorpusChunks(CORPUS), {
+        embeddings: new HashEmbeddings(),
+        reranker: new PassthroughReranker(),
+    });
+    const config = loadConfig({ NODE_ENV: 'test' });
+    const devTokens = new DevTokenService({ secret: 'ingest-xpatient-secret-0123456789abcdef' });
+    const app = buildServer(config, {
+        checkPostgres: async () => undefined,
+        runMigrations: async () => [],
+        prep: {} as never,
+        overview: {} as never,
+        chat: {} as never,
+        ingest: { service, records, enforcePatientScope: true },
+        evidence: { retriever },
+        auth: { mode: 'enforced', verifier: devTokens },
+    });
+    return { app, devTokens };
+}
+
+describe('id-keyed ingestion routes enforce per-patient ownership (enforced mode)', () => {
+    // Failure mode: a token bound to patient A reads patient B's ingestion record or original file
+    // by guessing/knowing the content-hash id — the PEP never saw a :patientId to reject.
+    it("a token bound to A cannot read B's ingestion record or file (403 cross_patient); the owner can", async () => {
+        const { app, devTokens } = await makeEnforcedApp();
+        const owner = bearer(devTokens, 'physician', 'margaret-chen');
+        const other = bearer(devTokens, 'physician', 'tren-okafor');
+
+        const { payload, headers } = multipart(
+            { doc_type: 'lab_pdf' },
+            { name: 'file', filename: 'renal.pdf', contentType: 'application/pdf', data: pdfBytes },
+        );
+        const upload = await app.inject({ method: 'POST', url: '/api/patients/margaret-chen/documents', payload, headers: { ...headers, ...owner } });
+        expect(upload.statusCode).toBe(202);
+        const { ingestion_id } = upload.json() as { ingestion_id: string };
+
+        // Owner reads the record and the file → 200.
+        expect((await app.inject({ method: 'GET', url: `/api/ingestions/${ingestion_id}`, headers: owner })).statusCode).toBe(200);
+        expect((await app.inject({ method: 'GET', url: `/api/ingestions/${ingestion_id}/file`, headers: owner })).statusCode).toBe(200);
+
+        // Cross-patient reads of the record AND the cached file → 403 cross_patient (the fix).
+        const crossRecord = await app.inject({ method: 'GET', url: `/api/ingestions/${ingestion_id}`, headers: other });
+        expect(crossRecord.statusCode).toBe(403);
+        expect(crossRecord.json()).toMatchObject({ reason: 'cross_patient' });
+        const crossFile = await app.inject({ method: 'GET', url: `/api/ingestions/${ingestion_id}/file`, headers: other });
+        expect(crossFile.statusCode).toBe(403);
+        expect(crossFile.json()).toMatchObject({ reason: 'cross_patient' });
+        await app.close();
+    });
+});
+
 describe('POST /api/evidence/search', () => {
     it('serves grounded snippets for an in-corpus query and empty for out-of-domain', async () => {
         const { app } = await makeApp();
