@@ -46,6 +46,10 @@ const EnvSchema = z.object({
     // and default to the pinned Haiku 4.5 tier ($1 in / $5 out per million tokens) —
     // override via env when pricing or the pinned model changes.
     LLM_DAILY_BUDGET_USD: z.coerce.number().positive().default(5).catch(orWarn(5, 'LLM_DAILY_BUDGET_USD')),
+    // Per-caller rate limit on the expensive LLM/write POST routes (chat, prep, document upload):
+    // one client cannot flood the assistant and exhaust the shared daily budget for everyone.
+    RATE_LIMIT_MAX: z.coerce.number().int().positive().default(60).catch(orWarn(60, 'RATE_LIMIT_MAX')),
+    RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000).catch(orWarn(60_000, 'RATE_LIMIT_WINDOW_MS')),
     // Per-call output ceiling. Extraction is per-document now, so one call's output is
     // bounded by one document's facts — 8K is generous headroom, and hitting it means
     // something degenerate (fail fast + one fresh retry, never feedback-retry truncation).
