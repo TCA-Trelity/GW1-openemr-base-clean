@@ -13,6 +13,7 @@
 //     the flag routes to the people who fix the prompt.
 import type { ChatCitation } from './chatCitations.js';
 import { lintPrescriptiveness, type PrescriptivenessFlag } from './prescriptivenessLint.js';
+import { lintSystemPromptLeak } from './systemPromptLeakLint.js';
 
 /** The slice of the app logger the gate needs (PrepLogger satisfies it structurally). */
 export interface GateLogger {
@@ -97,6 +98,12 @@ export function screenOutboundText(
             },
             'chat reply flagged by prescriptiveness lint',
         );
+    }
+    // AgentForge finding (system-prompt leak): a reply reciting the co-pilot's own hard rules is a
+    // leak — deterministically detected at this single outbound choke point and surfaced for alerting.
+    const leak = lintSystemPromptLeak(text);
+    if (leak.leaked) {
+        logger.warn({ ...context, leak_markers: leak.markers }, 'chat reply leaked system-prompt instructions');
     }
     return flags;
 }

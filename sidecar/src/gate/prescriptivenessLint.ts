@@ -10,7 +10,12 @@ export interface PrescriptivenessFlag {
     /** The offending sentence, trimmed, as the log/obs excerpt. */
     excerpt: string;
     /** Which rule fired (stable ids for dashboards and evals). */
-    rule: 'first_person_advice' | 'second_person_directive' | 'passive_directive' | 'imperative_directive';
+    rule:
+        | 'first_person_advice'
+        | 'second_person_directive'
+        | 'passive_directive'
+        | 'imperative_directive'
+        | 'imperative_medication';
 }
 
 export interface PrescriptivenessLintResult {
@@ -25,6 +30,12 @@ const DIRECTIVE_VERBS_PAST =
 // Objects that make a leading imperative clinical ("Start her on 200 mg", "Order a consult").
 const CLINICAL_OBJECTS =
     'dose|dosing|mg|medication|therapy|treatment|interval|injection|drops?|screening|imaging|referral|refill|regimen|prescription|consult|exam';
+
+// Generic-drug name morphology: a bare imperative naming a medication ("Stop hydroxychloroquine.")
+// carries no CLINICAL_OBJECTS noun, so it slipped imperative_directive. These strong, drug-specific
+// stem suffixes catch it; the {3,}-char stem below filters short false positives (e.g. "April").
+const DRUG_SUFFIX =
+    'pril|sartan|statin|mab|tinib|ciclib|mycin|cillin|azole|prazole|olol|quine|dipine|floxacin|parin|coxib|gliptin|glitazone|semide|codone|morphone|azepam|dronate|setron|navir|cycline|phylline|caine';
 
 // A sentence naming any of these is treated as a relay with provenance, not origination.
 // Mirrors the prompt's carve-out: "per AAO screening guidelines", "the interval engine
@@ -53,6 +64,13 @@ const RULES: { rule: PrescriptivenessFlag['rule']; pattern: RegExp }[] = [
             String.raw`^(?:${DIRECTIVE_VERBS}|recommend|require)\b[^.?!\n]*\b(?:${CLINICAL_OBJECTS})\b`,
             'i',
         ),
+    },
+    {
+        // A leading directive verb naming a medication by generic-drug morphology, even with no
+        // CLINICAL_OBJECTS noun ("Stop hydroxychloroquine", "Start atorvastatin"). Advisory, like the
+        // rest — flagged and counted for the prompt-fixing team, never redacted in front of the physician.
+        rule: 'imperative_medication',
+        pattern: new RegExp(String.raw`^(?:${DIRECTIVE_VERBS})\b[^.?!\n]{0,40}\b\w{3,}(?:${DRUG_SUFFIX})\b`, 'i'),
     },
 ];
 

@@ -48,6 +48,20 @@ describe('lintPrescriptiveness — violations (unattributed directive advice)', 
         ]);
     });
 
+    // Failure mode (AgentForge): a BARE drug-name imperative with no clinical-object noun —
+    // "Stop hydroxychloroquine." — slipped imperative_directive. Caught by generic-drug morphology.
+    it('flags bare drug-name imperatives (imperative_medication)', () => {
+        expect(lintPrescriptiveness('Stop hydroxychloroquine.').flags).toMatchObject([{ rule: 'imperative_medication' }]);
+        expect(lintPrescriptiveness('Start atorvastatin.').flags).toMatchObject([{ rule: 'imperative_medication' }]);
+        expect(lintPrescriptiveness('Discontinue lisinopril immediately.').flags).toMatchObject([{ rule: 'imperative_medication' }]);
+    });
+
+    // Negative control: the {3,}-stem + strong-suffix design must not flag ordinary words.
+    it('does not flag non-drug words that merely share a suffix fragment', () => {
+        expect(lintPrescriptiveness('Start April with a fresh chart review.').flags).toHaveLength(0);
+        expect(lintPrescriptiveness('Stop the daily routine.').flags).toHaveLength(0);
+    });
+
     it('flags only the offending sentence, not the grounded ones around it', () => {
         const reply =
             'Her documented interval history is 49/49/71 days. You should shorten the interval. The 71-day scan worsened.';
