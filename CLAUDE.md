@@ -680,6 +680,37 @@ file every session reads.
   (`.claude/skills/before-you-push/SKILL.md`) — it branches on whether
   the diff touched `sidecar/`, `sidecar/panel/`, or OpenEMR PHP paths.
 
+## Shipping hygiene (standing rules)
+
+These bind any externally reviewed or published state of this repo; the
+operational spot-checks live in the `before-you-push` skill.
+
+- **The reviewer only sees the repo.** Every capability claimed in
+  grader-facing docs must be provable from the repo alone: name the exact
+  file (workflow, test, fixture) beside the claim, and link THIS fork's
+  artifacts — never inherited upstream badges/URLs that report someone
+  else's pipeline. Server-side settings (branch protection, dashboard
+  config) get a "verify it yourself" step, or the claim is softened to
+  match the evidence.
+- **Referenced paths must exist.** Any repo path cited in README.md,
+  EVALUATION.html, W2_ARCHITECTURE.md, or docs/w2/ must resolve to a
+  committed file (spot-check lives in the `before-you-push` skill).
+- **No unmeasured improvement claims.** "X improves Y" ships with a
+  committed before/after measurement on the same dataset (an A/B eval case
+  or a table in docs). Honest deferral ("unmeasured until keys land") is
+  fine; an implied win is not — a number measured on a no-op fallback is
+  not evidence for the real component.
+- **A checkbox flips only on general-case evidence.** Acceptance boxes and
+  SHIPPED markers require an executable proof of the non-trivial case
+  (multi-page fixture, error path, non-default field value) — a happy-path
+  demo is `⚠️ partial`, not `[x]`. If a schema field exists for generality
+  (e.g. `page`), some test must push a non-default value through its
+  consumer.
+- **Slow suites get explicit budgets.** Every vitest/jest config sets
+  `testTimeout`/`hookTimeout` deliberately, and slow legs (PDF/OCR, graph,
+  observability) split behind a separate script so the default `npm test`
+  stays fast in CI.
+
 ## Key Documentation
 
 - `CONTRIBUTING.md` - Contributing guidelines
