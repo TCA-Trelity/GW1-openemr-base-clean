@@ -1,6 +1,6 @@
 ---
 name: before-you-push
-description: Pre-push checklist for this repo. Use before ANY git push. Branches on what the diff touched — sidecar/ (Node checks incl. the eval gate), sidecar/panel/ (panel leg), or OpenEMR PHP paths (container-based phpstan/phpcs/tests). Also enforces the eval-set maintenance rules (no expected-answer edits to force passes; re-baselines are separate labeled commits; the CT7 LLM-judge is informational-only). Trigger on "push", "pre-push", "ready to push", "ship this", or before ending a session with unpushed commits.
+description: Pre-push checklist for this repo. Use before ANY git push. Branches on what the diff touched — sidecar/ (Node checks incl. the eval gate), sidecar/panel/ (panel leg), or OpenEMR PHP paths (container-based phpstan/phpcs/tests). Also enforces the eval-set maintenance rules (no expected-answer edits to force passes; re-baselines are separate labeled commits; the CT7 LLM-judge is informational-only) and the standing shipping-hygiene checks (docs-path integrity, fork-scoped evidence, measured claims, general-case proof). Trigger on "push", "pre-push", "ready to push", "ship this", or before ending a session with unpushed commits.
 ---
 
 # Before you push
@@ -50,3 +50,27 @@ phpstan finding your own diff introduced.
 - Trackers ride the same commit as the code (build-status DATA block,
   requirements checkboxes, W2_ARCHITECTURE status markers).
 - Conventional commit + `--trailer "Assisted-by: Claude Code"`.
+- Docs integrity: every repo path the diff cites in the public docs
+  surfaces (README.md, EVALUATION.html, W2_ARCHITECTURE.md, docs/w2/)
+  resolves to a committed file — spot-check below.
+- Evidence points at THIS fork: no claim rides an upstream badge or URL; CI
+  claims name the workflow file (plus a run link where possible), and
+  server-side settings (branch protection) are stated as claims with a
+  verify-yourself step, not as facts.
+- New perf/quality claims carry a committed before/after measurement on the
+  same dataset — or an explicit "unmeasured" label. A no-op-fallback number
+  (e.g. passthrough rerank) is not evidence for the real component.
+- Flipped an acceptance checkbox or SHIPPED marker? It needs general-case
+  proof — a test, fixture, or eval case on the non-trivial input
+  (multi-page, error path, non-default field value), not the happy-path
+  demo.
+
+Rationale: CLAUDE.md "Shipping hygiene". Docs-integrity spot-check (run
+from repo root; eyeball the output — only real repo paths matter, external
+names are noise):
+
+```bash
+grep -rhoE '`[A-Za-z0-9_./-]+\.[A-Za-z0-9]{1,5}`' README.md W2_ARCHITECTURE.md docs/w2/*.md \
+  | tr -d '`' | sort -u \
+  | while read -r p; do [ -e "$p" ] || echo "MISSING: $p"; done
+```
