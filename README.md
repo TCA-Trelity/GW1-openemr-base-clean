@@ -129,6 +129,8 @@ Key-drop steps with verification: [`docs/internal/tickets/USER-ACTIONS.md`](docs
 | D7 | Cost & latency report | [`docs/COSTS.md`](docs/COSTS.md) §6, [`docs/execution/baselines.md`](docs/execution/baselines.md) |
 | D8 | Deployed app | URLs above |
 
+**Security — red-team loop closure:** [Red-Team Findings &amp; Remediation](docs/security/red-team-findings-and-remediation.html) — how each AgentForge red-team finding was discovered and remediated in this repo (commit · file · test), with validation.
+
 **Week 2 working docs:** [requirements register](docs/w2/requirements.md) ·
 [execution plan](docs/w2/execution-plan.md) ·
 [trace worked example](docs/w2/trace-example.md) ·
